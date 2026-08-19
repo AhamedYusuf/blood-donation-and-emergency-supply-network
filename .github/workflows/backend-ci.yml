@@ -1,0 +1,96 @@
+# Blood Donation Network
+
+A distributed blood donation and emergency supply network connecting donors,
+blood banks, organizations, requests, appointments, inventory management,
+and AI-powered workflows.
+
+## Project Structure
+
+### Backend
+
+ASP.NET Core backend using a layered architecture.
+
+- API
+- Application
+- Domain
+- Infrastructure
+
+### Agent Service
+
+Python-based AI agent service.
+
+Agents include:
+
+- Coordinator Agent
+- Eligibility Validation Agent
+- Stock Check Agent
+- Matching Dispatch Agent
+
+### Web
+
+React + Vite web application.
+
+### Mobile
+
+Flutter mobile application.
+
+### Infrastructure
+
+Docker Compose and deployment configuration.
+
+## Branching Strategy
+
+The project uses the following branch strategy:
+
+- production - production-ready code
+- development - shared development branch
+- dev/donor-registry - donor registry work
+- dev/blood-requests - blood request and workflow work
+- dev/inventory - inventory and organization work
+- dev/appointments - appointment work
+
+Feature branches should be merged into development through pull requests.
+
+Once the complete system has been tested and approved:
+
+development -> production
+"@ | Set-Content "README.md"
+
+# ============================================================
+# BASIC BACKEND CI
+# ============================================================
+
+@"
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - development
+      - production
+  pull_request:
+    branches:
+      - development
+      - production
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore backend/BloodDonationNetwork.sln
+
+      - name: Build
+        run: dotnet build backend/BloodDonationNetwork.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test backend/BloodDonationNetwork.sln --no-build --configuration Release
