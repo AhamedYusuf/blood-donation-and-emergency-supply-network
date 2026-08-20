@@ -1,0 +1,10 @@
+name: blood_donation_network
+description: Blood Donation Network mobile application.
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
