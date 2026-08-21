@@ -28,4 +28,27 @@ public class AppointmentsController : ControllerBase
 
         return Ok(result);
     }
+    [HttpGet("{id}")]
+public async Task<ActionResult<AppointmentResponseDto>> GetById(Guid id)
+{
+    var appointment = await _appointmentService.GetByIdAsync(id);
+
+    if (appointment is null)
+    {
+        return NotFound();
+    }
+
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+    var isOwner = appointment.DonorId == currentUserId;
+    var isStaffOrAdmin = currentUserRole is "Staff" or "Admin";
+
+    if (!isOwner && !isStaffOrAdmin)
+    {
+        return Forbid();
+    }
+
+    return Ok(appointment);
+}
 }

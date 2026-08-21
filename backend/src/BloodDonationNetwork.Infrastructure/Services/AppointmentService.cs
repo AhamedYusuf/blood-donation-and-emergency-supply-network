@@ -36,8 +36,13 @@ public class AppointmentService : IAppointmentService
         return MapToDto(appointment);
     }
 
-    public Task<AppointmentResponseDto?> GetByIdAsync(Guid id)
-        => throw new NotImplementedException();
+    public async Task<AppointmentResponseDto?> GetByIdAsync(Guid id)
+{
+    var appointment = await _context.DonationAppointments
+        .FirstOrDefaultAsync(a => a.Id == id);
+
+    return appointment is null ? null : MapToDto(appointment);
+}
 
     public Task<AppointmentResponseDto> UpdateStatusAsync(Guid id, UpdateAppointmentStatusDto dto)
         => throw new NotImplementedException();
