@@ -51,4 +51,41 @@ public async Task<ActionResult<AppointmentResponseDto>> GetById(Guid id)
 
     return Ok(appointment);
 }
+[HttpPut("{id}/status")]
+public async Task<IActionResult> UpdateStatus(Guid id, UpdateAppointmentStatusDto dto)
+{
+    var appointment = await _appointmentService.GetByIdAsync(id);
+
+    if (appointment is null)
+    {
+        return NotFound();
+    }
+
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+    var isOwner = appointment.DonorId == currentUserId;
+    var isStaffOrAdmin = currentUserRole is "Staff" or "Admin";
+
+    if (!isOwner && !isStaffOrAdmin)
+    {
+        return Forbid();
+    }
+
+    var validStatuses = new[] { "scheduled", "completed", "no_show", "cancelled" };
+    if (!validStatuses.Contains(dto.NewStatus))
+    {
+        return BadRequest(new { error = $"Invalid appointment status: '{dto.NewStatus}'" });
+    }
+
+    // Donors can only cancel their own appointment — not mark completed/no_show
+    if (isOwner && !isStaffOrAdmin && dto.NewStatus != "cancelled")
+    {
+        return BadRequest(new { error = "Donors may only cancel their own appointments." });
+    }
+
+    var result = await _appointmentService.UpdateStatusAsync(id, dto);
+    return Ok(result);
+}
+
 }

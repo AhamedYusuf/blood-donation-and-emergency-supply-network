@@ -37,15 +37,30 @@ public class AppointmentService : IAppointmentService
     }
 
     public async Task<AppointmentResponseDto?> GetByIdAsync(Guid id)
-{
-    var appointment = await _context.DonationAppointments
-        .FirstOrDefaultAsync(a => a.Id == id);
+    {
+        var appointment = await _context.DonationAppointments
+            .FirstOrDefaultAsync(a => a.Id == id);
 
-    return appointment is null ? null : MapToDto(appointment);
-}
+        return appointment is null ? null : MapToDto(appointment);
+    }
 
-    public Task<AppointmentResponseDto> UpdateStatusAsync(Guid id, UpdateAppointmentStatusDto dto)
-        => throw new NotImplementedException();
+    public async Task<AppointmentResponseDto> UpdateStatusAsync(Guid id, UpdateAppointmentStatusDto dto)
+    {
+        var appointment = await _context.DonationAppointments
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (appointment is null)
+        {
+            throw new KeyNotFoundException($"Appointment {id} not found.");
+        }
+
+        appointment.Status = ParseStatus(dto.NewStatus);
+        appointment.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(appointment);
+    }
 
     public Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId)
         => throw new NotImplementedException();
@@ -56,8 +71,7 @@ public class AppointmentService : IAppointmentService
     public Task<AppointmentResponseDto> CompleteAsync(Guid id, CompleteAppointmentDto dto)
         => throw new NotImplementedException();
 
-    // Private helper — converts the entity to the DTO shape, and is where
-    // the enum-to-lowercase-string fix I mentioned earlier actually lives.
+    // Private helper — converts the entity to the DTO shape.
     private static AppointmentResponseDto MapToDto(DonationAppointment appointment)
     {
         return new AppointmentResponseDto
@@ -67,10 +81,30 @@ public class AppointmentService : IAppointmentService
             OrganizationId = appointment.OrganizationId,
             RelatedWorkflowId = appointment.RelatedWorkflowId,
             ScheduledTime = appointment.ScheduledTime,
-            Status = appointment.Status.ToString().ToLowerInvariant(), // "Scheduled" -> "scheduled"
+            Status = MapStatusToString(appointment.Status),
             UnitsDonated = appointment.UnitsDonated,
             CreatedAt = appointment.CreatedAt,
             UpdatedAt = appointment.UpdatedAt
         };
     }
+
+    // Enum -> exact lowercase/snake_case string per Tech Doc §0.5
+    private static string MapStatusToString(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "scheduled",
+        AppointmentStatus.Completed => "completed",
+        AppointmentStatus.NoShow => "no_show",
+        AppointmentStatus.Cancelled => "cancelled",
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown appointment status")
+    };
+
+    // Reverse direction — client-sent string -> enum
+    private static AppointmentStatus ParseStatus(string status) => status switch
+    {
+        "scheduled" => AppointmentStatus.Scheduled,
+        "completed" => AppointmentStatus.Completed,
+        "no_show" => AppointmentStatus.NoShow,
+        "cancelled" => AppointmentStatus.Cancelled,
+        _ => throw new ArgumentException($"Invalid appointment status: '{status}'")
+    };
 }
