@@ -13,4 +13,6 @@ public class AppDbContext : DbContext
     public DbSet<Organization> Organizations => Set<Organization>();
 
     public DbSet<User> Users => Set<User>();
+
+    public DbSet<BloodRequest> BloodRequests => Set<BloodRequest>();
 }
