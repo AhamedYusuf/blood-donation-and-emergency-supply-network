@@ -62,12 +62,52 @@ public class AppointmentService : IAppointmentService
         return MapToDto(appointment);
     }
 
-    public Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId)
-        => throw new NotImplementedException();
+    public async Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId)
+{
+    var appointments = await _context.DonationAppointments
+        .Where(a => a.DonorId == donorId)
+        .OrderByDescending(a => a.ScheduledTime)
+        .ToListAsync();
 
-    public Task<List<AppointmentResponseDto>> GetUpcomingByOrganizationAsync(Guid organizationId, int page, int pageSize)
-        => throw new NotImplementedException();
+    return appointments.Select(MapToDto).ToList();
+}
 
+    public async Task<PagedResultDto<AppointmentResponseDto>> GetUpcomingByOrganizationAsync(
+    Guid organizationId, int page, int pageSize, Guid requestingUserId, bool isAdmin)
+{
+    if (!isAdmin)
+    {
+        var requestingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == requestingUserId);
+
+        if (requestingUser?.OrganizationId != organizationId)
+        {
+            throw new UnauthorizedAccessException(
+                "Staff may only view upcoming appointments for their own organization.");
+        }
+    }
+
+    var query = _context.DonationAppointments
+        .Where(a => a.OrganizationId == organizationId
+                 && a.ScheduledTime > DateTime.UtcNow
+                 && a.Status != AppointmentStatus.Cancelled)
+        .OrderBy(a => a.ScheduledTime);
+
+    var totalCount = await query.CountAsync();
+
+    var appointments = await query
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+
+    return new PagedResultDto<AppointmentResponseDto>
+    {
+        Items = appointments.Select(MapToDto).ToList(),
+        Page = page,
+        PageSize = pageSize,
+        TotalCount = totalCount
+    };
+}
     public Task<AppointmentResponseDto> CompleteAsync(Guid id, CompleteAppointmentDto dto)
         => throw new NotImplementedException();
 

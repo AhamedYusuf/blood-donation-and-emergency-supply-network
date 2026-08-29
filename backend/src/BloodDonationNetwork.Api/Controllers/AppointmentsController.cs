@@ -88,4 +88,43 @@ public async Task<IActionResult> UpdateStatus(Guid id, UpdateAppointmentStatusDt
     return Ok(result);
 }
 
+[HttpGet("donor/{donorId}")]
+public async Task<ActionResult<List<AppointmentResponseDto>>> GetByDonor(Guid donorId)
+{
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+    var isSelf = donorId == currentUserId;
+    var isAdmin = currentUserRole == "Admin";
+
+    if (!isSelf && !isAdmin)
+    {
+        return Forbid();
+    }
+
+    var appointments = await _appointmentService.GetByDonorAsync(donorId);
+    return Ok(appointments);
+}
+
+[HttpGet("bloodbank/{orgId}/upcoming")]
+[Authorize(Roles = "Staff,Admin")]
+public async Task<ActionResult<PagedResultDto<AppointmentResponseDto>>> GetUpcomingByOrganization(
+    Guid orgId, int page = 1, int pageSize = 20)
+{
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+    var isAdmin = currentUserRole == "Admin";
+
+    try
+    {
+        var result = await _appointmentService.GetUpcomingByOrganizationAsync(
+            orgId, page, pageSize, currentUserId, isAdmin);
+        return Ok(result);
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Forbid();
+    }
+}
+
 }

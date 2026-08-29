@@ -8,6 +8,7 @@ public interface IAppointmentService
     Task<AppointmentResponseDto?> GetByIdAsync(Guid id);
     Task<AppointmentResponseDto> UpdateStatusAsync(Guid id, UpdateAppointmentStatusDto dto);
     Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId);
-    Task<List<AppointmentResponseDto>> GetUpcomingByOrganizationAsync(Guid organizationId, int page, int pageSize);
+    Task<PagedResultDto<AppointmentResponseDto>> GetUpcomingByOrganizationAsync(
+        Guid organizationId, int page, int pageSize, Guid requestingUserId, bool isAdmin);
     Task<AppointmentResponseDto> CompleteAsync(Guid id, CompleteAppointmentDto dto);
 }
