@@ -33,8 +33,6 @@ public class DonorsController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
-        var result = await _donorService.RegisterAsync(userId, request, ct);
-        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     [HttpGet("{id:guid}")]
