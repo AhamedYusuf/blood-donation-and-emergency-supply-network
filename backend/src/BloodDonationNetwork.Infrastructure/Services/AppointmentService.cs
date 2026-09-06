@@ -108,8 +108,47 @@ public class AppointmentService : IAppointmentService
         TotalCount = totalCount
     };
 }
-    public Task<AppointmentResponseDto> CompleteAsync(Guid id, CompleteAppointmentDto dto)
-        => throw new NotImplementedException();
+    public async Task<AppointmentResponseDto> CompleteAsync(
+    Guid id, CompleteAppointmentDto dto, Guid requestingUserId, bool isAdmin)
+{
+    var appointment = await _context.DonationAppointments
+        .FirstOrDefaultAsync(a => a.Id == id);
+
+    if (appointment is null)
+    {
+        throw new KeyNotFoundException($"Appointment {id} not found.");
+    }
+
+    if (!isAdmin)
+    {
+        var requestingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == requestingUserId);
+
+        if (requestingUser?.OrganizationId != appointment.OrganizationId)
+        {
+            throw new UnauthorizedAccessException(
+                "Staff may only complete appointments at their own organization.");
+        }
+    }
+
+    // TODO (blocked — waiting on Student 3's InventoryService):
+    // call inventory transaction logic here (transaction_type = "donation_in",
+    // units = dto.UnitsDonated, related_appointment_id = appointment.Id),
+    // in the SAME database transaction as the appointment update below,
+    // per Tech Doc §4.3's cross-table atomicity requirement.
+
+    // TODO (blocked — waiting on Student 1's DonorProfile entity):
+    // update donor_profiles.last_donation_date = DateTime.UtcNow
+    // for appointment.DonorId, in the same transaction.
+
+    appointment.Status = AppointmentStatus.Completed;
+    appointment.UnitsDonated = dto.UnitsDonated;
+    appointment.UpdatedAt = DateTime.UtcNow;
+
+    await _context.SaveChangesAsync();
+
+    return MapToDto(appointment);
+}
 
     // Private helper — converts the entity to the DTO shape.
     private static AppointmentResponseDto MapToDto(DonationAppointment appointment)

@@ -127,4 +127,27 @@ public async Task<ActionResult<PagedResultDto<AppointmentResponseDto>>> GetUpcom
     }
 }
 
+[HttpPost("{id}/complete")]
+[Authorize(Roles = "Staff,Admin")]
+public async Task<IActionResult> Complete(Guid id, CompleteAppointmentDto dto)
+{
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+    var isAdmin = currentUserRole == "Admin";
+
+    try
+    {
+        var result = await _appointmentService.CompleteAsync(id, dto, currentUserId, isAdmin);
+        return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+        return NotFound();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Forbid();
+    }
+}
+
 }

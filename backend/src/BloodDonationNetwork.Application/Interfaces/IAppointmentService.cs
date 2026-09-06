@@ -10,5 +10,5 @@ public interface IAppointmentService
     Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId);
     Task<PagedResultDto<AppointmentResponseDto>> GetUpcomingByOrganizationAsync(
         Guid organizationId, int page, int pageSize, Guid requestingUserId, bool isAdmin);
-    Task<AppointmentResponseDto> CompleteAsync(Guid id, CompleteAppointmentDto dto);
+    Task<AppointmentResponseDto> CompleteAsync(Guid id, CompleteAppointmentDto dto, Guid requestingUserId, bool isAdmin);
 }
