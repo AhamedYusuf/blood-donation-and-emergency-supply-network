@@ -3,6 +3,7 @@ using System;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BloodDonationNetwork.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821090933_AddDonationAppointments")]
+    partial class AddDonationAppointments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,7 +26,6 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonationAppointment", b =>
-            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodRequest", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -34,55 +36,30 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
 
                     b.Property<Guid>("DonorId")
                         .HasColumnType("uuid");
-                    b.Property<int>("BloodType")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("FulfilledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("HospitalName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<double>("Latitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("RequesterId")
+                    b.Property<Guid?>("RelatedWorkflowId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ScheduledTime")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<int>("UnitsRequested")
+                    b.Property<int?>("UnitsDonated")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Urgency")
-                        .HasColumnType("integer");
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId");
 
                     b.ToTable("DonationAppointments");
-                    b.HasIndex("RequesterId");
-
-                    b.ToTable("BloodRequests");
                 });
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.Organization", b =>
@@ -171,7 +148,6 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonationAppointment", b =>
-            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodRequest", b =>
                 {
                     b.HasOne("BloodDonationNetwork.Domain.Entities.Organization", "Organization")
                         .WithMany()
@@ -179,15 +155,7 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("BloodDonationNetwork.Domain.Entities.User", "Requester")
-                        .WithMany()
-                        .HasForeignKey("RequesterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Organization");
-
-                    b.Navigation("Requester");
                 });
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.User", b =>
