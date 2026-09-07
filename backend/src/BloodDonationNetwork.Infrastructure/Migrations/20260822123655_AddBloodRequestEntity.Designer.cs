@@ -3,6 +3,7 @@ using System;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BloodDonationNetwork.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260822123655_AddBloodRequestEntity")]
+    partial class AddBloodRequestEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,18 +25,12 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonationAppointment", b =>
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodRequest", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DonorId")
-                        .HasColumnType("uuid");
                     b.Property<int>("BloodType")
                         .HasColumnType("integer");
 
@@ -79,7 +76,6 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("DonationAppointments");
                     b.HasIndex("RequesterId");
 
                     b.ToTable("BloodRequests");
@@ -170,7 +166,6 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonationAppointment", b =>
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodRequest", b =>
                 {
                     b.HasOne("BloodDonationNetwork.Domain.Entities.Organization", "Organization")
