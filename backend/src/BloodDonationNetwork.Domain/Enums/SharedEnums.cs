@@ -49,4 +49,32 @@ public static class ApprovalDecisions
 public static class OrganizationTypes
 {
     public const string Hospital = "hospital", BloodBank = "blood_bank";
+public enum BloodType
+{
+    APositive,
+    ANegative,
+    BPositive,
+    BNegative,
+    ABPositive,
+    ABNegative,
+    OPositive,
+    ONegative
+}
+
+public enum RequestUrgency
+{
+    Normal,
+    Urgent,
+    Critical
+}
+
+public enum BloodRequestStatus
+{
+    Pending,
+    AwaitingApproval,
+    Approved,
+    Dispatched,
+    Fulfilled,
+    Closed,
+    Cancelled
 }

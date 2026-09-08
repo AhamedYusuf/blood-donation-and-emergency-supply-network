@@ -46,6 +46,7 @@ builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<Ap
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
 // =====================================================
 // JWT AUTHENTICATION
