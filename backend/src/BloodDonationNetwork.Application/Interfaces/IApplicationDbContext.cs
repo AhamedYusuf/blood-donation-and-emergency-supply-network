@@ -1,10 +1,16 @@
-using Microsoft.EntityFrameworkCore;
 using BloodDonationNetwork.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace BloodDonationNetwork.Application.Interfaces;
 
 public interface IApplicationDbContext
 {
     DbSet<DonorProfile> DonorProfiles { get; }
-    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    DbSet<Organization> Organizations { get; }
+    DbSet<User> Users { get; }
+    DbSet<DonationAppointment> DonationAppointments { get; }
+    DbSet<BloodRequest> BloodRequests { get; }
+
+    Task<int> SaveChangesAsync(
+        CancellationToken cancellationToken = default);
 }
