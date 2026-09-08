@@ -1,0 +1,22 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
+
+namespace BloodDonationNetwork.Infrastructure.Persistence;
+
+public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+{
+    public AppDbContext CreateDbContext(string[] args)
+    {
+        var config = new ConfigurationBuilder()
+            .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "..", "BloodDonationNetwork.Api"))
+            .AddJsonFile("appsettings.Development.json", optional: false)
+            .Build();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(config.GetConnectionString("Default"))
+            .Options;
+
+        return new AppDbContext(options);
+    }
+}

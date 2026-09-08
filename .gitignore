@@ -12,6 +12,7 @@ TestResults/
 
 # ASP.NET local settings
 appsettings.Development.json
+appsettings.json
 
 
 # ============================================================
