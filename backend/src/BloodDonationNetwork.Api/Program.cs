@@ -1,4 +1,6 @@
 using BloodDonationNetwork.Application.Interfaces;
+using BloodDonationNetwork.Application.Services;
+using BloodDonationNetwork.Infrastructure.ExternalClients;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using BloodDonationNetwork.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,13 +20,25 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddProblemDetails();
+
+builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
+    c.DefaultRequestHeaders.Add("User-Agent", "BloodDonationNetwork/1.0"));
+
+builder.Services.AddScoped<IDonorService, DonorService>();
+
+builder.Services.AddScoped<IEligibilityRuleEngine, EligibilityRuleEngine>();
 // =====================================================
 // DATABASE
 // =====================================================
 
+var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("Default"));
+dataSourceBuilder.EnableDynamicJson();
+var dataSource = dataSourceBuilder.Build();
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(dataSource));
+
+builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
 // =====================================================
 // JWT TOKEN SERVICE

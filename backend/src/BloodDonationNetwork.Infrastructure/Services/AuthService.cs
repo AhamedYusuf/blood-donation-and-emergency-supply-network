@@ -1,4 +1,5 @@
-using BCryptHasher = BCrypt.Net.BCrypt;using BloodDonationNetwork.Application.DTOs.Auth;
+using BCryptHasher = BCrypt.Net.BCrypt;
+using BloodDonationNetwork.Application.DTOs.Auth;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Infrastructure.Persistence;
@@ -37,7 +38,7 @@ public class AuthService : IAuthService
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = BCryptHasher.HashPassword(request.Password),
-            Role = UserRole.Donor,
+            Role = Enum.Parse<UserRole>(request.Role, true),
             FullName = request.FullName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
             OrganizationId = null,

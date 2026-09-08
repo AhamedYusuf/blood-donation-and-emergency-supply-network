@@ -10,7 +10,7 @@ public class RegisterRequest
 
     public string PhoneNumber { get; set; } = string.Empty;
 
-    public string Role { get; set; } = "Donor";
+    public string Role { get; set; } = string.Empty;
 
     public Guid? OrganizationId { get; set; }
 }
