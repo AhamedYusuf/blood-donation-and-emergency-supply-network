@@ -162,7 +162,24 @@ public class RequestService : IRequestService
         return MapToResponse(request);
     }
 
-    // 5. Close a blood request
+    // 5. Delete a blood request
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var request = await _context.BloodRequests
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (request == null)
+        {
+            return false;
+        }
+
+        _context.BloodRequests.Remove(request);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    // 6. Close a blood request
     public async Task<RequestResponseDto?> CloseAsync(Guid id)
     {
         var request = await _context.BloodRequests

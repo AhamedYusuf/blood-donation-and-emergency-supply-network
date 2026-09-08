@@ -23,5 +23,7 @@ public interface IRequestService
         Guid id,
         RequestStatusUpdateDto dto);
 
+    Task<bool> DeleteAsync(Guid id);
+
     Task<RequestResponseDto?> CloseAsync(Guid id);
 }
