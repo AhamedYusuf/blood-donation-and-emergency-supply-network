@@ -11,13 +11,10 @@ public static class BloodTypes
 {
     public const string APositive = "A+";
     public const string ANegative = "A-";
-
     public const string BPositive = "B+";
     public const string BNegative = "B-";
-
     public const string ABPositive = "AB+";
     public const string ABNegative = "AB-";
-
     public const string OPositive = "O+";
     public const string ONegative = "O-";
 }
@@ -106,4 +103,12 @@ public enum BloodRequestStatus
     Fulfilled,
     Closed,
     Cancelled
+}
+
+public enum InventoryTransactionType
+{
+    DonationIn,
+    UsageOut,
+    TransferIn,
+    TransferOut
 }
