@@ -49,6 +49,8 @@ public static class ApprovalDecisions
 public static class OrganizationTypes
 {
     public const string Hospital = "hospital", BloodBank = "blood_bank";
+}
+
 public enum BloodType
 {
     APositive,

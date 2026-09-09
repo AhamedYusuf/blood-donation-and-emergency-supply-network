@@ -26,6 +26,9 @@ builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
 
 builder.Services.AddScoped<IDonorService, DonorService>();
 
+builder.Services.AddScoped<DonorRankingCalculator>();
+builder.Services.AddScoped<IMatchingDispatchAgentService, MatchingDispatchAgentService>();
+
 builder.Services.AddScoped<IEligibilityRuleEngine, EligibilityRuleEngine>();
 // =====================================================
 // DATABASE
@@ -131,6 +134,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<BloodDonationNetwork.Api.Middleware.InternalSecretMiddleware>();
 
 // Authentication must come before Authorization
 app.UseAuthentication();
