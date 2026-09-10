@@ -1,3 +1,4 @@
+using BloodDonationNetwork.Application.Common;
 using BloodDonationNetwork.Application.DTOs.Appointments;
 using BloodDonationNetwork.Application.DTOs.Inventory;
 using BloodDonationNetwork.Application.Interfaces;
@@ -58,7 +59,7 @@ public class AppointmentService : IAppointmentService
             throw new KeyNotFoundException($"Appointment {id} not found.");
         }
 
-        appointment.Status = ParseStatus(dto.NewStatus);
+        appointment.Status = AppointmentStatusMap.Parse(dto.NewStatus);
         appointment.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -191,32 +192,15 @@ public class AppointmentService : IAppointmentService
             OrganizationId = appointment.OrganizationId,
             RelatedWorkflowId = appointment.RelatedWorkflowId,
             ScheduledTime = appointment.ScheduledTime,
-            Status = MapStatusToString(appointment.Status),
+            Status = AppointmentStatusMap.ToApiString(appointment.Status),
             UnitsDonated = appointment.UnitsDonated,
             CreatedAt = appointment.CreatedAt,
             UpdatedAt = appointment.UpdatedAt
         };
     }
 
-    // Enum -> exact lowercase/snake_case string per Tech Doc §0.5
-    private static string MapStatusToString(AppointmentStatus status) => status switch
-    {
-        AppointmentStatus.Scheduled => "scheduled",
-        AppointmentStatus.Completed => "completed",
-        AppointmentStatus.NoShow => "no_show",
-        AppointmentStatus.Cancelled => "cancelled",
-        _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown appointment status")
-    };
-
-    // Reverse direction — client-sent string -> enum
-    private static AppointmentStatus ParseStatus(string status) => status switch
-    {
-        "scheduled" => AppointmentStatus.Scheduled,
-        "completed" => AppointmentStatus.Completed,
-        "no_show" => AppointmentStatus.NoShow,
-        "cancelled" => AppointmentStatus.Cancelled,
-        _ => throw new ArgumentException($"Invalid appointment status: '{status}'")
-    };
+    // Status <-> API-string conversion lives in AppointmentStatusMap
+    // (Application/Common) so it can be unit-tested without a DbContext.
 
     // Maps DonorProfile.BloodType (plain string, e.g. "O+") to the
     // Domain.Enums.BloodType enum CreateInventoryTransactionRequest expects.
