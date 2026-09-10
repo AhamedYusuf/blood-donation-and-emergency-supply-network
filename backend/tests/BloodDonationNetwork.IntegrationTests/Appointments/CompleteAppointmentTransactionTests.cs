@@ -55,11 +55,13 @@ public sealed class CompleteAppointmentTransactionTests : IDisposable
         await using var ctx = new TestAppDbContext(_options);
         var sut = new AppointmentService(ctx, new InventoryService(ctx));
 
+        var beforeUtcDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var result = await sut.CompleteAsync(
             AppointmentId,
             new CompleteAppointmentDto { UnitsDonated = UnitsDonated },
             StaffUserId,
             isAdmin: false);
+        var afterUtcDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
         Assert.Equal("completed", result.Status);
         Assert.Equal("O+", result.DonorBloodType);
@@ -71,7 +73,8 @@ public sealed class CompleteAppointmentTransactionTests : IDisposable
         Assert.Equal(UnitsDonated, appointment.UnitsDonated);
 
         var donor = await verify.DonorProfiles.SingleAsync(d => d.UserId == DonorUserId);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), donor.LastDonationDate);
+        Assert.NotNull(donor.LastDonationDate);
+        Assert.InRange(donor.LastDonationDate!.Value, beforeUtcDate, afterUtcDate);
 
         var inventory = await verify.BloodBankInventories.SingleAsync(
             i => i.OrganizationId == OrgId && i.BloodType == DomainBloodType.OPositive);
