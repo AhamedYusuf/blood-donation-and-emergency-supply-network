@@ -7,7 +7,6 @@ on:
       - production
       - "dev/**"
       - "chore/**"
-
   pull_request:
     branches:
       - development
@@ -15,7 +14,6 @@ on:
 
 jobs:
   build-and-test:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -28,10 +26,10 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore dependencies
-        run: dotnet restore backend/src/BloodDonationNetwork.Api/BloodDonationNetwork.Api.csproj
+        run: dotnet restore backend/BloodDonationNetwork.sln
 
       - name: Build
-        run: dotnet build backend/src/BloodDonationNetwork.Api/BloodDonationNetwork.Api.csproj --no-restore --configuration Release
+        run: dotnet build backend/BloodDonationNetwork.sln --no-restore --configuration Release
 
       - name: Test
-  run: dotnet test backend/tests/BloodDonationNetwork.Tests/BloodDonationNetwork.Tests.csproj --configuration Release --no-restore
+        run: dotnet test backend/BloodDonationNetwork.sln --no-build --configuration Release --verbosity normal
