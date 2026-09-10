@@ -80,3 +80,14 @@ class AuthController extends Notifier<AuthState> {
 
 final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
+
+/// The current bearer token, or null. Split out so feature code (and tests)
+/// can depend on just the token without the whole auth state.
+final authTokenProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider).token,
+);
+
+/// The current user's id, or null.
+final currentUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider).userId,
+);
