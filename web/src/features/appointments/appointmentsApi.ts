@@ -7,6 +7,7 @@ export interface Appointment {
   relatedWorkflowId: string | null;
   scheduledTime: string;
   status: string;
+  donorBloodType: string | null;
   unitsDonated: number | null;
   createdAt: string;
   updatedAt: string;

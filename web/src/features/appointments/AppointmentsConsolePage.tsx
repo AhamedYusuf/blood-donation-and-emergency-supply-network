@@ -250,7 +250,7 @@ export function AppointmentsConsolePage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--color-surface-sunken)" }}>
-                  {["", "Time", "Donor", "Status", "Source", ""].map((h, i) => (
+                  {["", "Time", "Donor", "Blood Type", "Status", "Source", ""].map((h, i) => (
                     <th
                       key={i}
                       className="text-label"
@@ -299,6 +299,26 @@ export function AppointmentsConsolePage() {
                       </td>
                       <td className="tabular-nums text-body-sm" style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
                         #{appt.donorId.slice(0, 8)}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {appt.donorBloodType ? (
+                          <span
+                            className="text-body-sm"
+                            style={{
+                              fontWeight: 500,
+                              padding: "2px 6px",
+                              borderRadius: "var(--radius-xs)",
+                              background: "var(--color-surface-sunken)",
+                              color: "var(--color-ink)",
+                            }}
+                          >
+                            {appt.donorBloodType}
+                          </span>
+                        ) : (
+                          <span className="text-body-sm" style={{ color: "var(--color-ink-faint)" }}>
+                            —
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <StatusBadge status={appt.status} />
@@ -370,6 +390,27 @@ export function AppointmentsConsolePage() {
             <span className="text-body-sm tabular-nums" style={{ color: "var(--color-ink-muted)" }}>
               {formatTime(selected.scheduledTime)} · {formatRelative(selected.scheduledTime)}
             </span>
+          </div>
+
+          <div style={{ marginTop: "var(--space-sm)", display: "flex", gap: "var(--space-lg)" }}>
+            <div>
+              <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                BLOOD TYPE
+              </p>
+              <p className="text-body-sm" style={{ margin: "2px 0 0", color: "var(--color-ink)", fontWeight: 500 }}>
+                {selected.donorBloodType ?? "—"}
+              </p>
+            </div>
+            {selected.unitsDonated != null && (
+              <div>
+                <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                  UNITS DONATED
+                </p>
+                <p className="text-body-sm tabular-nums" style={{ margin: "2px 0 0", color: "var(--color-ink)", fontWeight: 500 }}>
+                  {selected.unitsDonated}
+                </p>
+              </div>
+            )}
           </div>
 
           {selected.relatedWorkflowId && (
