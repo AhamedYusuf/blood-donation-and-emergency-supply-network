@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\BloodDonationNetwork.Api\BloodDonationNetwork.Api.csproj" />
     <ProjectReference Include="..\..\src\BloodDonationNetwork.Application\BloodDonationNetwork.Application.csproj" />
     <ProjectReference Include="..\..\src\BloodDonationNetwork.Domain\BloodDonationNetwork.Domain.csproj" />
   </ItemGroup>
