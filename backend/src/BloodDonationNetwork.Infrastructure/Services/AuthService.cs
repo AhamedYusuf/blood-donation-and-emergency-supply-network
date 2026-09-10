@@ -117,7 +117,8 @@ var passwordValid = BCryptHasher.Verify(
         var accessToken = _jwtTokenService.GenerateAccessToken(
             user.Id,
             user.Email,
-            user.Role.ToString());
+            user.Role.ToString(),
+            user.OrganizationId);
 
         return new AuthResponse
         {
@@ -126,7 +127,8 @@ var passwordValid = BCryptHasher.Verify(
             UserId = user.Id,
             Email = user.Email,
             FullName = user.FullName,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            OrganizationId = user.OrganizationId
         };
     }
 }
