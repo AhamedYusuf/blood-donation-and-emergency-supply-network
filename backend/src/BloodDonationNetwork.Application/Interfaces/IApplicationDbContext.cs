@@ -14,6 +14,8 @@ public interface IApplicationDbContext
     DbSet<BloodBankInventory> BloodBankInventories { get; }
 DbSet<InventoryTransaction> InventoryTransactions { get; }
 
+    DbSet<DonorDevice> DonorDevices { get; }
+
     Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default);
 }
