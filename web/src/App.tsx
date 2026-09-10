@@ -2,11 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "./app/store";
 import { LoginPage } from "./features/auth/LoginPage";
-
-function HomePage() {
-  const email = useSelector((state: RootState) => state.auth.email);
-  return <h1>Logged in as {email}</h1>;
-}
+import { AppointmentsConsolePage } from "./features/appointments/AppointmentsConsolePage";
+import { AppShell } from "./components/AppShell";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -25,7 +22,9 @@ export function App() {
           path="/"
           element={
             <RequireAuth>
-              <HomePage />
+              <AppShell>
+                <AppointmentsConsolePage />
+              </AppShell>
             </RequireAuth>
           }
         />
