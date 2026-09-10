@@ -42,6 +42,7 @@ builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
 
 builder.Services.AddScoped<IDonorService, DonorService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 
 builder.Services.AddScoped<DonorRankingCalculator>();
 builder.Services.AddScoped<IMatchingDispatchAgentService, MatchingDispatchAgentService>();
