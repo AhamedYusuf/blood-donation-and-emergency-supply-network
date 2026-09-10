@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: "◎",
     path: "/donors/search",
     adminPath: "/donors/verification-queue",
-    staffPath: "/donors/search",
+    staffPath: "/donors/verification-queue",
     allowedRoles: ["staff", "admin"],
   },
 ];

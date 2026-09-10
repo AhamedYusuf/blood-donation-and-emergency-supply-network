@@ -44,6 +44,7 @@ export interface DonorProfileResponse {
   dateOfBirth: string;
   lastDonationDate?: string | null;
   address?: string | null;
+  medicalFlags: Record<string, boolean>;
   latitude?: number | null;
   longitude?: number | null;
   locationVerified: boolean;

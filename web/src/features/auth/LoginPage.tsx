@@ -57,12 +57,22 @@ export function LoginPage() {
           token: result.accessToken,
           refreshToken: result.refreshToken,
           userId: result.userId,
+          donorProfileId: result.donorProfileId,
           email: result.email,
           fullName: result.fullName,
           role: result.role,
         })
       );
-      navigate("/");
+      const role = result.role.toLowerCase();
+      if (role === "donor") {
+        navigate(result.donorProfileId ? "/" : "/register/donor-profile");
+      } else if (role === "admin") {
+        navigate("/donors/verification-queue");
+      } else if (role === "staff") {
+        navigate("/donors/verification-queue");
+      } else {
+        navigate("/");
+      }
     } catch (err: unknown) {
       const e = err as { status?: number; data?: { message?: string } };
       if (e.status === 401 || e.status === 400) {

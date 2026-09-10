@@ -4,7 +4,7 @@ namespace BloodDonationNetwork.Application.DTOs.Donors;
 public class DonorRegisterRequest { 
     public string BloodType {get;set;} = default!; 
     public DateOnly DateOfBirth {get;set;} 
-    public string? Address {get;set;} 
+    public string Address {get;set;} = string.Empty; 
     public Dictionary<string,bool>? MedicalFlags {get;set;} 
 }
 
@@ -22,6 +22,7 @@ public class DonorProfileResponse {
     public DateOnly DateOfBirth {get;set;} 
     public DateOnly? LastDonationDate {get;set;} 
     public string? Address {get;set;} 
+    public Dictionary<string, bool> MedicalFlags {get;set;} = new();
     public double? Latitude {get;set;} 
     public double? Longitude {get;set;} 
     public bool LocationVerified {get;set;} 

@@ -28,6 +28,14 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const MEDICAL_FLAG_LABELS: Record<string, string> = {
+  recent_illness: "Recent illness",
+  recent_surgery: "Recent surgery",
+  chronic_condition: "Chronic condition",
+  hiv_positive: "HIV positive",
+  hepatitis: "Hepatitis",
+};
+
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? {
     label: status,
@@ -125,7 +133,13 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
             whiteSpace: "nowrap",
           }}
         >
-          {donor.id.slice(0, 8).toUpperCase()}
+          Profile ID: {donor.id}
+        </span>
+        <span
+          className="text-caption tabular-nums"
+          style={{ color: "var(--color-ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          Account ID: {donor.userId}
         </span>
         {donor.address && (
           <span
@@ -140,6 +154,17 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
             {donor.address}
           </span>
         )}
+        <span className="text-caption" style={{ color: "var(--color-ink-faint)" }}>
+          {Object.entries(donor.medicalFlags ?? {})
+            .filter(([, active]) => active)
+            .map(([key]) => MEDICAL_FLAG_LABELS[key] ?? key)
+            .join(", ") || "No medical conditions reported"}
+        </span>
+        <span className="text-caption" style={{ color: "var(--color-ink-faint)" }}>
+          {donor.locationVerified && donor.latitude != null && donor.longitude != null
+            ? `Location verified (${donor.latitude.toFixed(4)}, ${donor.longitude.toFixed(4)})`
+            : "Location not verified"}
+        </span>
       </div>
 
       {/* DOB */}

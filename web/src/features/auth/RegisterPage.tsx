@@ -171,6 +171,7 @@ export function RegisterPage() {
           token: result.accessToken,
           refreshToken: result.refreshToken,
           userId: result.userId,
+          donorProfileId: result.donorProfileId,
           email: result.email,
           fullName: result.fullName,
           role: result.role,

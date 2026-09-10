@@ -117,7 +117,7 @@ export function DonorProfilePage() {
     Object.fromEntries(Object.keys(MEDICAL_FLAG_LABELS).map((k) => [k, false]))
   );
 
-  const [touched, setTouched] = useState({ bloodType: false, dob: false });
+  const [touched, setTouched] = useState({ bloodType: false, dob: false, address: false });
   const [apiError, setApiError] = useState<string | null>(null);
 
   const [registerDonorProfile, { isLoading }] = useRegisterDonorProfileMutation();
@@ -125,9 +125,11 @@ export function DonorProfilePage() {
   const errors = {
     bloodType: touched.bloodType ? validateBloodType(bloodType) : "",
     dob: touched.dob ? validateDob(dob) : "",
+    address: touched.address && !address.trim() ? "Address is required." : "",
   };
 
-  const isFormValid = !validateBloodType(bloodType) && !validateDob(dob);
+  const isFormValid =
+    !validateBloodType(bloodType) && !validateDob(dob) && !!address.trim();
 
   const handleFlagChange = (key: string, e: ChangeEvent<HTMLInputElement>) => {
     setMedicalFlags((prev) => ({ ...prev, [key]: e.target.checked }));
@@ -142,7 +144,7 @@ export function DonorProfilePage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setTouched({ bloodType: true, dob: true });
+    setTouched({ bloodType: true, dob: true, address: true });
     setApiError(null);
 
     if (!isFormValid) return;
@@ -156,7 +158,7 @@ export function DonorProfilePage() {
       const result = await registerDonorProfile({
         bloodType,
         dateOfBirth: dob,
-        address: address.trim() || undefined,
+        address: address.trim(),
         // All flags are stored (true and false) so the engine can evaluate each rule.
         // Only send the map if at least one flag was touched/checked.
         medicalFlags: Object.keys(activeFlags).length > 0 ? activeFlags : undefined,
@@ -255,6 +257,9 @@ export function DonorProfilePage() {
           autoComplete="street-address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, address: true }))}
+          error={errors.address}
+          required
           placeholder="123 Main St, Colombo"
         />
 

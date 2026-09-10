@@ -72,7 +72,9 @@ export function App() {
           path="/register/donor-profile"
           element={
             <RequireAuth>
-              <DonorProfilePage />
+              <RequireRole roles={["donor"]}>
+                <DonorProfilePage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -103,12 +105,12 @@ export function App() {
           }
         />
 
-        {/* Admin only: verification queue */}
+        {/* Staff + Admin: verification queue */}
         <Route
           path="/donors/verification-queue"
           element={
             <RequireAuth>
-              <RequireRole roles={["admin"]}>
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <DonorVerificationQueuePage />
                 </AppShell>

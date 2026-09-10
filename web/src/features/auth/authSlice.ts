@@ -32,16 +32,18 @@ const authSlice = createSlice({
         token: string;
         refreshToken: string;
         userId: string;
+        donorProfileId?: string | null;
         email: string;
         fullName: string;
         role: string;
       }>
     ) => {
-      const { token, refreshToken, userId, email, fullName, role } =
+      const { token, refreshToken, userId, donorProfileId, email, fullName, role } =
         action.payload;
       state.token = token;
       state.refreshToken = refreshToken;
       state.userId = userId;
+      state.donorId = donorProfileId ?? null;
       state.email = email;
       state.fullName = fullName;
       state.role = role;
@@ -49,6 +51,8 @@ const authSlice = createSlice({
       localStorage.setItem("token", token);
       localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("userId", userId);
+      if (donorProfileId) localStorage.setItem("donorId", donorProfileId);
+      else localStorage.removeItem("donorId");
       localStorage.setItem("email", email);
       localStorage.setItem("fullName", fullName);
       localStorage.setItem("role", role);

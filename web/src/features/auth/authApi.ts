@@ -23,6 +23,8 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   userId: string;
+  /** Donor profile UUID, or null until the donor completes profile setup. */
+  donorProfileId: string | null;
   email: string;
   fullName: string;
   role: string;
