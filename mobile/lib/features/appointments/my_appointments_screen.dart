@@ -3,6 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
+import '../../core/date_format.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/tokens.dart';
+import '../../widgets/agent_tag.dart';
+import '../../widgets/app_card.dart';
+import '../../widgets/brand_mark.dart';
+import '../../widgets/states.dart';
+import '../../widgets/status_pill.dart';
 import 'appointment.dart';
 import 'appointments_repository.dart';
 
@@ -14,260 +22,370 @@ class MyAppointmentsScreen extends ConsumerWidget {
     await ref.read(myAppointmentsProvider.future);
   }
 
+  Future<void> _book(BuildContext context, WidgetRef ref) async {
+    await context.push('/appointments/book');
+    ref.invalidate(myAppointmentsProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(myAppointmentsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Appointments')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await context.push('/appointments/book');
-          ref.invalidate(myAppointmentsProvider);
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Book'),
+      appBar: AppBar(
+        titleSpacing: AppSpacing.gutter,
+        title: Row(
+          children: [
+            const BrandMark(size: 22, color: AppColors.ink),
+            const SizedBox(width: AppSpacing.xs),
+            Text('My donations', style: AppText.title),
+          ],
+        ),
+      ),
+      floatingActionButton: async.maybeWhen(
+        data: (list) => list.isEmpty
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () => _book(context, ref),
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                elevation: 2,
+                icon: const Icon(Icons.add, size: 20),
+                label: Text('Book', style: AppText.button),
+              ),
+        orElse: () => null,
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _ErrorView(
-          message: err is ApiException ? err.message : 'Could not load appointments.',
+        loading: () => const AppointmentsSkeleton(),
+        error: (err, _) => ErrorState(
+          message: err is ApiException ? err.message : 'We couldn’t load your donations.',
           onRetry: () => _refresh(ref),
         ),
         data: (appointments) {
+          if (appointments.isEmpty) {
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => _refresh(ref),
+              child: LayoutBuilder(
+                builder: (context, c) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: c.maxHeight),
+                    child: EmptyState(
+                      icon: Icons.water_drop_outlined,
+                      title: 'No donations booked',
+                      message: 'Schedule your first donation — it only takes a minute.',
+                      action: FilledButton(
+                        onPressed: () => _book(context, ref),
+                        style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                        child: const Text('Book a donation'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
           final upcoming = appointments.where((a) => a.isUpcoming).toList()
             ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
-          final past = appointments.where((a) => !a.isUpcoming).toList();
+          final history = appointments.where((a) => !a.isUpcoming).toList();
+          final next = upcoming.isNotEmpty ? upcoming.first : null;
+          final laterUpcoming = upcoming.skip(1).toList();
 
           return RefreshIndicator(
+            color: AppColors.primary,
             onRefresh: () => _refresh(ref),
-            child: appointments.isEmpty
-                ? const _EmptyView()
-                : ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    children: [
-                      if (upcoming.isNotEmpty) ...[
-                        const _SectionHeader('Upcoming'),
-                        for (final a in upcoming)
-                          _AppointmentTile(appointment: a, cancellable: true),
-                      ],
-                      if (past.isNotEmpty) ...[
-                        const _SectionHeader('History'),
-                        for (final a in past)
-                          _AppointmentTile(appointment: a, cancellable: false),
-                      ],
-                    ],
-                  ),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.gutter, AppSpacing.xs, AppSpacing.gutter, 96),
+              children: [
+                const SectionLabel('Next donation'),
+                if (next != null)
+                  _HeroCard(appointment: next, onCancel: () => _confirmCancel(context, ref, next))
+                else
+                  _BookPrompt(onBook: () => _book(context, ref)),
+
+                if (laterUpcoming.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const SectionLabel('Also upcoming'),
+                  for (final a in laterUpcoming)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: _Row(appointment: a, onCancel: () => _confirmCancel(context, ref, a)),
+                    ),
+                ],
+
+                if (history.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  SectionLabel('History',
+                      trailing: Text('${history.length}', style: AppText.caption)),
+                  for (final a in history)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: _Row(appointment: a, onCancel: null),
+                    ),
+                ],
+              ],
+            ),
           );
         },
       ),
     );
   }
-}
 
-class _AppointmentTile extends ConsumerWidget {
-  const _AppointmentTile({required this.appointment, required this.cancellable});
-
-  final Appointment appointment;
-  final bool cancellable;
-
-  Future<void> _cancel(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _confirmCancel(BuildContext context, WidgetRef ref, Appointment a) async {
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel appointment?'),
-        content: const Text('This frees the slot. You can book another later.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel it'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _CancelSheet(appointment: a),
     );
-    if (confirmed != true) return;
+    if (ok != true) return;
 
     try {
-      await ref.read(appointmentsRepositoryProvider).cancel(appointment.id);
+      await ref.read(appointmentsRepositoryProvider).cancel(a.id);
       ref.invalidate(myAppointmentsProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Appointment cancelled')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Appointment cancelled')));
       }
     } on ApiException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
+}
+
+// ── hero ─────────────────────────────────────────────────────────────────
+
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({required this.appointment, required this.onCancel});
+  final Appointment appointment;
+  final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = appointment.scheduledTime;
-    final dateLabel =
-        '${_weekday(t.weekday)} ${t.day} ${_month(t.month)}, '
-        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-    return ListTile(
-      leading: _StatusDot(status: appointment.status),
-      title: Text(dateLabel),
-      subtitle: Row(
+  Widget build(BuildContext context) {
+    final a = appointment;
+    return AppCard(
+      elevated: true,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_statusLabel(appointment.status)),
-          if (appointment.isAgentMatched) ...[
-            const SizedBox(width: 8),
-            const _AgentChip(),
-          ],
-          if (appointment.unitsDonated != null) ...[
-            const SizedBox(width: 8),
-            Text('${appointment.unitsDonated} unit(s)'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DateBlock(a.scheduledTime),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(clockTime(a.scheduledTime),
+                        style: AppText.numeric.copyWith(fontSize: 17, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(relativeTime(a.scheduledTime),
+                        style: AppText.bodySmall.copyWith(color: AppColors.inkMuted)),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        StatusPill(a.status),
+                        if (a.donorBloodType != null) _BloodTypeChip(a.donorBloodType!),
+                        if (a.isAgentMatched) const AgentTag(),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (a.canCancel) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Divider(height: 1),
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onCancel,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.critical,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
+                ),
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text('Cancel appointment'),
+              ),
+            ),
           ],
         ],
       ),
-      trailing: cancellable && appointment.canCancel
-          ? IconButton(
-              tooltip: 'Cancel',
-              icon: const Icon(Icons.close),
-              onPressed: () => _cancel(context, ref),
-            )
-          : null,
     );
   }
 }
 
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.status});
-  final String status;
+class _DateBlock extends StatelessWidget {
+  const _DateBlock(this.dt);
+  final DateTime dt;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 10,
-      height: 10,
-      margin: const EdgeInsets.only(top: 6),
+      width: 58,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: _statusColor(status, context),
-        shape: BoxShape.circle,
+        color: AppColors.primarySubtle,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Column(
+        children: [
+          Text(weekdayAbbr(dt).toUpperCase(),
+              style: AppText.caption.copyWith(color: AppColors.primary, letterSpacing: 0.6)),
+          Text(dayNum(dt), style: AppText.heroFigure.copyWith(color: AppColors.primary)),
+          Text(monthAbbr(dt).toUpperCase(),
+              style: AppText.caption.copyWith(color: AppColors.primary, letterSpacing: 0.6)),
+        ],
       ),
     );
   }
 }
 
-class _AgentChip extends StatelessWidget {
-  const _AgentChip();
+class _BookPrompt extends StatelessWidget {
+  const _BookPrompt({required this.onBook});
+  final VoidCallback onBook;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: const Color(0xFF7C5CFC).withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Text(
-        'Agent',
-        style: TextStyle(fontSize: 11, color: Color(0xFF7C5CFC)),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        text.toUpperCase(),
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(letterSpacing: 0.5, color: Theme.of(context).hintColor),
+    return AppCard(
+      elevated: true,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Nothing booked', style: AppText.headline),
+          const SizedBox(height: AppSpacing.xxs),
+          Text('You have no upcoming donation. Book a slot at a nearby blood bank.',
+              style: AppText.bodySmall),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton(onPressed: onBook, child: const Text('Book a donation')),
+        ],
       ),
     );
   }
 }
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+// ── list row ─────────────────────────────────────────────────────────────
+
+class _Row extends StatelessWidget {
+  const _Row({required this.appointment, required this.onCancel});
+  final Appointment appointment;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        const SizedBox(height: 120),
-        Icon(Icons.event_available, size: 48, color: Theme.of(context).hintColor),
-        const SizedBox(height: 12),
-        const Center(child: Text('No appointments yet')),
-        const SizedBox(height: 4),
-        Center(
-          child: Text(
-            'Tap Book to schedule a donation.',
-            style: TextStyle(color: Theme.of(context).hintColor),
+    final a = appointment;
+    final s = statusStyle(a.status);
+    return AppCard(
+      accent: s.color,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.xs, AppSpacing.sm),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 44,
+            child: Column(
+              children: [
+                Text(dayNum(a.scheduledTime), style: AppText.numeric.copyWith(fontSize: 17)),
+                Text(monthAbbr(a.scheduledTime).toUpperCase(), style: AppText.caption),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(clockTime(a.scheduledTime), style: AppText.numeric),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    StatusPill(a.status),
+                    if (a.status == 'completed' && a.unitsDonated != null)
+                      Text('${a.unitsDonated} unit${a.unitsDonated == 1 ? '' : 's'}',
+                          style: AppText.caption.copyWith(color: AppColors.inkMuted)),
+                    if (a.isAgentMatched) const AgentTag(),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (onCancel != null && a.canCancel)
+            IconButton(
+              tooltip: 'Cancel',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.close, size: 18, color: AppColors.inkMuted),
+              onPressed: onCancel,
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
+class _BloodTypeChip extends StatelessWidget {
+  const _BloodTypeChip(this.type);
+  final String type;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Text(type, style: AppText.caption.copyWith(color: AppColors.ink, letterSpacing: 0.2)),
+    );
+  }
+}
+
+// ── cancel sheet ─────────────────────────────────────────────────────────
+
+class _CancelSheet extends StatelessWidget {
+  const _CancelSheet({required this.appointment});
+  final Appointment appointment;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            Text('Cancel this appointment?', style: AppText.headline),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${longStamp(appointment.scheduledTime)}. The slot is released and '
+              'you can book another any time.',
+              style: AppText.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.critical),
+              child: const Text('Cancel appointment'),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep it'),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
-Color _statusColor(String status, BuildContext context) {
-  switch (status) {
-    case 'scheduled':
-      return const Color(0xFFD97F1D);
-    case 'completed':
-      return const Color(0xFF1F8A54);
-    case 'no_show':
-      return const Color(0xFFD64545);
-    case 'cancelled':
-    default:
-      return Theme.of(context).hintColor;
-  }
-}
-
-String _statusLabel(String status) => switch (status) {
-      'scheduled' => 'Scheduled',
-      'completed' => 'Completed',
-      'no_show' => 'No-show',
-      'cancelled' => 'Cancelled',
-      _ => status,
-    };
-
-String _weekday(int w) =>
-    const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][w - 1];
-String _month(int m) => const [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ][m - 1];
