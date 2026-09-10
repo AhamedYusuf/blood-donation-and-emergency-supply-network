@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   useGetUpcomingByOrganizationQuery,
   useCompleteAppointmentMutation,
@@ -7,8 +9,6 @@ import {
 } from "./appointmentsApi";
 import { StatusBadge, STATUS_CONFIG } from "./StatusBadge";
 import { AgentTag } from "./AgentTag";
-
-const TEST_ORG_ID = "11111111-1111-1111-1111-111111111111";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -119,11 +119,12 @@ export function AppointmentsConsolePage() {
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [unitsDonated, setUnitsDonated] = useState("1");
 
-  const { data, isLoading, error } = useGetUpcomingByOrganizationQuery({
-    orgId: TEST_ORG_ID,
-    page: 1,
-    pageSize: 50,
-  });
+  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+
+  const { data, isLoading, error } = useGetUpcomingByOrganizationQuery(
+    { orgId: organizationId ?? "", page: 1, pageSize: 50 },
+    { skip: !organizationId }
+  );
 
   const [completeAppointment, { isLoading: isCompleting }] = useCompleteAppointmentMutation();
   const [updateStatus, { isLoading: isUpdatingStatus }] = useUpdateAppointmentStatusMutation();
@@ -156,6 +157,20 @@ export function AppointmentsConsolePage() {
     await updateStatus({ id: selected.id, newStatus: "no_show" }).unwrap();
     setSelected(null);
   };
+
+  if (!organizationId) {
+    return (
+      <div style={{ padding: "var(--space-xl)", fontFamily: "var(--font-sans)", background: "var(--color-canvas)", height: "100%" }}>
+        <h1 className="text-display" style={{ margin: "0 0 var(--space-sm)", color: "var(--color-ink)" }}>
+          Upcoming Appointments
+        </h1>
+        <p className="text-body" style={{ color: "var(--color-ink-secondary)", margin: 0, maxWidth: 440 }}>
+          This console shows a blood bank's appointment queue. Your account isn't
+          linked to an organization, so there is nothing to display here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", height: "100%", background: "var(--color-canvas)", fontFamily: "var(--font-sans)" }}>
