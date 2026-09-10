@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../auth/auth_controller.dart';
 
@@ -42,8 +43,14 @@ class HomeScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => context.push('/appointments'),
+                icon: const Icon(Icons.event),
+                label: const Text('My appointments'),
+              ),
+              const SizedBox(height: 12),
               Text(
-                'Donor screens land here as they are built.',
+                'More donor screens land here as they are built.',
                 style: Theme.of(context).textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),

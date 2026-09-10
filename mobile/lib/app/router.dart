@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/appointments/book_appointment_screen.dart';
+import '../features/appointments/my_appointments_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
@@ -28,6 +30,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: '/appointments',
+        builder: (_, _) => const MyAppointmentsScreen(),
+        routes: [
+          GoRoute(
+            path: 'book',
+            builder: (_, _) => const BookAppointmentScreen(),
+          ),
+        ],
+      ),
       GoRoute(
         path: '/splash',
         builder: (_, _) => const Scaffold(
