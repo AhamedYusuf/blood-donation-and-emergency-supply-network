@@ -1,10 +1,10 @@
-using System.Text.Json;
 using BloodDonationNetwork.Application.DTOs.Appointments;
 using BloodDonationNetwork.Application.Services;
 using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using BloodDonationNetwork.Infrastructure.Services;
+using BloodDonationNetwork.IntegrationTests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using DomainBloodType = BloodDonationNetwork.Domain.Enums.BloodType;
@@ -62,6 +62,7 @@ public sealed class CompleteAppointmentTransactionTests : IDisposable
             isAdmin: false);
 
         Assert.Equal("completed", result.Status);
+        Assert.Equal("O+", result.DonorBloodType);
 
         await using var verify = new TestAppDbContext(_options);
 
@@ -170,42 +171,5 @@ public sealed class CompleteAppointmentTransactionTests : IDisposable
         });
 
         ctx.SaveChanges();
-    }
-
-    // AppDbContext subclass for tests: (1) maps DonorProfile.MedicalFlags with a
-    // plain JSON<->string converter, since the production mapping relies on the
-    // Npgsql jsonb provider type; (2) can throw on the Nth SaveChangesAsync to
-    // simulate a mid-transaction failure.
-    private sealed class TestAppDbContext : AppDbContext
-    {
-        public int FailOnSaveNumber { get; init; } = int.MaxValue;
-        private int _saveCount;
-
-        public TestAppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            base.OnModelCreating(modelBuilder);
-
-            modelBuilder.Entity<DonorProfile>()
-                .Property(d => d.MedicalFlags)
-                .HasColumnType("TEXT")
-                .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<Dictionary<string, bool>>(v, (JsonSerializerOptions?)null)
-                         ?? new Dictionary<string, bool>());
-        }
-
-        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-        {
-            _saveCount++;
-            if (_saveCount == FailOnSaveNumber)
-            {
-                throw new InvalidOperationException(
-                    $"Forced failure on SaveChangesAsync call #{_saveCount} (rollback test).");
-            }
-
-            return base.SaveChangesAsync(cancellationToken);
-        }
     }
 }
