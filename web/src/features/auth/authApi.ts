@@ -28,6 +28,7 @@ export interface AuthResponse {
   email: string;
   fullName: string;
   role: string;
+  organizationId: string | null;
 }
 
 // ── API slice ─────────────────────────────────────────────────────────────────

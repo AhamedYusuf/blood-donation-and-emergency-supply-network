@@ -61,6 +61,7 @@ export function LoginPage() {
           email: result.email,
           fullName: result.fullName,
           role: result.role,
+          organizationId: result.organizationId,
         })
       );
       const role = result.role.toLowerCase();

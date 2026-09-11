@@ -25,6 +25,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
 
+    public DbSet<DonorDevice> DonorDevices => Set<DonorDevice>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

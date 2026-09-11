@@ -38,7 +38,7 @@ public class AppointmentService : IAppointmentService
         _context.DonationAppointments.Add(appointment);
         await _context.SaveChangesAsync();
 
-        return MapToDto(appointment);
+        return MapToDto(appointment, await GetDonorBloodTypeAsync(donorId));
     }
 
     public async Task<AppointmentResponseDto?> GetByIdAsync(Guid id)
@@ -46,7 +46,9 @@ public class AppointmentService : IAppointmentService
         var appointment = await _context.DonationAppointments
             .FirstOrDefaultAsync(a => a.Id == id);
 
-        return appointment is null ? null : MapToDto(appointment);
+        return appointment is null
+            ? null
+            : MapToDto(appointment, await GetDonorBloodTypeAsync(appointment.DonorId));
     }
 
     public async Task<AppointmentResponseDto> UpdateStatusAsync(Guid id, UpdateAppointmentStatusDto dto)
@@ -64,7 +66,7 @@ public class AppointmentService : IAppointmentService
 
         await _context.SaveChangesAsync();
 
-        return MapToDto(appointment);
+        return MapToDto(appointment, await GetDonorBloodTypeAsync(appointment.DonorId));
     }
 
     public async Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId)
@@ -74,7 +76,10 @@ public class AppointmentService : IAppointmentService
             .OrderByDescending(a => a.ScheduledTime)
             .ToListAsync();
 
-        return appointments.Select(MapToDto).ToList();
+        // Every row is the same donor, so one lookup covers the whole list.
+        var bloodType = await GetDonorBloodTypeAsync(donorId);
+
+        return appointments.Select(a => MapToDto(a, bloodType)).ToList();
     }
 
     public async Task<PagedResultDto<AppointmentResponseDto>> GetUpcomingByOrganizationAsync(
@@ -105,9 +110,18 @@ public class AppointmentService : IAppointmentService
             .Take(pageSize)
             .ToListAsync();
 
+        // Batch-load blood types for the donors on this page to avoid an
+        // N+1 lookup per row.
+        var donorIds = appointments.Select(a => a.DonorId).Distinct().ToList();
+        var bloodTypes = await _context.DonorProfiles
+            .Where(d => donorIds.Contains(d.UserId))
+            .ToDictionaryAsync(d => d.UserId, d => d.BloodType);
+
         return new PagedResultDto<AppointmentResponseDto>
         {
-            Items = appointments.Select(MapToDto).ToList(),
+            Items = appointments
+                .Select(a => MapToDto(a, bloodTypes.GetValueOrDefault(a.DonorId)))
+                .ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount
@@ -179,11 +193,20 @@ public class AppointmentService : IAppointmentService
             throw;
         }
 
-        return MapToDto(appointment);
+        return MapToDto(appointment, donorProfile?.BloodType);
     }
 
+    // Looks up one donor's blood type by their user id (DonationAppointment.DonorId
+    // holds a User.Id). Returns null when the donor has no DonorProfile row.
+    private Task<string?> GetDonorBloodTypeAsync(Guid donorUserId) =>
+        _context.DonorProfiles
+            .Where(d => d.UserId == donorUserId)
+            .Select(d => (string?)d.BloodType)
+            .FirstOrDefaultAsync();
+
     // Private helper — converts the entity to the DTO shape.
-    private static AppointmentResponseDto MapToDto(DonationAppointment appointment)
+    private static AppointmentResponseDto MapToDto(
+        DonationAppointment appointment, string? donorBloodType = null)
     {
         return new AppointmentResponseDto
         {
@@ -193,6 +216,7 @@ public class AppointmentService : IAppointmentService
             RelatedWorkflowId = appointment.RelatedWorkflowId,
             ScheduledTime = appointment.ScheduledTime,
             Status = AppointmentStatusMap.ToApiString(appointment.Status),
+            DonorBloodType = donorBloodType,
             UnitsDonated = appointment.UnitsDonated,
             CreatedAt = appointment.CreatedAt,
             UpdatedAt = appointment.UpdatedAt

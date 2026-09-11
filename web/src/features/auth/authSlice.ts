@@ -10,6 +10,7 @@ interface AuthState {
   /** Donor profile UUID — set after POST /api/donors/register succeeds.
    *  Different from userId: used for GET/PUT /api/donors/{id} and eligibility. */
   donorId: string | null;
+  organizationId: string | null;
 }
 
 const initialState: AuthState = {
@@ -20,6 +21,7 @@ const initialState: AuthState = {
   fullName: localStorage.getItem("fullName"),
   role: localStorage.getItem("role"),
   donorId: localStorage.getItem("donorId"),
+  organizationId: localStorage.getItem("organizationId"),
 };
 
 const authSlice = createSlice({
@@ -47,6 +49,7 @@ const authSlice = createSlice({
       state.email = email;
       state.fullName = fullName;
       state.role = role;
+      state.organizationId = organizationId;
 
       localStorage.setItem("token", token);
       localStorage.setItem("refreshToken", refreshToken);
@@ -56,6 +59,11 @@ const authSlice = createSlice({
       localStorage.setItem("email", email);
       localStorage.setItem("fullName", fullName);
       localStorage.setItem("role", role);
+      if (organizationId) {
+        localStorage.setItem("organizationId", organizationId);
+      } else {
+        localStorage.removeItem("organizationId");
+      }
     },
 
     /** Persists the donor profile UUID returned by POST /api/donors/register. */
@@ -72,6 +80,7 @@ const authSlice = createSlice({
       state.fullName = null;
       state.role = null;
       state.donorId = null;
+      state.organizationId = null;
 
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
@@ -80,9 +89,10 @@ const authSlice = createSlice({
       localStorage.removeItem("fullName");
       localStorage.removeItem("role");
       localStorage.removeItem("donorId");
+      localStorage.removeItem("organizationId");
     },
   },
 });
 
-export const { setCredentials, setDonorId, logout } = authSlice.actions;
+export const { setCredentials, logout } = authSlice.actions;
 export default authSlice.reducer;

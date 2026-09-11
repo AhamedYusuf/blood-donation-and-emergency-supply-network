@@ -158,6 +158,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* TODO: organization name needs a lookup — the JWT/auth response
+                only carries organizationId, not the name. */}
             <span className="text-subheading" style={{ color: "var(--color-ink)" }}>
               Blood Donation Network
             </span>
