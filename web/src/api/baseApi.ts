@@ -6,16 +6,26 @@ export const API_BASE_URL =
 
 export const baseApi = createApi({
   reducerPath: "api",
+
   baseQuery: fetchBaseQuery({
     baseUrl: `${API_BASE_URL}/api`,
+
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.token;
+
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
+
       return headers;
     },
   }),
-  tagTypes: ["Appointment"],
+
+  tagTypes: [
+    "Appointment",
+    "Inventory",
+    "Organization",
+  ],
+
   endpoints: () => ({}),
 });
