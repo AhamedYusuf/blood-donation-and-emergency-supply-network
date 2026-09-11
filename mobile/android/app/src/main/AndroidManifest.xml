@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required on Android 13+ to show push notifications; requested at
+         runtime via FirebaseMessaging.requestPermission() -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="blood_donation_network"
         android:name="${applicationName}"
