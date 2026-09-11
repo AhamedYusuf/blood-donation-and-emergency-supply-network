@@ -26,6 +26,11 @@ dependencies:
   # HTTP client for the shared ASP.NET Core API
   http: ^1.2.2
 
+  # Push notifications (urgent-request alerts) — Android configured via
+  # android/app/google-services.json; see fcm_token_source.dart
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
