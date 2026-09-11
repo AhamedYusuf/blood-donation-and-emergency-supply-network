@@ -38,10 +38,19 @@ const authSlice = createSlice({
         email: string;
         fullName: string;
         role: string;
+        organizationId?: string | null;
       }>
     ) => {
-      const { token, refreshToken, userId, donorProfileId, email, fullName, role } =
-        action.payload;
+      const {
+        token,
+        refreshToken,
+        userId,
+        donorProfileId,
+        email,
+        fullName,
+        role,
+        organizationId,
+      } = action.payload;
       state.token = token;
       state.refreshToken = refreshToken;
       state.userId = userId;
@@ -49,7 +58,7 @@ const authSlice = createSlice({
       state.email = email;
       state.fullName = fullName;
       state.role = role;
-      state.organizationId = organizationId;
+      state.organizationId = organizationId ?? null;
 
       localStorage.setItem("token", token);
       localStorage.setItem("refreshToken", refreshToken);
@@ -94,5 +103,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, setDonorId, logout } = authSlice.actions;
 export default authSlice.reducer;

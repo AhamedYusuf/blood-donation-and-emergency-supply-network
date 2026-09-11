@@ -49,7 +49,7 @@ public class AuthService : IAuthService
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = BCryptHasher.HashPassword(request.Password),
-            Role = UserRole.Donor,
+            Role = role,
             FullName = request.FullName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
             OrganizationId = organizationId,
@@ -142,7 +142,7 @@ var passwordValid = BCryptHasher.Verify(
             DonorProfileId = await _dbContext.DonorProfiles
                 .Where(profile => profile.UserId == user.Id)
                 .Select(profile => (Guid?)profile.Id)
-                .FirstOrDefaultAsync()
+                .FirstOrDefaultAsync(),
             OrganizationId = user.OrganizationId
         };
     }
