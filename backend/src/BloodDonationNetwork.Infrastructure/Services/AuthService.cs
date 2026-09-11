@@ -49,7 +49,7 @@ public class AuthService : IAuthService
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = BCryptHasher.HashPassword(request.Password),
-            Role = role,
+            Role = UserRole.Donor,
             FullName = request.FullName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
             OrganizationId = organizationId,
@@ -61,7 +61,7 @@ public class AuthService : IAuthService
 
         await _dbContext.SaveChangesAsync();
 
-        return CreateAuthResponse(user);
+        return await CreateAuthResponseAsync(user);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -95,7 +95,7 @@ var passwordValid = BCryptHasher.Verify(
 
         await _dbContext.SaveChangesAsync();
 
-        return CreateAuthResponse(user);
+        return await CreateAuthResponseAsync(user);
     }
 
     public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
@@ -120,10 +120,10 @@ var passwordValid = BCryptHasher.Verify(
 
         await _dbContext.SaveChangesAsync();
 
-        return CreateAuthResponse(user);
+        return await CreateAuthResponseAsync(user);
     }
 
-    private AuthResponse CreateAuthResponse(User user)
+    private async Task<AuthResponse> CreateAuthResponseAsync(User user)
     {
         var accessToken = _jwtTokenService.GenerateAccessToken(
             user.Id,
@@ -139,6 +139,10 @@ var passwordValid = BCryptHasher.Verify(
             Email = user.Email,
             FullName = user.FullName,
             Role = user.Role.ToString(),
+            DonorProfileId = await _dbContext.DonorProfiles
+                .Where(profile => profile.UserId == user.Id)
+                .Select(profile => (Guid?)profile.Id)
+                .FirstOrDefaultAsync()
             OrganizationId = user.OrganizationId
         };
     }

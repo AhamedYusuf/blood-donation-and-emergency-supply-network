@@ -19,18 +19,28 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<AuthResponse>> Register(
         RegisterRequest request)
     {
-        var response = await _authService.RegisterAsync(request);
-
-        return Ok(response);
+        try
+        {
+            return Ok(await _authService.RegisterAsync(request));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login(
         LoginRequest request)
     {
-        var response = await _authService.LoginAsync(request);
-
-        return Ok(response);
+        try
+        {
+            return Ok(await _authService.LoginAsync(request));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
     }
 
     [HttpPost("refresh")]
