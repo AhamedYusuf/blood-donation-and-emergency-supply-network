@@ -1,6 +1,7 @@
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Application.Services;
 using BloodDonationNetwork.Infrastructure.ExternalClients;
+using BloodDonationNetwork.Infrastructure.ExternalClients.Fcm;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using BloodDonationNetwork.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -37,8 +38,44 @@ builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
         "BloodDonationNetwork/1.0"));
 
 // =====================================================
+// PUSH NOTIFICATIONS (Firebase Cloud Messaging)
+// =====================================================
+// If no service-account key is configured the app still runs — a no-op
+// sender is used and NotificationService reports "not configured".
+
+var fcmOptions = builder.Configuration.GetSection("Fcm").Get<FcmOptions>() ?? new FcmOptions();
+
+if (fcmOptions.HasCredentials)
+{
+    var keyJson = !string.IsNullOrWhiteSpace(fcmOptions.ServiceAccountKeyJson)
+        ? fcmOptions.ServiceAccountKeyJson!
+        : File.ReadAllText(fcmOptions.ServiceAccountKeyPath!);
+    var serviceAccount = ServiceAccountKey.Parse(keyJson);
+    var projectId = fcmOptions.ProjectId ?? serviceAccount.ProjectId;
+
+    builder.Services.AddHttpClient("fcm-token");
+    builder.Services.AddHttpClient("fcm-send");
+
+    builder.Services.AddSingleton(sp => new GoogleAccessTokenProvider(
+        serviceAccount,
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("fcm-token")));
+
+    builder.Services.AddScoped<IFcmSender>(sp => new FcmHttpSender(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("fcm-send"),
+        sp.GetRequiredService<GoogleAccessTokenProvider>(),
+        projectId,
+        TimeSpan.FromSeconds(fcmOptions.RequestTimeoutSeconds)));
+}
+else
+{
+    builder.Services.AddScoped<IFcmSender, NoOpFcmSender>();
+}
+
+// =====================================================
 // APPLICATION SERVICES
 // =====================================================
+
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 builder.Services.AddScoped<IDonorService, DonorService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();

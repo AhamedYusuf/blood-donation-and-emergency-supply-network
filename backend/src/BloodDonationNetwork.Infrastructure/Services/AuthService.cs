@@ -33,15 +33,26 @@ public class AuthService : IAuthService
                 "A user with this email already exists.");
         }
 
+        var role = Enum.Parse<UserRole>(request.Role, true);
+
+        // Staff/admin belong to an organization; donors never do. Honour the
+        // organizationId the caller supplied (Bug #2 — this used to be
+        // hardcoded to null, so staff could never be linked to an org
+        // through the API and had to be SQL-patched).
+        // NOTE: self-registering as staff with an arbitrary org is a trust
+        // gap the team should close later (admin-created staff, or an
+        // approval step). It is honoured here so the flow works end to end.
+        var organizationId = role == UserRole.Donor ? null : request.OrganizationId;
+
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = BCryptHasher.HashPassword(request.Password),
-            Role = Enum.Parse<UserRole>(request.Role, true),
+            Role = role,
             FullName = request.FullName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
-            OrganizationId = null,
+            OrganizationId = organizationId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -117,7 +128,8 @@ var passwordValid = BCryptHasher.Verify(
         var accessToken = _jwtTokenService.GenerateAccessToken(
             user.Id,
             user.Email,
-            user.Role.ToString());
+            user.Role.ToString(),
+            user.OrganizationId);
 
         return new AuthResponse
         {
@@ -126,7 +138,8 @@ var passwordValid = BCryptHasher.Verify(
             UserId = user.Id,
             Email = user.Email,
             FullName = user.FullName,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            OrganizationId = user.OrganizationId
         };
     }
 }

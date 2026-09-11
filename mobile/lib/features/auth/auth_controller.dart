@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/secure_storage.dart';
+import '../notifications/devices_repository.dart';
 import 'auth_repository.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -70,13 +73,42 @@ class AuthController extends Notifier<AuthState> {
       role: result.role,
       organizationId: result.organizationId,
     );
+
+    // Best-effort: tell the backend where to push this donor's alerts.
+    // Never let a registration failure surface as a failed login.
+    unawaited(_bestEffort(
+        () => ref.read(devicesRepositoryProvider).registerCurrentDevice()));
   }
 
   Future<void> logout() async {
+    final token = state.token;
+    await _bestEffort(() => ref
+        .read(devicesRepositoryProvider)
+        .unregisterCurrentDevice(sessionToken: token));
+
     await _storage.clear();
     state = const AuthState.signedOut();
+  }
+
+  static Future<void> _bestEffort(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (_) {
+      // non-fatal — retried on the next login
+    }
   }
 }
 
 final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
+
+/// The current bearer token, or null. Split out so feature code (and tests)
+/// can depend on just the token without the whole auth state.
+final authTokenProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider).token,
+);
+
+/// The current user's id, or null.
+final currentUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider).userId,
+);

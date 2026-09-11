@@ -17,7 +17,7 @@ public class JwtTokenService : IJwtTokenService
         _configuration = configuration;
     }
 
-    public string GenerateAccessToken(Guid userId, string email, string role)
+    public string GenerateAccessToken(Guid userId, string email, string role, Guid? organizationId)
     {
         var key = _configuration["Jwt:Key"]
                   ?? throw new InvalidOperationException(
@@ -40,12 +40,19 @@ public class JwtTokenService : IJwtTokenService
             expiresInMinutes = configuredMinutes;
         }
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, email),
-            new Claim(ClaimTypes.Role, role.ToLowerInvariant()),
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email),
+            new(ClaimTypes.Role, role.ToLowerInvariant()),
         };
+
+        // Tech Doc §0.4: organizationId claim, present only for users that
+        // belong to an organization (staff).
+        if (organizationId.HasValue)
+        {
+            claims.Add(new Claim("organizationId", organizationId.Value.ToString()));
+        }
 
         var securityKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(key));

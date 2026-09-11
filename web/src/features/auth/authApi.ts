@@ -12,6 +12,7 @@ interface AuthResponse {
   email: string;
   fullName: string;
   role: string;
+  organizationId: string | null;
 }
 
 export const authApi = baseApi.injectEndpoints({

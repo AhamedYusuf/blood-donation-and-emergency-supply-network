@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   useGetUpcomingByOrganizationQuery,
   useCompleteAppointmentMutation,
@@ -7,8 +9,6 @@ import {
 } from "./appointmentsApi";
 import { StatusBadge, STATUS_CONFIG } from "./StatusBadge";
 import { AgentTag } from "./AgentTag";
-
-const TEST_ORG_ID = "11111111-1111-1111-1111-111111111111";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -119,11 +119,12 @@ export function AppointmentsConsolePage() {
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [unitsDonated, setUnitsDonated] = useState("1");
 
-  const { data, isLoading, error } = useGetUpcomingByOrganizationQuery({
-    orgId: TEST_ORG_ID,
-    page: 1,
-    pageSize: 50,
-  });
+  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+
+  const { data, isLoading, error } = useGetUpcomingByOrganizationQuery(
+    { orgId: organizationId ?? "", page: 1, pageSize: 50 },
+    { skip: !organizationId }
+  );
 
   const [completeAppointment, { isLoading: isCompleting }] = useCompleteAppointmentMutation();
   const [updateStatus, { isLoading: isUpdatingStatus }] = useUpdateAppointmentStatusMutation();
@@ -156,6 +157,20 @@ export function AppointmentsConsolePage() {
     await updateStatus({ id: selected.id, newStatus: "no_show" }).unwrap();
     setSelected(null);
   };
+
+  if (!organizationId) {
+    return (
+      <div style={{ padding: "var(--space-xl)", fontFamily: "var(--font-sans)", background: "var(--color-canvas)", height: "100%" }}>
+        <h1 className="text-display" style={{ margin: "0 0 var(--space-sm)", color: "var(--color-ink)" }}>
+          Upcoming Appointments
+        </h1>
+        <p className="text-body" style={{ color: "var(--color-ink-secondary)", margin: 0, maxWidth: 440 }}>
+          This console shows a blood bank's appointment queue. Your account isn't
+          linked to an organization, so there is nothing to display here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", height: "100%", background: "var(--color-canvas)", fontFamily: "var(--font-sans)" }}>
@@ -250,7 +265,7 @@ export function AppointmentsConsolePage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--color-surface-sunken)" }}>
-                  {["", "Time", "Donor", "Status", "Source", ""].map((h, i) => (
+                  {["", "Time", "Donor", "Blood Type", "Status", "Source", ""].map((h, i) => (
                     <th
                       key={i}
                       className="text-label"
@@ -299,6 +314,26 @@ export function AppointmentsConsolePage() {
                       </td>
                       <td className="tabular-nums text-body-sm" style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
                         #{appt.donorId.slice(0, 8)}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {appt.donorBloodType ? (
+                          <span
+                            className="text-body-sm"
+                            style={{
+                              fontWeight: 500,
+                              padding: "2px 6px",
+                              borderRadius: "var(--radius-xs)",
+                              background: "var(--color-surface-sunken)",
+                              color: "var(--color-ink)",
+                            }}
+                          >
+                            {appt.donorBloodType}
+                          </span>
+                        ) : (
+                          <span className="text-body-sm" style={{ color: "var(--color-ink-faint)" }}>
+                            —
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <StatusBadge status={appt.status} />
@@ -370,6 +405,27 @@ export function AppointmentsConsolePage() {
             <span className="text-body-sm tabular-nums" style={{ color: "var(--color-ink-muted)" }}>
               {formatTime(selected.scheduledTime)} · {formatRelative(selected.scheduledTime)}
             </span>
+          </div>
+
+          <div style={{ marginTop: "var(--space-sm)", display: "flex", gap: "var(--space-lg)" }}>
+            <div>
+              <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                BLOOD TYPE
+              </p>
+              <p className="text-body-sm" style={{ margin: "2px 0 0", color: "var(--color-ink)", fontWeight: 500 }}>
+                {selected.donorBloodType ?? "—"}
+              </p>
+            </div>
+            {selected.unitsDonated != null && (
+              <div>
+                <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                  UNITS DONATED
+                </p>
+                <p className="text-body-sm tabular-nums" style={{ margin: "2px 0 0", color: "var(--color-ink)", fontWeight: 500 }}>
+                  {selected.unitsDonated}
+                </p>
+              </div>
+            )}
           </div>
 
           {selected.relatedWorkflowId && (

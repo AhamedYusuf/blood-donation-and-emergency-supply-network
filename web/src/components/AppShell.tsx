@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const email = useSelector((state: RootState) => state.auth.email);
+  const role = useSelector((state: RootState) => state.auth.role);
   const dispatch = useDispatch();
 
   return (
@@ -81,20 +82,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* TODO: organization name needs a lookup — the JWT/auth response
+                only carries organizationId, not the name. */}
             <span className="text-subheading" style={{ color: "var(--color-ink)" }}>
               Test Blood Bank
             </span>
-            <span
-              className="text-caption"
-              style={{
-                padding: "2px 6px",
-                borderRadius: "var(--radius-xs)",
-                background: "var(--color-surface-sunken)",
-                color: "var(--color-ink-muted)",
-              }}
-            >
-              STAFF
-            </span>
+            {role && (
+              <span
+                className="text-caption"
+                style={{
+                  padding: "2px 6px",
+                  borderRadius: "var(--radius-xs)",
+                  background: "var(--color-surface-sunken)",
+                  color: "var(--color-ink-muted)",
+                }}
+              >
+                {role.toUpperCase()}
+              </span>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="text-body-sm" style={{ color: "var(--color-ink-muted)" }}>

@@ -22,6 +22,7 @@ export function LoginPage() {
           userId: result.userId,
           email: result.email,
           role: result.role,
+          organizationId: result.organizationId,
         })
       );
       navigate("/");

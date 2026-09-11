@@ -146,6 +146,41 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.ToTable("DonationAppointments");
                 });
 
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonorDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DonorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FcmToken")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonorUserId");
+
+                    b.HasIndex("FcmToken")
+                        .IsUnique();
+
+                    b.ToTable("DonorDevices");
+                });
+
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonorProfile", b =>
                 {
                     b.Property<Guid>("Id")
