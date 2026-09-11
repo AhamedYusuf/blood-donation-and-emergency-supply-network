@@ -1,10 +1,46 @@
 name: blood_donation_network
-description: Blood Donation Network mobile application.
+description: "Blood Donation & Emergency Supply Network — mobile app (donor-facing)."
 publish_to: 'none'
 
+version: 1.0.0+1
+
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
     sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management — Riverpod (chosen over Provider for compile-time
+  # safety and testability; see the ADR).
+  flutter_riverpod: ^2.6.1
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Secure token storage (Keychain / Keystore)
+  flutter_secure_storage: ^9.2.4
+
+  # HTTP client for the shared ASP.NET Core API
+  http: ^1.2.2
+
+  # Push notifications (urgent-request alerts) — Android configured via
+  # android/app/google-services.json; see fcm_token_source.dart
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf

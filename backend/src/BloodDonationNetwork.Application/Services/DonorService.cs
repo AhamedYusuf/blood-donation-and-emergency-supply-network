@@ -22,9 +22,11 @@ public class DonorService : IDonorService
 
     public async Task<DonorProfileResponse> RegisterAsync(Guid userId, DonorRegisterRequest request, CancellationToken ct)
     {
-         var alreadyExists = await _db.DonorProfiles.AnyAsync(d => d.UserId == userId, ct);
-    if (alreadyExists)
-        throw new InvalidOperationException("A donor profile already exists for this user.");
+        if (await _db.DonorProfiles.AnyAsync(d => d.UserId == userId, ct))
+            throw new InvalidOperationException("A donor profile already exists for this user.");
+
+        if (string.IsNullOrWhiteSpace(request.Address))
+            throw new InvalidOperationException("A valid address is required to create a donor profile.");
         
         var profile = new DonorProfile
         {
@@ -35,11 +37,13 @@ public class DonorService : IDonorService
             MedicalFlags = request.MedicalFlags ?? new()
         };
 
-        if (!string.IsNullOrWhiteSpace(request.Address))
-        {
-            var coords = await _geocoder.GeocodeAsync(request.Address, ct);
-            if (coords is { } c) { profile.Latitude = c.Item1; profile.Longitude = c.Item2; profile.LocationVerified = true; }
-        }
+        var coords = await _geocoder.GeocodeAsync(request.Address, ct);
+        if (coords is not { } coordinate)
+            throw new InvalidOperationException("We could not locate that address. Please enter a more specific address.");
+
+        profile.Latitude = coordinate.Lat;
+        profile.Longitude = coordinate.Lng;
+        profile.LocationVerified = true;
 
         _db.DonorProfiles.Add(profile);
         await _db.SaveChangesAsync(ct);
@@ -114,6 +118,7 @@ public class DonorService : IDonorService
     {
         Id = p.Id, UserId = p.UserId, BloodType = p.BloodType, EligibilityStatus = p.EligibilityStatus,
         DateOfBirth = p.DateOfBirth, LastDonationDate = p.LastDonationDate, Address = p.Address,
+        MedicalFlags = p.MedicalFlags,
         Latitude = p.Latitude, Longitude = p.Longitude, LocationVerified = p.LocationVerified, VerifiedByAdmin = p.VerifiedByAdmin
     };
 }

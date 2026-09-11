@@ -1,1 +1,18 @@
-# Agent service dependencies will be added here.
+# Agent service — Python 3.12
+#
+# Runtime + HTTP client used by the shared internal client and the
+# Matching & Dispatch agent node.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+python-dotenv==1.0.1
+
+# Test tooling
+pytest==8.3.4
+
+# --- Owned by Student 2 (Coordinator agent / LangGraph orchestration) ---
+# Add the graph + local-LLM dependencies here when that work starts, e.g.:
+#   langgraph==...
+#   langchain-core==...
+#   langchain-ollama==...

@@ -19,7 +19,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Donor")]
+    [Authorize(Roles = "donor")]
     public async Task<ActionResult<AppointmentResponseDto>> Create(CreateAppointmentDto dto)
     {
         var donorId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -42,7 +42,7 @@ public async Task<ActionResult<AppointmentResponseDto>> GetById(Guid id)
     var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
 
     var isOwner = appointment.DonorId == currentUserId;
-    var isStaffOrAdmin = currentUserRole is "Staff" or "Admin";
+    var isStaffOrAdmin = currentUserRole is "staff" or "admin";
 
     if (!isOwner && !isStaffOrAdmin)
     {
@@ -65,7 +65,7 @@ public async Task<IActionResult> UpdateStatus(Guid id, UpdateAppointmentStatusDt
     var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
 
     var isOwner = appointment.DonorId == currentUserId;
-    var isStaffOrAdmin = currentUserRole is "Staff" or "Admin";
+    var isStaffOrAdmin = currentUserRole is "staff" or "admin";
 
     if (!isOwner && !isStaffOrAdmin)
     {
@@ -95,7 +95,7 @@ public async Task<ActionResult<List<AppointmentResponseDto>>> GetByDonor(Guid do
     var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
 
     var isSelf = donorId == currentUserId;
-    var isAdmin = currentUserRole == "Admin";
+    var isAdmin = currentUserRole == "admin";
 
     if (!isSelf && !isAdmin)
     {
@@ -107,13 +107,13 @@ public async Task<ActionResult<List<AppointmentResponseDto>>> GetByDonor(Guid do
 }
 
 [HttpGet("bloodbank/{orgId}/upcoming")]
-[Authorize(Roles = "Staff,Admin")]
+[Authorize(Roles = "staff,admin")]
 public async Task<ActionResult<PagedResultDto<AppointmentResponseDto>>> GetUpcomingByOrganization(
     Guid orgId, int page = 1, int pageSize = 20)
 {
     var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
-    var isAdmin = currentUserRole == "Admin";
+    var isAdmin = currentUserRole == "admin";
 
     try
     {
@@ -128,12 +128,12 @@ public async Task<ActionResult<PagedResultDto<AppointmentResponseDto>>> GetUpcom
 }
 
 [HttpPost("{id}/complete")]
-[Authorize(Roles = "Staff,Admin")]
+[Authorize(Roles = "staff,admin")]
 public async Task<IActionResult> Complete(Guid id, CompleteAppointmentDto dto)
 {
     var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
-    var isAdmin = currentUserRole == "Admin";
+    var isAdmin = currentUserRole == "admin";
 
     try
     {
