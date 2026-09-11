@@ -16,12 +16,16 @@ class SecureStorage {
   static const _kUserId = 'auth_user_id';
   static const _kRole = 'auth_role';
   static const _kOrgId = 'auth_org_id';
+  static const _kEmail = 'auth_email';
+  static const _kFullName = 'auth_full_name';
 
   Future<void> saveSession({
     required String token,
     required String userId,
     required String role,
     String? organizationId,
+    String? email,
+    String? fullName,
   }) async {
     await _storage.write(key: _kToken, value: token);
     await _storage.write(key: _kUserId, value: userId);
@@ -31,10 +35,21 @@ class SecureStorage {
     } else {
       await _storage.delete(key: _kOrgId);
     }
+    if (email != null) await _storage.write(key: _kEmail, value: email);
+    if (fullName != null) {
+      await _storage.write(key: _kFullName, value: fullName);
+    }
   }
 
-  Future<({String token, String userId, String role, String? organizationId})?>
-      readSession() async {
+  Future<
+      ({
+        String token,
+        String userId,
+        String role,
+        String? organizationId,
+        String? email,
+        String? fullName,
+      })?> readSession() async {
     final token = await _storage.read(key: _kToken);
     final userId = await _storage.read(key: _kUserId);
     final role = await _storage.read(key: _kRole);
@@ -44,6 +59,8 @@ class SecureStorage {
       userId: userId,
       role: role,
       organizationId: await _storage.read(key: _kOrgId),
+      email: await _storage.read(key: _kEmail),
+      fullName: await _storage.read(key: _kFullName),
     );
   }
 

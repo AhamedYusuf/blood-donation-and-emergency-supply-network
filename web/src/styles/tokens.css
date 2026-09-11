@@ -1,33 +1,41 @@
 :root {
-  --color-primary: #2F5EDB;
-  --color-primary-hover: #4A72E8;
-  --color-primary-press: #1F42A8;
-  --color-primary-subtle: #E8EDFC;
+  /* Primary — DESIGN.md §4.1: burgundy is the blood-bank brand identity,
+     used for primary actions, active states and important elements. Not
+     a generic SaaS blue. */
+  --color-primary: #9F1738;
+  --color-primary-hover: #8C1430;
+  --color-primary-press: #7F1230;
+  --color-primary-subtle: #FFF1F4;
   --color-on-primary: #FFFFFF;
 
-  --color-agent: #7C5CFC;
-  --color-agent-subtle: #F1EDFF;
+  /* AI/agent accent — DESIGN.md §30: a subtle blue reserved for
+     distinguishing AI-generated data from normal system data. */
+  --color-agent: #2563EB;
+  --color-agent-subtle: #EFF6FF;
 
-  --color-ink: #141B2C;
-  --color-ink-secondary: #3D4A5C;
-  --color-ink-muted: #6B7684;
-  --color-ink-faint: #98A1AC;
+  /* Neutrals — DESIGN.md §4.2 */
+  --color-ink: #172033;
+  --color-ink-secondary: #3D4759;
+  --color-ink-muted: #5E6675;
+  --color-ink-faint: #8A92A1;
 
-  --color-canvas: #F7F8FA;
+  --color-canvas: #F6F7F9;
   --color-surface: #FFFFFF;
-  --color-surface-sunken: #EEF1F4;
+  --color-surface-sunken: #EEF0F3;
 
-  --color-hairline: #DFE3E8;
-  --color-hairline-strong: #C6CCD4;
+  --color-hairline: #E7E9EE;
+  --color-hairline-strong: #D5D9E0;
 
-  --color-critical: #D64545;
-  --color-critical-subtle: #FBEAEA;
-  --color-urgent: #D97F1D;
-  --color-urgent-subtle: #FCF1E3;
-  --color-success: #1F8A54;
-  --color-success-subtle: #E8F5EE;
-  --color-neutral-status: #6B7684;
-  --color-neutral-status-subtle: #EEF1F4;
+  /* Semantic — DESIGN.md §5. `critical` is a brighter, more saturated
+     red than `primary` on purpose: never mistaken for brand chrome. */
+  --color-critical: #C62845;
+  --color-critical-subtle: #FFF0F2;
+  --color-urgent: #D97706;
+  --color-urgent-subtle: #FFF7E8;
+  --color-success: #198754;
+  --color-success-subtle: #EAF7F0;
+  --color-neutral-status: #5E6675;
+  --color-neutral-status-subtle: #EEF0F3;
 
   --space-xxs: 4px;
   --space-xs: 8px;
@@ -37,20 +45,22 @@
   --space-xl: 32px;
   --space-xxl: 48px;
 
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* DESIGN.md §39: small 8px, standard 12-14px, cards 14-18px, large
+     hero surfaces 18-24px. */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
   --radius-full: 9999px;
 
   --font-sans: "Inter", -apple-system, system-ui, sans-serif;
 
-  /* Motion — restrained, purposeful, matching the ops-tool brief.
-     Two speeds only: fast for hover/interaction feedback, base for
-     entrances. No bounce, no decoration. */
+  /* Motion — DESIGN.md §36: 150-300ms standard, 300-500ms page
+     transitions. Two speeds only: fast for hover/interaction feedback,
+     base for entrances. No bounce, no decoration. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
 }
 
 * {
@@ -70,26 +80,28 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* Type scale — actually used, not just documented */
+/* Type scale — DESIGN.md §7.1. Page title 28-36/700, section title
+   20-24/700, card title 16-18/600, body 14-16/400, labels 12-14/600,
+   small metadata 12/400. */
 .text-display {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
   letter-spacing: -0.4px;
   line-height: 1.2;
 }
 .text-heading {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
   letter-spacing: -0.2px;
   line-height: 1.3;
 }
 .text-subheading {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.4;
 }
 .text-body {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -99,13 +111,13 @@ body {
   line-height: 1.45;
 }
 .text-label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 0.2px;
   line-height: 1.3;
 }
 .text-caption {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.3px;
   line-height: 1.3;

@@ -9,8 +9,10 @@ import '../../theme/tokens.dart';
 import '../../widgets/agent_tag.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/brand_mark.dart';
+import '../../widgets/fade_slide_in.dart';
 import '../../widgets/states.dart';
 import '../../widgets/status_pill.dart';
+import '../../widgets/ticket_card.dart';
 import 'appointment.dart';
 import 'appointments_repository.dart';
 
@@ -109,10 +111,13 @@ class MyAppointmentsScreen extends ConsumerWidget {
                 if (laterUpcoming.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),
                   const SectionLabel('Also upcoming'),
-                  for (final a in laterUpcoming)
+                  for (final (i, a) in laterUpcoming.indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: _Row(appointment: a, onCancel: () => _confirmCancel(context, ref, a)),
+                      child: FadeSlideIn(
+                        index: i,
+                        child: _Row(appointment: a, onCancel: () => _confirmCancel(context, ref, a)),
+                      ),
                     ),
                 ],
 
@@ -120,10 +125,10 @@ class MyAppointmentsScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.lg),
                   SectionLabel('History',
                       trailing: Text('${history.length}', style: AppText.caption)),
-                  for (final a in history)
+                  for (final (i, a) in history.indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: _Row(appointment: a, onCancel: null),
+                      child: FadeSlideIn(index: i, child: _Row(appointment: a, onCancel: null)),
                     ),
                 ],
               ],
@@ -158,6 +163,9 @@ class MyAppointmentsScreen extends ConsumerWidget {
 
 // ── hero ─────────────────────────────────────────────────────────────────
 
+/// The one boarding-pass surface in the product (see [TicketCard]) — the
+/// donor's single most important fact, front and centre in the brand
+/// gradient rather than another flat white card.
 class _HeroCard extends StatelessWidget {
   const _HeroCard({required this.appointment, required this.onCancel});
   final Appointment appointment;
@@ -166,59 +174,57 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = appointment;
-    return AppCard(
-      elevated: true,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DateBlock(a.scheduledTime),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(clockTime(a.scheduledTime),
-                        style: AppText.numeric.copyWith(fontSize: 17, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(relativeTime(a.scheduledTime),
-                        style: AppText.bodySmall.copyWith(color: AppColors.inkMuted)),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
-                      children: [
-                        StatusPill(a.status),
-                        if (a.donorBloodType != null) _BloodTypeChip(a.donorBloodType!),
-                        if (a.isAgentMatched) const AgentTag(),
-                      ],
-                    ),
-                  ],
+    return TicketCard(
+      gradient: AppGradients.ticket,
+      boxShadow: AppElevation.lifted,
+      bottom: a.canCancel
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xxs, AppSpacing.lg, AppSpacing.sm),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onCancel,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.critical,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
+                  ),
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Cancel appointment'),
                 ),
               ),
-            ],
-          ),
-          if (a.canCancel) ...[
-            const SizedBox(height: AppSpacing.md),
-            const Divider(height: 1),
-            const SizedBox(height: AppSpacing.xs),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: onCancel,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.critical,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
-                ),
-                icon: const Icon(Icons.close, size: 16),
-                label: const Text('Cancel appointment'),
+            )
+          : null,
+      top: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _DateBlock(a.scheduledTime),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(clockTime(a.scheduledTime),
+                      style: AppText.numeric.copyWith(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
+                  const SizedBox(height: 2),
+                  Text(relativeTime(a.scheduledTime),
+                      style: AppText.bodySmall.copyWith(color: Colors.white.withValues(alpha: 0.68))),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      StatusPill(a.status),
+                      if (a.donorBloodType != null) _BloodTypeChip(a.donorBloodType!),
+                      if (a.isAgentMatched) const AgentTag(),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -234,16 +240,17 @@ class _DateBlock extends StatelessWidget {
       width: 58,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: AppColors.primarySubtle,
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Column(
         children: [
           Text(weekdayAbbr(dt).toUpperCase(),
-              style: AppText.caption.copyWith(color: AppColors.primary, letterSpacing: 0.6)),
-          Text(dayNum(dt), style: AppText.heroFigure.copyWith(color: AppColors.primary)),
+              style: AppText.caption.copyWith(color: Colors.white.withValues(alpha: 0.8), letterSpacing: 0.6)),
+          Text(dayNum(dt), style: AppText.heroFigure.copyWith(color: Colors.white)),
           Text(monthAbbr(dt).toUpperCase(),
-              style: AppText.caption.copyWith(color: AppColors.primary, letterSpacing: 0.6)),
+              style: AppText.caption.copyWith(color: Colors.white.withValues(alpha: 0.8), letterSpacing: 0.6)),
         ],
       ),
     );

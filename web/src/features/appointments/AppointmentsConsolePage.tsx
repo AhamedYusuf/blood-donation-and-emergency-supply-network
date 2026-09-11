@@ -365,7 +365,7 @@ export function AppointmentsConsolePage() {
             width: 420,
             background: "var(--color-surface)",
             borderLeft: "1px solid var(--color-hairline)",
-            boxShadow: "0 4px 16px rgba(20, 27, 44, 0.10), 0 1px 3px rgba(20, 27, 44, 0.06)",
+            boxShadow: "0 4px 16px rgba(23, 32, 51, 0.10), 0 1px 3px rgba(23, 32, 51, 0.06)",
             padding: "var(--space-lg)",
             overflowY: "auto",
           }}

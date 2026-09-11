@@ -14,6 +14,7 @@ class AppCard extends StatelessWidget {
     this.accent,
     this.elevated = false,
     this.onTap,
+    this.boxShadow,
   });
 
   final Widget child;
@@ -21,6 +22,12 @@ class AppCard extends StatelessWidget {
   final Color? accent;
   final bool elevated;
   final VoidCallback? onTap;
+
+  /// A soft shadow without opting into the full `elevated` treatment (which
+  /// also switches to the larger hero corner radius and drops the border).
+  /// Used sparingly — the bento-style stat cards on home are the one other
+  /// place this app lifts a surface off the canvas.
+  final List<BoxShadow>? boxShadow;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +55,7 @@ class AppCard extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: radius,
         border: elevated ? null : Border.all(color: AppColors.hairline),
-        boxShadow: elevated ? AppElevation.lifted : null,
+        boxShadow: elevated ? AppElevation.lifted : boxShadow,
       ),
       child: inner,
     );

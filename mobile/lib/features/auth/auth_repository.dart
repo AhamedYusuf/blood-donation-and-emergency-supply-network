@@ -8,6 +8,7 @@ class AuthResult {
     required this.token,
     required this.userId,
     required this.email,
+    required this.fullName,
     required this.role,
     this.organizationId,
   });
@@ -15,6 +16,7 @@ class AuthResult {
   final String token;
   final String userId;
   final String email;
+  final String fullName;
   final String role;
   final String? organizationId;
 
@@ -22,6 +24,7 @@ class AuthResult {
         token: json['accessToken'] as String,
         userId: json['userId'] as String,
         email: json['email'] as String,
+        fullName: json['fullName'] as String? ?? '',
         role: (json['role'] as String).toLowerCase(),
         organizationId: json['organizationId'] as String?,
       );
