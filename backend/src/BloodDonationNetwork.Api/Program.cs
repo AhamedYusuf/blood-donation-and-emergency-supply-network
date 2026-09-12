@@ -27,6 +27,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<BloodDonationNetwork.Api.Middleware.DatabaseExceptionHandler>();
 
 // =====================================================
 // EXTERNAL CLIENTS
@@ -91,6 +92,8 @@ builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+builder.Services.AddScoped<IStaffInvitationService, StaffInvitationService>();
 
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
@@ -210,6 +213,42 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // Bootstraps the very first admin account. There's no other way to
+    // get one: public registration always creates a donor (AuthService),
+    // and staff accounts require an admin-issued invitation
+    // (StaffInvitationService) — so without this, a fresh database has
+    // no user who could ever issue that first invitation. Runs once per
+    // startup, is a no-op once any admin exists, and only runs in
+    // Development — production admin provisioning is a separate,
+    // deliberately manual concern (this seeder is not safe to run
+    // unattended against a real database).
+    using var seedScope = app.Services.CreateScope();
+    var seedContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (!await seedContext.Users.AnyAsync(u => u.Role == BloodDonationNetwork.Domain.Entities.UserRole.Admin))
+    {
+        var adminEmail = (app.Configuration["Seed:AdminEmail"] ?? "admin@blooddonation.local").Trim().ToLowerInvariant();
+        var adminPassword = app.Configuration["Seed:AdminPassword"] ?? "ChangeMe123!";
+
+        seedContext.Users.Add(new BloodDonationNetwork.Domain.Entities.User
+        {
+            Id = Guid.NewGuid(),
+            Email = adminEmail,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+            Role = BloodDonationNetwork.Domain.Entities.UserRole.Admin,
+            FullName = "Admin",
+            PhoneNumber = string.Empty,
+            OrganizationId = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await seedContext.SaveChangesAsync();
+
+        app.Logger.LogWarning(
+            "Seeded first admin account {Email} — set Seed:AdminEmail/Seed:AdminPassword in " +
+            "appsettings.Development.json to override, and change this password after logging in.",
+            adminEmail);
+    }
 }
 
 app.UseHttpsRedirection();

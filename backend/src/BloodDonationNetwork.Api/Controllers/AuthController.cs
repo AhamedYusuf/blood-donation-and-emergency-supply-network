@@ -9,10 +9,12 @@ namespace BloodDonationNetwork.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IStaffInvitationService _staffInvitationService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IStaffInvitationService staffInvitationService)
     {
         _authService = authService;
+        _staffInvitationService = staffInvitationService;
     }
 
     [HttpPost("register")]
@@ -50,5 +52,22 @@ public class AuthController : ControllerBase
         var response = await _authService.RefreshTokenAsync(refreshToken);
 
         return Ok(response);
+    }
+
+    // The only way to get a non-donor account: redeem an admin-issued
+    // invitation (see StaffInvitationsController for creating one). Role
+    // and organization come from the invitation, never from this request.
+    [HttpPost("register/staff")]
+    public async Task<ActionResult<AuthResponse>> RegisterStaff(
+        AcceptStaffInvitationRequest request)
+    {
+        try
+        {
+            return Ok(await _staffInvitationService.AcceptAsync(request));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

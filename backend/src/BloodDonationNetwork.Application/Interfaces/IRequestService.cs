@@ -5,7 +5,10 @@ namespace BloodDonationNetwork.Application.Interfaces;
 
 public interface IRequestService
 {
-    Task<RequestResponseDto> CreateAsync(CreateRequestDto dto);
+    /// <summary>Throws <see cref="UnauthorizedAccessException"/> if the
+    /// caller is staff at a different organization than
+    /// <paramref name="dto"/>.OrganizationId.</summary>
+    Task<RequestResponseDto> CreateAsync(Guid requesterId, Guid requestingUserId, bool isAdmin, CreateRequestDto dto);
 
     Task<RequestResponseDto?> GetByIdAsync(Guid id);
 
@@ -19,11 +22,15 @@ public interface IRequestService
         string sortBy = "createdAt",
         bool descending = true);
 
+    /// <summary>Throws <see cref="UnauthorizedAccessException"/> if the
+    /// caller is staff at a different organization than the request.</summary>
     Task<RequestResponseDto?> UpdateStatusAsync(
         Guid id,
+        Guid requestingUserId,
+        bool isAdmin,
         RequestStatusUpdateDto dto);
 
-    Task<bool> DeleteAsync(Guid id);
+    Task<bool> DeleteAsync(Guid id, Guid requestingUserId, bool isAdmin);
 
-    Task<RequestResponseDto?> CloseAsync(Guid id);
+    Task<RequestResponseDto?> CloseAsync(Guid id, Guid requestingUserId, bool isAdmin);
 }

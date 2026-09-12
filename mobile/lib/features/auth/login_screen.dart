@@ -54,6 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -65,12 +66,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Center(child: BrandMark(size: 48)),
+                    Center(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: const BoxDecoration(color: AppColors.primarySubtle, shape: BoxShape.circle),
+                        child: const Center(child: BrandMark(size: 32)),
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.lg),
                     Text('Blood Donation Network', style: AppText.title, textAlign: TextAlign.center),
                     const SizedBox(height: AppSpacing.xxs),
                     Text('Sign in to manage your donations', style: AppText.body, textAlign: TextAlign.center),
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: AppSpacing.xxl),
                     _FieldLabel('Email'),
                     TextFormField(
                       controller: _email,
@@ -152,7 +160,6 @@ class _Banner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.criticalSubtle,
         borderRadius: BorderRadius.circular(AppRadii.sm),
-        border: Border.all(color: AppColors.critical.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

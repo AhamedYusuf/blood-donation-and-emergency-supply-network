@@ -16,12 +16,14 @@ public class RequestService : IRequestService
     }
 
     // 1. Create a new blood request
-    public async Task<RequestResponseDto> CreateAsync(CreateRequestDto dto)
+    public async Task<RequestResponseDto> CreateAsync(Guid requesterId, Guid requestingUserId, bool isAdmin, CreateRequestDto dto)
     {
+        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, dto.OrganizationId);
+
         var request = new BloodRequest
         {
             Id = Guid.NewGuid(),
-            RequesterId = dto.RequesterId,
+            RequesterId = requesterId,
             OrganizationId = dto.OrganizationId,
             BloodType = dto.BloodType,
             UnitsRequested = dto.UnitsRequested,
@@ -133,6 +135,8 @@ public class RequestService : IRequestService
     // 4. Update request status
     public async Task<RequestResponseDto?> UpdateStatusAsync(
         Guid id,
+        Guid requestingUserId,
+        bool isAdmin,
         RequestStatusUpdateDto dto)
     {
         var request = await _context.BloodRequests
@@ -142,6 +146,8 @@ public class RequestService : IRequestService
         {
             return null;
         }
+
+        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, request.OrganizationId);
 
         request.Status = dto.Status;
 
@@ -163,7 +169,7 @@ public class RequestService : IRequestService
     }
 
     // 5. Delete a blood request
-    public async Task<bool> DeleteAsync(Guid id)
+    public async Task<bool> DeleteAsync(Guid id, Guid requestingUserId, bool isAdmin)
     {
         var request = await _context.BloodRequests
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -173,6 +179,8 @@ public class RequestService : IRequestService
             return false;
         }
 
+        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, request.OrganizationId);
+
         _context.BloodRequests.Remove(request);
         await _context.SaveChangesAsync();
 
@@ -180,7 +188,7 @@ public class RequestService : IRequestService
     }
 
     // 6. Close a blood request
-    public async Task<RequestResponseDto?> CloseAsync(Guid id)
+    public async Task<RequestResponseDto?> CloseAsync(Guid id, Guid requestingUserId, bool isAdmin)
     {
         var request = await _context.BloodRequests
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -190,12 +198,33 @@ public class RequestService : IRequestService
             return null;
         }
 
+        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, request.OrganizationId);
+
         request.Status = BloodRequestStatus.Closed;
         request.ClosedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
         return MapToResponse(request);
+    }
+
+    // Staff may only act on their own organization's requests; admins may
+    // act on any. Mirrors AppointmentService's org-ownership check.
+    private async Task EnsureCanActOnOrganizationAsync(Guid requestingUserId, bool isAdmin, Guid organizationId)
+    {
+        if (isAdmin)
+        {
+            return;
+        }
+
+        var requestingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == requestingUserId);
+
+        if (requestingUser?.OrganizationId != organizationId)
+        {
+            throw new UnauthorizedAccessException(
+                "Staff may only manage blood requests for their own organization.");
+        }
     }
 
     // Convert BloodRequest entity into response DTO

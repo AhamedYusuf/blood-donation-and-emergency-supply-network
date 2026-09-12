@@ -2,17 +2,24 @@ import 'package:flutter/material.dart';
 
 import 'tokens.dart';
 
-/// Inter, one family, weights 400/500/600 only — nothing bolder appears
-/// anywhere (matches the web system). `tnum` variants are used for every
-/// time, count and id fragment so columns line up.
+/// Inter — DESIGN.md §7.1's exact hierarchy, shared with the web staff
+/// console: page title 28-36/700, section title 20-24/700, card title
+/// 16-18/600, body 14-16/400, labels 12-14/600, small metadata 12/400-500.
+/// `tnum` variants are used for every time, count and id fragment so
+/// columns line up.
 abstract final class AppText {
   static const _f = 'Inter';
   static const _tnum = [FontFeature.tabularFigures()];
 
+  /// Page title (Home's greeting).
+  static const largeTitle = TextStyle(
+      fontFamily: _f, fontSize: 32, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.4, color: AppColors.ink);
   static const display = TextStyle(
-      fontFamily: _f, fontSize: 27, fontWeight: FontWeight.w600, height: 1.15, letterSpacing: -0.4, color: AppColors.ink);
+      fontFamily: _f, fontSize: 27, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.4, color: AppColors.ink);
+  /// Section title — screen/app-bar titles.
   static const title = TextStyle(
-      fontFamily: _f, fontSize: 20, fontWeight: FontWeight.w600, height: 1.25, letterSpacing: -0.2, color: AppColors.ink);
+      fontFamily: _f, fontSize: 22, fontWeight: FontWeight.w700, height: 1.25, letterSpacing: -0.2, color: AppColors.ink);
+  /// Card title.
   static const headline = TextStyle(
       fontFamily: _f, fontSize: 17, fontWeight: FontWeight.w600, height: 1.3, letterSpacing: -0.1, color: AppColors.ink);
   static const body = TextStyle(
@@ -24,9 +31,10 @@ abstract final class AppText {
   static const numeric = TextStyle(
       fontFamily: _f, fontSize: 14, fontWeight: FontWeight.w500, height: 1.3, color: AppColors.ink, fontFeatures: _tnum);
   static const label = TextStyle(
-      fontFamily: _f, fontSize: 12, fontWeight: FontWeight.w500, height: 1.3, letterSpacing: 0.4, color: AppColors.inkMuted);
+      fontFamily: _f, fontSize: 13, fontWeight: FontWeight.w600, height: 1.3, letterSpacing: 0.3, color: AppColors.inkMuted);
+  /// Small metadata.
   static const caption = TextStyle(
-      fontFamily: _f, fontSize: 11, fontWeight: FontWeight.w500, height: 1.3, letterSpacing: 0.3, color: AppColors.inkFaint);
+      fontFamily: _f, fontSize: 12, fontWeight: FontWeight.w500, height: 1.3, letterSpacing: 0.2, color: AppColors.inkFaint);
   static const button = TextStyle(
       fontFamily: _f, fontSize: 15, fontWeight: FontWeight.w600, height: 1.2, letterSpacing: 0);
 
@@ -114,6 +122,8 @@ ThemeData buildAppTheme() {
       ),
     ),
 
+    // DESIGN.md §17: white background, light border, rounded corners,
+    // focus state uses the primary burgundy subtly.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surface,
@@ -121,6 +131,10 @@ ThemeData buildAppTheme() {
       hintStyle: AppText.body.copyWith(color: AppColors.inkFaint),
       labelStyle: AppText.body.copyWith(color: AppColors.inkMuted),
       floatingLabelStyle: AppText.bodySmall.copyWith(color: AppColors.primary),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        borderSide: const BorderSide(color: AppColors.hairlineStrong),
+      ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.sm),
         borderSide: const BorderSide(color: AppColors.hairlineStrong),
@@ -131,7 +145,7 @@ ThemeData buildAppTheme() {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.sm),
-        borderSide: const BorderSide(color: AppColors.critical),
+        borderSide: const BorderSide(color: AppColors.critical, width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.sm),

@@ -16,17 +16,28 @@ class _FakeSecureStorage implements SecureStorage {
     required String userId,
     required String role,
     String? organizationId,
+    String? email,
+    String? fullName,
   }) async {
     _store
       ..['token'] = token
       ..['userId'] = userId
       ..['role'] = role;
     if (organizationId != null) _store['orgId'] = organizationId;
+    if (email != null) _store['email'] = email;
+    if (fullName != null) _store['fullName'] = fullName;
   }
 
   @override
-  Future<({String token, String userId, String role, String? organizationId})?>
-      readSession() async {
+  Future<
+      ({
+        String token,
+        String userId,
+        String role,
+        String? organizationId,
+        String? email,
+        String? fullName,
+      })?> readSession() async {
     final token = _store['token'];
     if (token == null) return null;
     return (
@@ -34,6 +45,8 @@ class _FakeSecureStorage implements SecureStorage {
       userId: _store['userId']!,
       role: _store['role']!,
       organizationId: _store['orgId'],
+      email: _store['email'],
+      fullName: _store['fullName'],
     );
   }
 

@@ -26,7 +26,24 @@ public sealed class NotificationServiceTests : IDisposable
         _options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options;
         using var ctx = new TestAppDbContext(_options);
         ctx.Database.EnsureCreated();
+
+        // DonorDevices.DonorUserId now has a real FK to Users.Id — every
+        // device row below needs a matching user to exist first.
+        ctx.Users.AddRange(SeedUser(Donor), SeedUser(OtherDonor));
+        ctx.SaveChanges();
     }
+
+    private static User SeedUser(Guid id) => new()
+    {
+        Id = id,
+        Email = $"{id}@example.com",
+        PasswordHash = "not-a-real-hash",
+        Role = UserRole.Donor,
+        FullName = "Test Donor",
+        PhoneNumber = "0000000000",
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow,
+    };
 
     public void Dispose() => _connection.Dispose();
 

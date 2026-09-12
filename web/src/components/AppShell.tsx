@@ -18,12 +18,17 @@ interface NavItem {
   staffPath?: string;
   /** Roles that can see/use this item. Undefined = all roles. */
   allowedRoles?: string[];
+  /** False = no route exists for this yet (App.tsx has nothing registered
+   * at `path`) — shown dimmed with an explanatory tooltip instead of a
+   * dead link, the same "coming soon" treatment the mobile app uses.
+   * Defaults to true. */
+  built?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Appointments", icon: "◧", path: "/" },
-  { label: "Requests", icon: "◇", path: "/requests" },
-  { label: "Inventory", icon: "▤", path: "/inventory" },
+  { label: "Requests", icon: "◇", path: "/requests", built: false },
+  { label: "Inventory", icon: "▤", path: "/inventory", built: false },
   {
     label: "Donors",
     icon: "◎",
@@ -45,6 +50,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   const resolveNavPath = (item: NavItem): string | null => {
+    // Not built yet — no route exists to send them to.
+    if (item.built === false) return null;
     // If item is role-restricted and user doesn't qualify, return null (inactive)
     if (item.allowedRoles && !item.allowedRoles.includes(role)) return null;
 
@@ -106,6 +113,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               title={
                 clickable
                   ? item.label
+                  : item.built === false
+                  ? `${item.label} — coming soon`
                   : `${item.label} — not available for your role`
               }
               onClick={() => clickable && navigate(targetPath!)}
