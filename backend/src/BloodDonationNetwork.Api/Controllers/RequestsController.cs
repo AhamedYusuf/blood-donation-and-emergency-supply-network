@@ -1,12 +1,20 @@
+using System.Security.Claims;
 using BloodDonationNetwork.Application.DTOs.Requests;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BloodDonationNetwork.Api.Controllers;
 
+// Previously had no [Authorize] anywhere — anonymous callers could
+// create/edit/delete/close any organization's blood requests. Reads stay
+// open to any authenticated user (donors need to see compatible requests);
+// writes are staff/admin, org-scoped in RequestService the same way
+// AppointmentsController/AppointmentService scope appointment completion.
 [ApiController]
 [Route("api/requests")]
+[Authorize]
 public class RequestsController : ControllerBase
 {
     private readonly IRequestService _requestService;
@@ -18,15 +26,25 @@ public class RequestsController : ControllerBase
 
     // POST /api/requests
     [HttpPost]
+    [Authorize(Roles = "staff,admin")]
     public async Task<ActionResult<RequestResponseDto>> Create(
         [FromBody] CreateRequestDto dto)
     {
-        var request = await _requestService.CreateAsync(dto);
+        var (userId, isAdmin) = CurrentUser();
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = request.Id },
-            request);
+        try
+        {
+            var request = await _requestService.CreateAsync(userId, userId, isAdmin, dto);
+
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = request.Id },
+                request);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     // GET /api/requests/{id}
@@ -73,54 +91,91 @@ public class RequestsController : ControllerBase
 
     // PUT /api/requests/{id}/status
     [HttpPut("{id:guid}/status")]
+    [Authorize(Roles = "staff,admin")]
     public async Task<ActionResult<RequestResponseDto>> UpdateStatus(
         Guid id,
         [FromBody] RequestStatusUpdateDto dto)
     {
-        var request = await _requestService.UpdateStatusAsync(id, dto);
+        var (userId, isAdmin) = CurrentUser();
 
-        if (request == null)
+        try
         {
-            return NotFound(new
-            {
-                message = "Blood request not found."
-            });
-        }
+            var request = await _requestService.UpdateStatusAsync(id, userId, isAdmin, dto);
 
-        return Ok(request);
+            if (request == null)
+            {
+                return NotFound(new
+                {
+                    message = "Blood request not found."
+                });
+            }
+
+            return Ok(request);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     // DELETE /api/requests/{id}
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "staff,admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var deleted = await _requestService.DeleteAsync(id);
+        var (userId, isAdmin) = CurrentUser();
 
-        if (!deleted)
+        try
         {
-            return NotFound(new
-            {
-                message = "Blood request not found."
-            });
-        }
+            var deleted = await _requestService.DeleteAsync(id, userId, isAdmin);
 
-        return NoContent();
+            if (!deleted)
+            {
+                return NotFound(new
+                {
+                    message = "Blood request not found."
+                });
+            }
+
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     // POST /api/requests/{id}/close
     [HttpPost("{id:guid}/close")]
+    [Authorize(Roles = "staff,admin")]
     public async Task<ActionResult<RequestResponseDto>> Close(Guid id)
     {
-        var request = await _requestService.CloseAsync(id);
+        var (userId, isAdmin) = CurrentUser();
 
-        if (request == null)
+        try
         {
-            return NotFound(new
-            {
-                message = "Blood request not found."
-            });
-        }
+            var request = await _requestService.CloseAsync(id, userId, isAdmin);
 
-        return Ok(request);
+            if (request == null)
+            {
+                return NotFound(new
+                {
+                    message = "Blood request not found."
+                });
+            }
+
+            return Ok(request);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    private (Guid UserId, bool IsAdmin) CurrentUser()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var isAdmin = User.FindFirstValue(ClaimTypes.Role) == "admin";
+        return (userId, isAdmin);
     }
 }

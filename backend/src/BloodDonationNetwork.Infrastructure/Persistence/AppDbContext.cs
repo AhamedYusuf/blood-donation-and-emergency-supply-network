@@ -27,11 +27,33 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     public DbSet<DonorDevice> DonorDevices => Set<DonorDevice>();
 
+    public DbSet<StaffInvitation> StaffInvitations => Set<StaffInvitation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
         base.OnModelCreating(modelBuilder);
+
+        // DonationAppointments.DonorId and DonorDevices.DonorUserId store a
+        // User.Id (not a DonorProfile.Id — easy to misread given the
+        // "Donor" naming; see the comments on those entities). Both were
+        // plain, unconstrained Guid columns because DonorProfiles didn't
+        // exist yet when DonationAppointments was first migrated. It does
+        // now — add the real FK constraints (shadow FK: no CLR navigation
+        // property, so nothing that constructs these entities needs to
+        // change).
+        modelBuilder.Entity<DonationAppointment>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(a => a.DonorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<DonorDevice>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(d => d.DonorUserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<BloodBankInventory>(entity =>
         {

@@ -148,6 +148,19 @@ public sealed class CompleteAppointmentTransactionTests : IDisposable
             UpdatedAt = DateTime.UtcNow,
         });
 
+        // DonationAppointments.DonorId now has a real FK to Users.Id.
+        ctx.Users.Add(new User
+        {
+            Id = DonorUserId,
+            Email = "donor@test.local",
+            PasswordHash = "x",
+            Role = UserRole.Donor,
+            FullName = "Test Donor",
+            PhoneNumber = "000",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+
         ctx.DonorProfiles.Add(new DonorProfile
         {
             Id = Guid.NewGuid(),

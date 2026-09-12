@@ -33,26 +33,24 @@ public class AuthService : IAuthService
                 "A user with this email already exists.");
         }
 
-        var role = Enum.Parse<UserRole>(request.Role, true);
-
-        // Staff/admin belong to an organization; donors never do. Honour the
-        // organizationId the caller supplied (Bug #2 — this used to be
-        // hardcoded to null, so staff could never be linked to an org
-        // through the API and had to be SQL-patched).
-        // NOTE: self-registering as staff with an arbitrary org is a trust
-        // gap the team should close later (admin-created staff, or an
-        // approval step). It is honoured here so the flow works end to end.
-        var organizationId = role == UserRole.Donor ? null : request.OrganizationId;
-
+        // Public self-registration creates donors ONLY. This used to trust
+        // request.Role/request.OrganizationId from the caller, which meant
+        // anyone could POST role:"staff" with an arbitrary organizationId
+        // and get a staff account at an org they have no relationship to —
+        // a real privilege-escalation hole (flagged as a known trust gap
+        // when the organizationId honouring was first added, now closed).
+        // Staff accounts are created exclusively through the admin-issued
+        // invitation flow (see StaffInvitationService), which is the only
+        // path that can set Role != Donor or a non-null OrganizationId.
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = email,
             PasswordHash = BCryptHasher.HashPassword(request.Password),
-            Role = role,
+            Role = UserRole.Donor,
             FullName = request.FullName.Trim(),
             PhoneNumber = request.PhoneNumber.Trim(),
-            OrganizationId = organizationId,
+            OrganizationId = null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
