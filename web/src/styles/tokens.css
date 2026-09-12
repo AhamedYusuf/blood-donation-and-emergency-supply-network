@@ -1,10 +1,15 @@
 :root {
   /* Primary — DESIGN.md §4.1: burgundy is the blood-bank brand identity,
      used for primary actions, active states and important elements. Not
-     a generic SaaS blue. */
+     a generic SaaS blue.
+     These exact stops (700/800/900 of a blood-950..50 scale) are lifted
+     directly from organizations.css — the actual shipped reference
+     implementation DESIGN.md was modelled on — rather than re-derived
+     from the doc's prose, so this page and that one read as one product
+     down to the hex value. */
   --color-primary: #9F1738;
-  --color-primary-hover: #8C1430;
-  --color-primary-press: #7F1230;
+  --color-primary-hover: #8E1233;
+  --color-primary-press: #74102B;
   --color-primary-subtle: #FFF1F4;
   --color-on-primary: #FFFFFF;
 
@@ -13,17 +18,17 @@
   --color-agent: #2563EB;
   --color-agent-subtle: #EFF6FF;
 
-  /* Neutrals — DESIGN.md §4.2 */
+  /* Neutrals — organizations.css's navy-900/600 and muted tones. */
   --color-ink: #172033;
-  --color-ink-secondary: #3D4759;
-  --color-ink-muted: #5E6675;
+  --color-ink-secondary: #4D586B;
+  --color-ink-muted: #737C8C;
   --color-ink-faint: #8A92A1;
 
-  --color-canvas: #F6F7F9;
+  --color-canvas: #F7F8FA;
   --color-surface: #FFFFFF;
   --color-surface-sunken: #EEF0F3;
 
-  --color-hairline: #E7E9EE;
+  --color-hairline: #E9EBEF;
   --color-hairline-strong: #D5D9E0;
 
   /* Semantic — DESIGN.md §5. `critical` is a brighter, more saturated
@@ -32,7 +37,7 @@
   --color-critical-subtle: #FFF0F2;
   --color-urgent: #D97706;
   --color-urgent-subtle: #FFF7E8;
-  --color-success: #198754;
+  --color-success: #17805A;
   --color-success-subtle: #EAF7F0;
   --color-neutral-status: #5E6675;
   --color-neutral-status-subtle: #EEF0F3;

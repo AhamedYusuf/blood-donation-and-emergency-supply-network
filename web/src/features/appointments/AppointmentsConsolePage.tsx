@@ -184,9 +184,41 @@ export function AppointmentsConsolePage() {
           overflowY: "auto",
         }}
       >
-        <h1 className="text-display" style={{ margin: "0 0 var(--space-md)", color: "var(--color-ink)" }}>
-          Upcoming Appointments
-        </h1>
+        {/* Compact hero band — same gradient family as the Organizations
+            page (organizations.css's blood-900/800/600 stops), scaled down
+            for a working console rather than a landing hero: no floating
+            illustration, just enough to read as the same product. */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: "var(--radius-lg)",
+            padding: "var(--space-lg)",
+            marginBottom: "var(--space-md)",
+            background:
+              "radial-gradient(circle at 85% 20%, rgba(211, 38, 79, 0.35), transparent 45%), " +
+              "linear-gradient(135deg, #74102B 0%, #8E1233 45%, #B91F45 100%)",
+          }}
+        >
+          <span
+            className="text-caption"
+            style={{
+              display: "inline-block",
+              color: "rgba(255,255,255,0.72)",
+              letterSpacing: "0.18em",
+              fontWeight: 800,
+              textTransform: "uppercase",
+            }}
+          >
+            Blood Bank Console
+          </span>
+          <h1 className="text-display" style={{ margin: "4px 0 0", color: "#FFFFFF" }}>
+            Upcoming Appointments
+          </h1>
+          <p className="text-body" style={{ color: "rgba(255,255,255,0.78)", margin: "6px 0 0", maxWidth: 480 }}>
+            Track, complete and manage donor appointments at your organization.
+          </p>
+        </div>
 
         {/* Stats strip — real computed numbers, not decoration */}
         <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
