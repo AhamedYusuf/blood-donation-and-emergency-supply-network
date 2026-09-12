@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
 import { useSelector } from "react-redux";
 import type { RootState } from "./app/store";
 
@@ -13,14 +19,23 @@ import { AppointmentsConsolePage } from "./features/appointments/AppointmentsCon
 import { AppShell } from "./components/AppShell";
 
 import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
+
 import { InventoryPage } from "./features/inventory/InventoryPage";
 import { InventoryManagePage } from "./features/inventory/InventoryManagePage";
 import { InventoryEmergencyPage } from "./features/inventory/InventoryEmergencyPage";
 
-// ── Auth guards ───────────────────────────────────────────────────────────────
+import RequestsPage from "./features/requests/RequestsPage";
+import CreateRequestPage from "./features/requests/CreateRequestPage";
+import RequestDetailsPage from "./features/requests/RequestDetailsPage";
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = useSelector((state: RootState) => state.auth.token);
+function RequireAuth({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const token = useSelector(
+    (state: RootState) => state.auth.token
+  );
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -29,11 +44,17 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
-  const token = useSelector((state: RootState) => state.auth.token);
+function RedirectIfAuthed({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const token = useSelector(
+    (state: RootState) => state.auth.token
+  );
 
   if (token) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/requests" replace />;
   }
 
   return <>{children}</>;
@@ -46,22 +67,27 @@ function RequireRole({
   children: React.ReactNode;
   roles: string[];
 }) {
-  const role = useSelector((state: RootState) => state.auth.role ?? "");
+  const role = useSelector(
+    (state: RootState) => state.auth.role ?? ""
+  );
 
-  if (!roles.map((r) => r.toLowerCase()).includes(role.toLowerCase())) {
+  const allowedRoles = roles.map((r) =>
+    r.toLowerCase()
+  );
+
+  if (!allowedRoles.includes(role.toLowerCase())) {
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
-
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ── Public auth pages ── */}
+        {/* PUBLIC AUTH */}
+
         <Route
           path="/login"
           element={
@@ -80,7 +106,8 @@ export function App() {
           }
         />
 
-        {/* Step 2 of registration */}
+        {/* DONOR PROFILE */}
+
         <Route
           path="/register/donor-profile"
           element={
@@ -92,7 +119,8 @@ export function App() {
           }
         />
 
-        {/* ── Main protected console ── */}
+        {/* MAIN CONSOLE */}
+
         <Route
           path="/"
           element={
@@ -104,7 +132,8 @@ export function App() {
           }
         />
 
-        {/* Staff + Admin: donor search */}
+        {/* DONOR MODULE */}
+
         <Route
           path="/donors/search"
           element={
@@ -118,7 +147,6 @@ export function App() {
           }
         />
 
-        {/* Staff + Admin: verification queue */}
         <Route
           path="/donors/verification-queue"
           element={
@@ -132,7 +160,8 @@ export function App() {
           }
         />
 
-        {/* ── Inventory / Organization module ── */}
+        {/* ORGANIZATIONS */}
+
         <Route
           path="/organizations"
           element={
@@ -141,6 +170,8 @@ export function App() {
             </RequireAuth>
           }
         />
+
+        {/* INVENTORY */}
 
         <Route
           path="/inventory"
@@ -169,8 +200,46 @@ export function App() {
           }
         />
 
-        {/* ── Catch-all ── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* BLOOD REQUEST MODULE
+            For now: any authenticated user can access.
+            We will add exact role restrictions later.
+        */}
+
+        <Route
+          path="/requests"
+          element={
+            <RequireAuth>
+              <RequestsPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/requests/create"
+          element={
+            <RequireAuth>
+              <CreateRequestPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/requests/:id"
+          element={
+            <RequireAuth>
+              <RequestDetailsPage />
+            </RequireAuth>
+          }
+        />
+
+        {/* CATCH ALL */}
+
+        <Route
+          path="*"
+          element={
+            <Navigate to="/requests" replace />
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
