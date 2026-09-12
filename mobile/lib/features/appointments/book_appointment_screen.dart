@@ -105,7 +105,15 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 children: [
-                  const Icon(Icons.local_hospital_outlined, size: 20, color: AppColors.inkMuted),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySubtle,
+                      borderRadius: BorderRadius.circular(AppRadii.sm),
+                    ),
+                    child: const Icon(Icons.local_hospital_outlined, size: 18, color: AppColors.primary),
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: _bank == null
@@ -185,7 +193,15 @@ class _PickerField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.inkMuted),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceSunken,
+              borderRadius: BorderRadius.circular(AppRadii.sm - 2),
+            ),
+            child: Icon(icon, size: 15, color: AppColors.inkMuted),
+          ),
           const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Column(

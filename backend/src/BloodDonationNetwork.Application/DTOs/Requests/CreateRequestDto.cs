@@ -5,9 +5,10 @@ namespace BloodDonationNetwork.Application.DTOs.Requests;
 
 public class CreateRequestDto
 {
-    [Required]
-    public Guid RequesterId { get; set; }
-
+    // RequesterId is intentionally not here — the requester is always the
+    // authenticated caller (RequestsController derives it from the JWT).
+    // A client-supplied requester id would let anyone file a request
+    // "as" someone else.
     [Required]
     public Guid OrganizationId { get; set; }
 

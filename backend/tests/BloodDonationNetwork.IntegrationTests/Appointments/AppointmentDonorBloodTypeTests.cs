@@ -104,6 +104,12 @@ public sealed class AppointmentDonorBloodTypeTests : IDisposable
             UpdatedAt = DateTime.UtcNow,
         });
 
+        // DonationAppointments.DonorId now has a real FK to Users.Id.
+        ctx.Users.AddRange(
+            NewUser(DonorWithProfile),
+            NewUser(DonorOtherType),
+            NewUser(DonorNoProfile));
+
         ctx.DonorProfiles.AddRange(
             NewDonorProfile(DonorWithProfile, "O+"),
             NewDonorProfile(DonorOtherType, "AB-"));
@@ -116,6 +122,18 @@ public sealed class AppointmentDonorBloodTypeTests : IDisposable
 
         ctx.SaveChanges();
     }
+
+    private static User NewUser(Guid id) => new()
+    {
+        Id = id,
+        Email = $"{id}@example.com",
+        PasswordHash = "not-a-real-hash",
+        Role = UserRole.Donor,
+        FullName = "Test Donor",
+        PhoneNumber = "0000000000",
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow,
+    };
 
     private static DonorProfile NewDonorProfile(Guid userId, string bloodType) => new()
     {

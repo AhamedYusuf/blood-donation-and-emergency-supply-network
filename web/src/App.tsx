@@ -28,6 +28,10 @@ import RequestsPage from "./features/requests/RequestsPage";
 import CreateRequestPage from "./features/requests/CreateRequestPage";
 import RequestDetailsPage from "./features/requests/RequestDetailsPage";
 
+// =====================================================
+// AUTH GUARDS
+// =====================================================
+
 function RequireAuth({
   children,
 }: {
@@ -82,11 +86,51 @@ function RequireRole({
   return <>{children}</>;
 }
 
+/**
+ * Donors must complete their donor profile before
+ * accessing the normal protected application pages.
+ *
+ * This also handles donors who close the browser during
+ * registration and later return with a valid token still
+ * stored in localStorage.
+ */
+function RequireDonorProfile({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const role = useSelector(
+    (state: RootState) =>
+      (state.auth.role ?? "").toLowerCase()
+  );
+
+  const donorId = useSelector(
+    (state: RootState) => state.auth.donorId
+  );
+
+  if (role === "donor" && !donorId) {
+    return (
+      <Navigate
+        to="/register/donor-profile"
+        replace
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+// =====================================================
+// APP
+// =====================================================
+
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* PUBLIC AUTH */}
+        {/* =================================================
+            PUBLIC AUTH
+           ================================================= */}
 
         <Route
           path="/login"
@@ -106,7 +150,9 @@ export function App() {
           }
         />
 
-        {/* DONOR PROFILE */}
+        {/* =================================================
+            DONOR PROFILE REGISTRATION
+           ================================================= */}
 
         <Route
           path="/register/donor-profile"
@@ -119,20 +165,26 @@ export function App() {
           }
         />
 
-        {/* MAIN CONSOLE */}
+        {/* =================================================
+            MAIN CONSOLE
+           ================================================= */}
 
         <Route
           path="/"
           element={
             <RequireAuth>
-              <AppShell>
-                <AppointmentsConsolePage />
-              </AppShell>
+              <RequireDonorProfile>
+                <AppShell>
+                  <AppointmentsConsolePage />
+                </AppShell>
+              </RequireDonorProfile>
             </RequireAuth>
           }
         />
 
-        {/* DONOR MODULE */}
+        {/* =================================================
+            DONOR MODULE
+           ================================================= */}
 
         <Route
           path="/donors/search"
@@ -160,24 +212,34 @@ export function App() {
           }
         />
 
-        {/* ORGANIZATIONS */}
+        {/* =================================================
+            ORGANIZATION MODULE
+            Staff + Admin only
+           ================================================= */}
 
         <Route
           path="/organizations"
           element={
             <RequireAuth>
-              <OrganizationsPage />
+              <RequireRole roles={["staff", "admin"]}>
+                <OrganizationsPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
 
-        {/* INVENTORY */}
+        {/* =================================================
+            INVENTORY MODULE
+            Staff + Admin only
+           ================================================= */}
 
         <Route
           path="/inventory"
           element={
             <RequireAuth>
-              <InventoryPage />
+              <RequireRole roles={["staff", "admin"]}>
+                <InventoryPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -186,7 +248,9 @@ export function App() {
           path="/inventory/manage"
           element={
             <RequireAuth>
-              <InventoryManagePage />
+              <RequireRole roles={["staff", "admin"]}>
+                <InventoryManagePage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -195,21 +259,29 @@ export function App() {
           path="/inventory/emergency"
           element={
             <RequireAuth>
-              <InventoryEmergencyPage />
+              <RequireRole roles={["staff", "admin"]}>
+                <InventoryEmergencyPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
 
-        {/* BLOOD REQUEST MODULE
-            For now: any authenticated user can access.
-            We will add exact role restrictions later.
-        */}
+        {/* =================================================
+            BLOOD REQUEST MODULE
+
+            For now, authenticated users can access these
+            routes while we finish and test the request
+            workflow. Exact role restrictions can be added
+            later when the workflow roles are finalized.
+           ================================================= */}
 
         <Route
           path="/requests"
           element={
             <RequireAuth>
-              <RequestsPage />
+              <RequireDonorProfile>
+                <RequestsPage />
+              </RequireDonorProfile>
             </RequireAuth>
           }
         />
@@ -218,7 +290,9 @@ export function App() {
           path="/requests/create"
           element={
             <RequireAuth>
-              <CreateRequestPage />
+              <RequireDonorProfile>
+                <CreateRequestPage />
+              </RequireDonorProfile>
             </RequireAuth>
           }
         />
@@ -227,12 +301,16 @@ export function App() {
           path="/requests/:id"
           element={
             <RequireAuth>
-              <RequestDetailsPage />
+              <RequireDonorProfile>
+                <RequestDetailsPage />
+              </RequireDonorProfile>
             </RequireAuth>
           }
         />
 
-        {/* CATCH ALL */}
+        {/* =================================================
+            CATCH ALL
+           ================================================= */}
 
         <Route
           path="*"

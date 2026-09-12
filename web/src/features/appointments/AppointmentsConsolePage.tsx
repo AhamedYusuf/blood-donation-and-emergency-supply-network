@@ -184,9 +184,41 @@ export function AppointmentsConsolePage() {
           overflowY: "auto",
         }}
       >
-        <h1 className="text-display" style={{ margin: "0 0 var(--space-md)", color: "var(--color-ink)" }}>
-          Upcoming Appointments
-        </h1>
+        {/* Compact hero band — same gradient family as the Organizations
+            page (organizations.css's blood-900/800/600 stops), scaled down
+            for a working console rather than a landing hero: no floating
+            illustration, just enough to read as the same product. */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: "var(--radius-lg)",
+            padding: "var(--space-lg)",
+            marginBottom: "var(--space-md)",
+            background:
+              "radial-gradient(circle at 85% 20%, rgba(211, 38, 79, 0.35), transparent 45%), " +
+              "linear-gradient(135deg, #74102B 0%, #8E1233 45%, #B91F45 100%)",
+          }}
+        >
+          <span
+            className="text-caption"
+            style={{
+              display: "inline-block",
+              color: "rgba(255,255,255,0.72)",
+              letterSpacing: "0.18em",
+              fontWeight: 800,
+              textTransform: "uppercase",
+            }}
+          >
+            Blood Bank Console
+          </span>
+          <h1 className="text-display" style={{ margin: "4px 0 0", color: "#FFFFFF" }}>
+            Upcoming Appointments
+          </h1>
+          <p className="text-body" style={{ color: "rgba(255,255,255,0.78)", margin: "6px 0 0", maxWidth: 480 }}>
+            Track, complete and manage donor appointments at your organization.
+          </p>
+        </div>
 
         {/* Stats strip — real computed numbers, not decoration */}
         <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
@@ -365,7 +397,7 @@ export function AppointmentsConsolePage() {
             width: 420,
             background: "var(--color-surface)",
             borderLeft: "1px solid var(--color-hairline)",
-            boxShadow: "0 4px 16px rgba(20, 27, 44, 0.10), 0 1px 3px rgba(20, 27, 44, 0.06)",
+            boxShadow: "0 4px 16px rgba(23, 32, 51, 0.10), 0 1px 3px rgba(23, 32, 51, 0.06)",
             padding: "var(--space-lg)",
             overflowY: "auto",
           }}

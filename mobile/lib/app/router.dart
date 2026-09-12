@@ -7,11 +7,19 @@ import '../features/appointments/my_appointments_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/profile/profile_screen.dart';
+import 'mobile_shell.dart';
+
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// App router. Redirects between the login and home routes based on the
 /// auth state, and shows a splash while the session is being restored.
+/// The three tab destinations (Home / Donations / Profile) live behind a
+/// persistent bottom nav via [StatefulShellRoute.indexedStack]; booking a
+/// donation pushes full-screen on the root navigator, above the tab bar.
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) {
       final status = ref.read(authControllerProvider).status;
@@ -28,18 +36,26 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     refreshListenable: _AuthRefresh(ref),
     routes: [
-      GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      GoRoute(
-        path: '/appointments',
-        builder: (_, _) => const MyAppointmentsScreen(),
-        routes: [
-          GoRoute(
-            path: 'book',
-            builder: (_, _) => const BookAppointmentScreen(),
-          ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, shell) => MobileShell(navigationShell: shell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/appointments', builder: (_, _) => const MyAppointmentsScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
+          ]),
         ],
       ),
+      GoRoute(
+        path: '/appointments/book',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, _) => const BookAppointmentScreen(),
+      ),
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: '/splash',
         builder: (_, _) => const Scaffold(
