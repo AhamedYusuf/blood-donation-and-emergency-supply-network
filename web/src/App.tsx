@@ -1,34 +1,44 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "./app/store";
+
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
+
 import { DonorProfilePage } from "./features/donors/DonorProfilePage";
 import { DonorVerificationQueuePage } from "./features/donors/DonorVerificationQueuePage";
 import { DonorSearchPage } from "./features/donors/DonorSearchPage";
+
 import { AppointmentsConsolePage } from "./features/appointments/AppointmentsConsolePage";
 import { AppShell } from "./components/AppShell";
 
+import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
+import { InventoryPage } from "./features/inventory/InventoryPage";
+import { InventoryManagePage } from "./features/inventory/InventoryManagePage";
+import { InventoryEmergencyPage } from "./features/inventory/InventoryEmergencyPage";
+
 // ── Auth guards ───────────────────────────────────────────────────────────────
 
-/** Redirects to /login when no JWT is present. */
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useSelector((state: RootState) => state.auth.token);
-  if (!token) return <Navigate to="/login" replace />;
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
   return <>{children}</>;
 }
 
-/** Redirects already-authenticated users away from auth pages to the console. */
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const token = useSelector((state: RootState) => state.auth.token);
-  if (token) return <Navigate to="/" replace />;
+
+  if (token) {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
 
-/**
- * Role-based guard. Redirects to "/" if the authenticated user's role
- * doesn't match the allowed set (case-insensitive).
- */
 function RequireRole({
   children,
   roles,
@@ -37,9 +47,11 @@ function RequireRole({
   roles: string[];
 }) {
   const role = useSelector((state: RootState) => state.auth.role ?? "");
+
   if (!roles.map((r) => r.toLowerCase()).includes(role.toLowerCase())) {
     return <Navigate to="/" replace />;
   }
+
   return <>{children}</>;
 }
 
@@ -67,7 +79,7 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ── Public auth pages (no AppShell) ── */}
+        {/* ── Public auth pages ── */}
         <Route
           path="/login"
           element={
@@ -76,6 +88,7 @@ export function App() {
             </RedirectIfAuthed>
           }
         />
+
         <Route
           path="/register"
           element={
@@ -85,7 +98,7 @@ export function App() {
           }
         />
 
-        {/* Step 2 of registration — requires JWT from Step 1, but no AppShell */}
+        {/* Step 2 of registration */}
         <Route
           path="/register/donor-profile"
           element={
@@ -97,7 +110,7 @@ export function App() {
           }
         />
 
-        {/* ── Protected console pages (inside AppShell) ── */}
+        {/* ── Main protected console ── */}
         <Route
           path="/"
           element={
@@ -139,8 +152,45 @@ export function App() {
           }
         />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* ── Inventory / Organization module ── */}
+        <Route
+          path="/organizations"
+          element={
+            <RequireAuth>
+              <OrganizationsPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/inventory"
+          element={
+            <RequireAuth>
+              <InventoryPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/inventory/manage"
+          element={
+            <RequireAuth>
+              <InventoryManagePage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/inventory/emergency"
+          element={
+            <RequireAuth>
+              <InventoryEmergencyPage />
+            </RequireAuth>
+          }
+        />
+
+        {/* ── Catch-all ── */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
