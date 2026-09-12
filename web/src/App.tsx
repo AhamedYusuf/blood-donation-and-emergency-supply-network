@@ -152,12 +152,18 @@ export function App() {
           }
         />
 
-        {/* ── Inventory / Organization module ── */}
+        {/* ── Inventory / Organization module — staff+admin only, same as
+            donor search/verification below. The backend already enforces
+            this on every mutating endpoint; this stops a donor from
+            landing on a staff-facing management screen client-side at
+            all. ── */}
         <Route
           path="/organizations"
           element={
             <RequireAuth>
-              <OrganizationsPage />
+              <RequireRole roles={["staff", "admin"]}>
+                <OrganizationsPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -166,7 +172,9 @@ export function App() {
           path="/inventory"
           element={
             <RequireAuth>
-              <InventoryPage />
+              <RequireRole roles={["staff", "admin"]}>
+                <InventoryPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -175,7 +183,9 @@ export function App() {
           path="/inventory/manage"
           element={
             <RequireAuth>
-              <InventoryManagePage />
+              <RequireRole roles={["staff", "admin"]}>
+                <InventoryManagePage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -184,7 +194,9 @@ export function App() {
           path="/inventory/emergency"
           element={
             <RequireAuth>
-              <InventoryEmergencyPage />
+              <RequireRole roles={["staff", "admin"]}>
+                <InventoryEmergencyPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
