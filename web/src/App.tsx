@@ -152,22 +152,27 @@ export function App() {
           }
         />
 
-        {/* ── Inventory / Organization module — staff+admin only, same as
-            donor search/verification below. The backend already enforces
-            this on every mutating endpoint; this stops a donor from
-            landing on a staff-facing management screen client-side at
-            all. ── */}
+        {/* Organizations is create/edit/delete-an-organization — an admin
+            action per the workflow ("Admin creates the blood bank/hospital
+            organization"). OrganizationsController only allows admin past
+            [Authorize(Roles = "admin")] on every write endpoint, so staff
+            landing here would just see a "+ Add Organization" button and
+            edit/delete controls that 403 on click. Admin-only, not
+            staff+admin. */}
         <Route
           path="/organizations"
           element={
             <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
+              <RequireRole roles={["admin"]}>
                 <OrganizationsPage />
               </RequireRole>
             </RequireAuth>
           }
         />
 
+        {/* Inventory genuinely is staff+admin, per the workflow: "Staff
+            create/manage blood requests and inventory for their
+            organization." */}
         <Route
           path="/inventory"
           element={
