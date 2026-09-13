@@ -1,0 +1,327 @@
+/* Appointments Console — hero + stat-card treatment.
+   Deliberately mirrors organizations.css's recipe (gradient stops, wave
+   transition, floating stat cards, orbiting-drop visual) rather than
+   inventing a new one, so this page and the Organizations page read as
+   one product. Kept in its own file per this project's CSS convention
+   (each feature owns its full styles) instead of importing across
+   features. */
+
+.appointments-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  color: white;
+  background:
+    radial-gradient(circle at 78% 30%, rgba(211, 38, 79, 0.35), transparent 25%),
+    linear-gradient(135deg, var(--color-primary-deepest) 0%, #8E1233 45%, #B91F45 100%);
+}
+
+.appointments-hero__glow {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  right: 4%;
+  top: -40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.appointments-hero__content {
+  position: relative;
+  z-index: 2;
+  padding: var(--space-xl) var(--space-lg) 56px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.appointments-hero__copy {
+  max-width: 560px;
+  animation: appointments-hero-copy-in 0.7s ease both;
+}
+
+.appointments-eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.appointments-hero h1 {
+  margin: 0;
+  font-size: clamp(30px, 3.6vw, 44px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.appointments-hero h1 span {
+  color: #FFD7DF;
+}
+
+.appointments-hero p {
+  max-width: 460px;
+  margin: 16px 0 22px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.appointments-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.appointments-hero__actions button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.appointments-hero__actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.appointments-hero__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.appointments-hero__live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.appointments-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6FE0A9;
+  box-shadow: 0 0 0 4px rgba(111, 224, 169, 0.12);
+  animation: appointments-trust-pulse 2s ease infinite;
+}
+
+/* Visual column — same floating-drop language as the Organizations hero. */
+
+.appointments-hero__visual {
+  position: relative;
+  height: 220px;
+  animation: appointments-hero-visual-in 0.9s ease 0.1s both;
+}
+
+.appointments-hero__visual .hero-blood-drop {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100px;
+  height: 130px;
+  transform: translate(-50%, -55%) rotate(45deg);
+  border-radius: 58% 58% 65% 65% / 45% 45% 75% 75%;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.85) 0 4%, transparent 5%),
+    linear-gradient(145deg, #FF5275, #C61F49 48%, #6E0B28);
+  box-shadow:
+    -14px 20px 40px rgba(48, 0, 16, 0.35),
+    inset 8px 10px 14px rgba(255, 255, 255, 0.1),
+    inset -10px -14px 20px rgba(54, 0, 15, 0.3);
+  animation: appointments-hero-drop-float 4.5s ease-in-out infinite;
+}
+
+.appointments-hero__visual .hero-blood-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.appointments-hero__visual .hero-blood-orbit--one {
+  width: 180px;
+  height: 180px;
+  animation: appointments-orbit-spin 20s linear infinite;
+}
+
+.appointments-hero__visual .hero-blood-orbit--two {
+  width: 236px;
+  height: 236px;
+  border-color: rgba(255, 255, 255, 0.09);
+  animation: appointments-orbit-spin-reverse 30s linear infinite;
+}
+
+.appointments-hero__queue-card {
+  position: absolute;
+  right: 0;
+  bottom: 8px;
+  min-width: 168px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(50, 4, 19, 0.35);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 32px rgba(45, 0, 15, 0.18);
+}
+
+.appointments-hero__queue-card span {
+  display: block;
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.appointments-hero__queue-card strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 16px;
+}
+
+.appointments-hero__queue-card small {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Wave transition into the stat cards. */
+
+.appointments-hero__wave {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  bottom: -1px;
+  height: 46px;
+  z-index: 3;
+}
+
+.appointments-hero__wave div {
+  position: absolute;
+  inset: auto 0 0;
+  height: 42px;
+  background: var(--color-canvas);
+  clip-path: ellipse(62% 55% at 50% 100%);
+}
+
+.appointments-hero__wave div:last-child {
+  height: 30px;
+  opacity: 0.45;
+  background: #F4D7DE;
+  clip-path: ellipse(50% 50% at 50% 100%);
+}
+
+/* Stat cards — float slightly over the wave, same as Organizations. */
+
+.appointments-stat-grid {
+  position: relative;
+  z-index: 5;
+  margin-top: -20px;
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.appointments-stat-card {
+  flex: 1;
+  min-height: 92px;
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(233, 235, 239, 0.9);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.06);
+  backdrop-filter: blur(10px);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.appointments-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(23, 32, 51, 0.1);
+}
+
+.appointments-stat-card__icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-subtle);
+  font-size: 17px;
+}
+
+.appointments-stat-card span {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.appointments-stat-card strong {
+  display: block;
+  margin: 2px 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+@keyframes appointments-hero-copy-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes appointments-hero-visual-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes appointments-hero-drop-float {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -10px; }
+}
+
+@keyframes appointments-orbit-spin {
+  from { transform: translate(-50%, -50%) rotate(0); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes appointments-orbit-spin-reverse {
+  from { transform: translate(-50%, -50%) rotate(360deg); }
+  to { transform: translate(-50%, -50%) rotate(0); }
+}
+
+@keyframes appointments-trust-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(111, 224, 169, 0.1); }
+  50% { box-shadow: 0 0 0 8px rgba(111, 224, 169, 0.03); }
+}
+
+@media (max-width: 860px) {
+  .appointments-hero__content {
+    grid-template-columns: 1fr;
+  }
+  .appointments-hero__visual {
+    display: none;
+  }
+  .appointments-stat-grid {
+    flex-wrap: wrap;
+  }
+  .appointments-stat-card {
+    min-width: calc(50% - var(--space-sm) / 2);
+  }
+}

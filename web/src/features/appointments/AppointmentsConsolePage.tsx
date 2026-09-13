@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { BloodDrops } from "../../components/blood-effects/BloodDrops";
 import {
   useGetUpcomingByOrganizationQuery,
   useCompleteAppointmentMutation,
@@ -9,6 +10,7 @@ import {
 } from "./appointmentsApi";
 import { StatusBadge, STATUS_CONFIG } from "./StatusBadge";
 import { AgentTag } from "./AgentTag";
+import "./appointments.css";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -90,30 +92,6 @@ function EmptyState({ filter }: { filter: string }) {
   );
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-hairline)",
-        borderRadius: "var(--radius-md)",
-        padding: "var(--space-sm) var(--space-md)",
-      }}
-    >
-      <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
-        {label}
-      </p>
-      <p
-        className="tabular-nums"
-        style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.3px", margin: "2px 0 0", color: accent ?? "var(--color-ink)" }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
 export function AppointmentsConsolePage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Appointment | null>(null);
@@ -121,7 +99,7 @@ export function AppointmentsConsolePage() {
 
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
 
-  const { data, isLoading, error } = useGetUpcomingByOrganizationQuery(
+  const { data, isLoading, error, isFetching, refetch } = useGetUpcomingByOrganizationQuery(
     { orgId: organizationId ?? "", page: 1, pageSize: 50 },
     { skip: !organizationId }
   );
@@ -184,49 +162,93 @@ export function AppointmentsConsolePage() {
           overflowY: "auto",
         }}
       >
-        {/* Compact hero band — same gradient family as the Organizations
-            page (organizations.css's blood-900/800/600 stops), scaled down
-            for a working console rather than a landing hero: no floating
-            illustration, just enough to read as the same product. */}
-        <div
-          style={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: "var(--radius-lg)",
-            padding: "var(--space-lg)",
-            marginBottom: "var(--space-md)",
-            background:
-              "radial-gradient(circle at 85% 20%, rgba(211, 38, 79, 0.35), transparent 45%), " +
-              "linear-gradient(135deg, #74102B 0%, #8E1233 45%, #B91F45 100%)",
-          }}
-        >
-          <span
-            className="text-caption"
-            style={{
-              display: "inline-block",
-              color: "rgba(255,255,255,0.72)",
-              letterSpacing: "0.18em",
-              fontWeight: 800,
-              textTransform: "uppercase",
-            }}
-          >
-            Blood Bank Console
-          </span>
-          <h1 className="text-display" style={{ margin: "4px 0 0", color: "#FFFFFF" }}>
-            Upcoming Appointments
-          </h1>
-          <p className="text-body" style={{ color: "rgba(255,255,255,0.78)", margin: "6px 0 0", maxWidth: 480 }}>
-            Track, complete and manage donor appointments at your organization.
-          </p>
-        </div>
+        {/* Hero — deliberately built from the same recipe as the
+            Organizations page hero (see appointments.css): gradient +
+            glow, an orbiting-drop visual, a floating status card, and a
+            wave transition the stat cards float over. The refresh button
+            and "Live queue" indicator are real (refetch()), not
+            decoration — this console has no create action of its own
+            (donors book, staff don't), so it stands in for Organizations'
+            "+ Add Organization" CTA. */}
+        <section className="appointments-hero">
+          <BloodDrops count={8} intensity="subtle" />
+          <div className="appointments-hero__glow" />
+
+          <div className="appointments-hero__content">
+            <div className="appointments-hero__copy">
+              <span className="appointments-eyebrow">BLOOD BANK CONSOLE</span>
+              <h1>
+                Every appointment.
+                <br />
+                <span>One life closer to saved.</span>
+              </h1>
+              <p>
+                Track, complete and manage donor appointments at your
+                organization — from first booking to the moment blood
+                reaches someone who needs it.
+              </p>
+              <div className="appointments-hero__actions">
+                <button type="button" onClick={() => refetch()} disabled={isFetching}>
+                  {isFetching ? "Refreshing…" : "↻ Refresh queue"}
+                </button>
+                <div className="appointments-hero__live">
+                  <span className="appointments-live-dot" />
+                  Live queue data
+                </div>
+              </div>
+            </div>
+
+            <div className="appointments-hero__visual">
+              <div className="hero-blood-orbit hero-blood-orbit--one" />
+              <div className="hero-blood-orbit hero-blood-orbit--two" />
+              <div className="hero-blood-drop" />
+              <div className="appointments-hero__queue-card">
+                <span>DUE NEXT 24H</span>
+                <strong>{next24h}</strong>
+                <small>{next24h === 1 ? "appointment" : "appointments"}</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="appointments-hero__wave">
+            <div />
+            <div />
+          </div>
+        </section>
 
         {/* Stats strip — real computed numbers, not decoration */}
-        <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
-          <StatCard label="DUE NEXT 24H" value={next24h} accent="var(--color-urgent)" />
-          <StatCard label="AGENT-MATCHED" value={agentCount} accent="var(--color-agent)" />
-          <StatCard label="COMPLETION RATE" value={`${completionRate}%`} accent="var(--color-success)" />
-          <StatCard label="TOTAL" value={data?.totalCount ?? 0} />
+        <div className="appointments-stat-grid">
+          <div className="appointments-stat-card">
+            <div className="appointments-stat-card__icon" style={{ color: "var(--color-urgent)" }}>◷</div>
+            <div>
+              <span>Due next 24h</span>
+              <strong>{next24h}</strong>
+            </div>
+          </div>
+          <div className="appointments-stat-card">
+            <div className="appointments-stat-card__icon" style={{ color: "var(--color-agent)" }}>✦</div>
+            <div>
+              <span>Agent-matched</span>
+              <strong>{agentCount}</strong>
+            </div>
+          </div>
+          <div className="appointments-stat-card">
+            <div className="appointments-stat-card__icon" style={{ color: "var(--color-success)" }}>✓</div>
+            <div>
+              <span>Completion rate</span>
+              <strong>{completionRate}%</strong>
+            </div>
+          </div>
+          <div className="appointments-stat-card">
+            <div className="appointments-stat-card__icon" style={{ color: "var(--color-primary)" }}>Σ</div>
+            <div>
+              <span>Total</span>
+              <strong>{data?.totalCount ?? 0}</strong>
+            </div>
+          </div>
         </div>
+
+        <div style={{ height: "var(--space-md)" }} />
 
         <div
           style={{

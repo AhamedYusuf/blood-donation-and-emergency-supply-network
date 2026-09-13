@@ -12,6 +12,10 @@
   --color-primary-press: #74102B;
   --color-primary-subtle: #FFF1F4;
   --color-on-primary: #FFFFFF;
+  /* The deepest stop of the hero gradient (organizations.css's
+     blood-950-ish literal) — nothing else needs a shade this dark, so it
+     isn't part of the regular button/state ladder above. */
+  --color-primary-deepest: #5D0B25;
 
   /* AI/agent accent — DESIGN.md §30: a subtle blue reserved for
      distinguishing AI-generated data from normal system data. */
