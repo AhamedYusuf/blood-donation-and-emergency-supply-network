@@ -6,8 +6,6 @@ import { setCredentials } from "./authSlice";
 import { AuthCard } from "../../components/AuthCard";
 import { FormField } from "../../components/FormField";
 
-// ── Validation helpers ────────────────────────────────────────────────────────
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validateEmail(v: string) {
@@ -22,36 +20,49 @@ function validatePassword(v: string) {
   return "";
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [touched, setTouched] = useState({ email: false, password: false });
+
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+  });
+
   const [apiError, setApiError] = useState<string | null>(null);
 
   const [login, { isLoading }] = useLoginMutation();
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Derive current validation errors (shown only when field is touched)
   const errors = {
     email: touched.email ? validateEmail(email) : "",
     password: touched.password ? validatePassword(password) : "",
   };
 
-  const isFormValid = !validateEmail(email) && !validatePassword(password);
+  const isFormValid =
+    !validateEmail(email) &&
+    !validatePassword(password);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Mark everything touched so all errors surface on submit
-    setTouched({ email: true, password: true });
+
+    setTouched({
+      email: true,
+      password: true,
+    });
+
     setApiError(null);
 
     if (!isFormValid) return;
 
     try {
-      const result = await login({ email: email.trim(), password }).unwrap();
+      const result = await login({
+        email: email.trim(),
+        password,
+      }).unwrap();
+
       dispatch(
         setCredentials({
           token: result.accessToken,
@@ -64,22 +75,33 @@ export function LoginPage() {
           organizationId: result.organizationId,
         })
       );
-      const role = result.role.toLowerCase();
-      if (role === "donor") {
-        navigate(result.donorProfileId ? "/" : "/register/donor-profile");
-      } else if (role === "admin") {
-        navigate("/donors/verification-queue");
-      } else if (role === "staff") {
-        navigate("/donors/verification-queue");
-      } else {
-        navigate("/");
+
+      const role = result.role?.toLowerCase();
+
+      // Donor profile must be completed first
+      if (role === "donor" && !result.donorProfileId) {
+        navigate("/register/donor-profile");
+        return;
       }
+
+      // For now, all authenticated users can test the request module
+      navigate("/requests");
     } catch (err: unknown) {
-      const e = err as { status?: number; data?: { message?: string } };
-      if (e.status === 401 || e.status === 400) {
-        setApiError("Invalid email or password. Please try again.");
+      const apiErr = err as {
+        status?: number;
+        data?: {
+          message?: string;
+        };
+      };
+
+      if (apiErr.status === 401 || apiErr.status === 400) {
+        setApiError(
+          "Invalid email or password. Please try again."
+        );
       } else {
-        setApiError("Something went wrong. Please try again later.");
+        setApiError(
+          "Something went wrong. Please try again later."
+        );
       }
     }
   };
@@ -92,9 +114,12 @@ export function LoginPage() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-md)",
+        }}
       >
-        {/* API error banner */}
         {apiError && (
           <div
             role="alert"
@@ -109,9 +134,12 @@ export function LoginPage() {
             }}
           >
             <span style={{ fontSize: 14 }}>⚠</span>
+
             <span
               className="text-body-sm"
-              style={{ color: "var(--color-critical)" }}
+              style={{
+                color: "var(--color-critical)",
+              }}
             >
               {apiError}
             </span>
@@ -125,7 +153,12 @@ export function LoginPage() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+          onBlur={() =>
+            setTouched((t) => ({
+              ...t,
+              email: true,
+            }))
+          }
           error={errors.email}
           required
           placeholder="you@example.com"
@@ -138,7 +171,12 @@ export function LoginPage() {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+          onBlur={() =>
+            setTouched((t) => ({
+              ...t,
+              password: true,
+            }))
+          }
           error={errors.password}
           required
           placeholder="••••••••"
@@ -160,7 +198,9 @@ export function LoginPage() {
             fontSize: 13,
             fontWeight: 500,
             fontFamily: "var(--font-sans)",
-            cursor: isLoading ? "not-allowed" : "pointer",
+            cursor: isLoading
+              ? "not-allowed"
+              : "pointer",
             width: "100%",
             display: "flex",
             alignItems: "center",
@@ -168,18 +208,24 @@ export function LoginPage() {
             gap: 8,
           }}
           onMouseEnter={(e) => {
-            if (!isLoading)
-              e.currentTarget.style.background = "var(--color-primary-hover)";
+            if (!isLoading) {
+              e.currentTarget.style.background =
+                "var(--color-primary-hover)";
+            }
           }}
           onMouseLeave={(e) => {
-            if (!isLoading)
-              e.currentTarget.style.background = "var(--color-primary)";
+            if (!isLoading) {
+              e.currentTarget.style.background =
+                "var(--color-primary)";
+            }
           }}
           onMouseDown={(e) => {
-            e.currentTarget.style.background = "var(--color-primary-press)";
+            e.currentTarget.style.background =
+              "var(--color-primary-press)";
           }}
           onMouseUp={(e) => {
-            e.currentTarget.style.background = "var(--color-primary)";
+            e.currentTarget.style.background =
+              "var(--color-primary)";
           }}
         >
           {isLoading ? (
@@ -189,10 +235,12 @@ export function LoginPage() {
                   display: "inline-block",
                   width: 12,
                   height: 12,
-                  border: "2px solid rgba(255,255,255,0.4)",
+                  border:
+                    "2px solid rgba(255,255,255,0.4)",
                   borderTopColor: "#fff",
                   borderRadius: "50%",
-                  animation: "spin 0.7s linear infinite",
+                  animation:
+                    "spin 0.7s linear infinite",
                 }}
               />
               Logging in…
@@ -224,8 +272,15 @@ export function LoginPage() {
         </p>
       </form>
 
-      {/* spinner keyframe */}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>
+        {`
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}
+      </style>
     </AuthCard>
   );
 }
