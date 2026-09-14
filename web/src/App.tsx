@@ -164,7 +164,9 @@ export function App() {
           element={
             <RequireAuth>
               <RequireRole roles={["admin"]}>
-                <OrganizationsPage />
+                <AppShell>
+                  <OrganizationsPage />
+                </AppShell>
               </RequireRole>
             </RequireAuth>
           }
@@ -172,13 +174,18 @@ export function App() {
 
         {/* Inventory genuinely is staff+admin, per the workflow: "Staff
             create/manage blood requests and inventory for their
-            organization." */}
+            organization." All four of these routes were missing AppShell
+            entirely (unlike every other protected route) — there was no
+            nav rail on any of them, so once you landed here there was no
+            way back to Appointments except the browser's back button. */}
         <Route
           path="/inventory"
           element={
             <RequireAuth>
               <RequireRole roles={["staff", "admin"]}>
-                <InventoryPage />
+                <AppShell>
+                  <InventoryPage />
+                </AppShell>
               </RequireRole>
             </RequireAuth>
           }
@@ -189,7 +196,9 @@ export function App() {
           element={
             <RequireAuth>
               <RequireRole roles={["staff", "admin"]}>
-                <InventoryManagePage />
+                <AppShell>
+                  <InventoryManagePage />
+                </AppShell>
               </RequireRole>
             </RequireAuth>
           }
@@ -200,7 +209,9 @@ export function App() {
           element={
             <RequireAuth>
               <RequireRole roles={["staff", "admin"]}>
-                <InventoryEmergencyPage />
+                <AppShell>
+                  <InventoryEmergencyPage />
+                </AppShell>
               </RequireRole>
             </RequireAuth>
           }
