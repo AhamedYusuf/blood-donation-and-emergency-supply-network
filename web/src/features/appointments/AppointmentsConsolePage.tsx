@@ -151,8 +151,9 @@ export function AppointmentsConsolePage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100%", background: "var(--color-canvas)", fontFamily: "var(--font-sans)" }}>
+    <div className="appointments-page" style={{ display: "flex", height: "100%", fontFamily: "var(--font-sans)" }}>
       <div
+        className="appointments-dot-grid"
         style={{
           flex: 1,
           padding: "var(--space-lg)",
@@ -216,39 +217,76 @@ export function AppointmentsConsolePage() {
           </div>
         </section>
 
-        {/* Stats strip — real computed numbers, not decoration */}
-        <div className="appointments-stat-grid">
-          <div className="appointments-stat-card">
-            <div className="appointments-stat-card__icon" style={{ color: "var(--color-urgent)" }}>◷</div>
-            <div>
-              <span>Due next 24h</span>
-              <strong>{next24h}</strong>
+        {/* Stats strip — real computed numbers, not decoration. Wrapped
+            with a bounded, quiet drop layer (never behind the table
+            below, where movement would fight legibility) so the page's
+            texture doesn't stop dead the moment the hero ends. */}
+        <div className="appointments-stat-grid-wrap">
+          <BloodDrops count={5} intensity="subtle" />
+          <div className="appointments-stat-grid">
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-urgent)" }}>◷</div>
+              <div>
+                <span>Due next 24h</span>
+                <strong>{next24h}</strong>
+              </div>
             </div>
-          </div>
-          <div className="appointments-stat-card">
-            <div className="appointments-stat-card__icon" style={{ color: "var(--color-agent)" }}>✦</div>
-            <div>
-              <span>Agent-matched</span>
-              <strong>{agentCount}</strong>
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-agent)" }}>✦</div>
+              <div>
+                <span>Agent-matched</span>
+                <strong>{agentCount}</strong>
+              </div>
             </div>
-          </div>
-          <div className="appointments-stat-card">
-            <div className="appointments-stat-card__icon" style={{ color: "var(--color-success)" }}>✓</div>
-            <div>
-              <span>Completion rate</span>
-              <strong>{completionRate}%</strong>
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-success)" }}>✓</div>
+              <div>
+                <span>Completion rate</span>
+                <strong>{completionRate}%</strong>
+              </div>
             </div>
-          </div>
-          <div className="appointments-stat-card">
-            <div className="appointments-stat-card__icon" style={{ color: "var(--color-primary)" }}>Σ</div>
-            <div>
-              <span>Total</span>
-              <strong>{data?.totalCount ?? 0}</strong>
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-primary)" }}>Σ</div>
+              <div>
+                <span>Total</span>
+                <strong>{data?.totalCount ?? 0}</strong>
+              </div>
             </div>
           </div>
         </div>
 
-        <div style={{ height: "var(--space-md)" }} />
+        <div style={{ height: "var(--space-lg)" }} />
+
+        <div className="appointments-section-header">
+          <div>
+            <span className="appointments-section-eyebrow">DONOR QUEUE</span>
+            <h2>Today's appointments</h2>
+            <p>Filter, complete and manage bookings at your organization.</p>
+          </div>
+          <div className="appointments-count-badge">
+            {appointments.length} appointment{appointments.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        {/* Queue-mix bar — real proportions, not a fixed decorative
+            fill: width comes straight from `counts`, the same numbers
+            the filter pills below show. */}
+        {appointments.length > 0 && (
+          <>
+            <div className="appointments-mix-bar">
+              <span style={{ width: `${(counts.scheduled / appointments.length) * 100}%`, background: "var(--color-urgent)" }} />
+              <span style={{ width: `${(counts.completed / appointments.length) * 100}%`, background: "var(--color-success)" }} />
+              <span style={{ width: `${(counts.no_show / appointments.length) * 100}%`, background: "var(--color-critical)" }} />
+              <span style={{ width: `${(counts.cancelled / appointments.length) * 100}%`, background: "var(--color-ink-faint)" }} />
+            </div>
+            <div className="appointments-mix-legend">
+              <div><i style={{ background: "var(--color-urgent)" }} />Scheduled {counts.scheduled}</div>
+              <div><i style={{ background: "var(--color-success)" }} />Completed {counts.completed}</div>
+              <div><i style={{ background: "var(--color-critical)" }} />No-show {counts.no_show}</div>
+              <div><i style={{ background: "var(--color-ink-faint)" }} />Cancelled {counts.cancelled}</div>
+            </div>
+          </>
+        )}
 
         <div
           style={{
@@ -371,17 +409,8 @@ export function AppointmentsConsolePage() {
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         {appt.donorBloodType ? (
-                          <span
-                            className="text-body-sm"
-                            style={{
-                              fontWeight: 500,
-                              padding: "2px 6px",
-                              borderRadius: "var(--radius-xs)",
-                              background: "var(--color-surface-sunken)",
-                              color: "var(--color-ink)",
-                            }}
-                          >
-                            {appt.donorBloodType}
+                          <span className="text-body-sm appointments-blood-chip">
+                            🩸 {appt.donorBloodType}
                           </span>
                         ) : (
                           <span className="text-body-sm" style={{ color: "var(--color-ink-faint)" }}>
@@ -409,6 +438,66 @@ export function AppointmentsConsolePage() {
             </table>
           )}
         </div>
+
+        {/* Matching & Dispatch Agent — this screen's own equivalent of
+            Inventory's "AI Inventory Intelligence" section, scoped
+            honestly to what this agent actually has: one agent, two
+            modes, and Mode 2 genuinely isn't live yet. */}
+        <section className="appointments-ai-section">
+          <div className="appointments-ai-heading">
+            <div>
+              <span className="appointments-section-eyebrow" style={{ color: "var(--color-agent)" }}>
+                MATCHING &amp; DISPATCH AGENT
+              </span>
+              <h2>What's finding your donors</h2>
+              <p>
+                Every appointment tagged "Agent" above was booked through this
+                agent's donor-ranking search rather than a walk-in booking.
+              </p>
+            </div>
+            <div className="appointments-ai-badge">
+              <i />
+              {agentCount} matched
+            </div>
+          </div>
+
+          <div className="appointments-ai-grid">
+            <div className="appointments-ai-card">
+              <div className="appointments-ai-card__top">
+                <div className="appointments-ai-icon">⌕</div>
+                <span className="appointments-ai-status appointments-ai-status--ready">READY</span>
+              </div>
+              <div>
+                <span className="appointments-ai-kicker">MODE 01</span>
+                <h3>Donor Search &amp; Ranking</h3>
+                <p>
+                  Ranks nearby, verified donors by proximity, urgency and
+                  reliability score whenever a workflow requests candidates.
+                </p>
+              </div>
+            </div>
+
+            <div className="appointments-ai-card appointments-ai-card--pending">
+              <div className="appointments-ai-card__top">
+                <div className="appointments-ai-icon appointments-ai-icon--pending">⇢</div>
+                <span className="appointments-ai-status appointments-ai-status--pending">PENDING</span>
+              </div>
+              <div>
+                <span className="appointments-ai-kicker" style={{ color: "var(--color-ink-muted)" }}>MODE 02</span>
+                <h3>Notify &amp; Dispatch</h3>
+                <p>
+                  Sends push alerts and creates appointment invites once a
+                  workflow is approved — waiting on the shared workflow/
+                  approval tables before this can go live.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="appointments-ai-note">
+            Ranking weights: 50% proximity, 20% urgency, 30% donor reliability.
+          </div>
+        </section>
       </div>
 
       {selected && (

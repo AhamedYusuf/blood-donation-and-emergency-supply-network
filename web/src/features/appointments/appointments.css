@@ -6,6 +6,362 @@
    (each feature owns its full styles) instead of importing across
    features. */
 
+/* Page-wide background — the same subtle radial burgundy tint
+   organizations.css applies to its whole page (not just the hero), so
+   the "empty" feeling comes from the same source on both screens: this
+   page's content area just had nothing behind it before. */
+.appointments-page {
+  background:
+    radial-gradient(circle at 12% 15%, rgba(159, 23, 56, 0.045), transparent 25%),
+    var(--color-canvas);
+}
+
+/* A dot-grid, not more falling drops: this page's job is a table
+   someone reads row by row, so texture behind it needs to sit still.
+   Same "give the background more presence" goal as the Organizations
+   page's drops, suited to a console instead of a landing section. */
+.appointments-dot-grid {
+  background-image: radial-gradient(rgba(159, 23, 56, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -4px -4px;
+}
+
+/* Bounded, quieter second drop layer behind the stat row only — never
+   behind the table itself, where movement would fight legibility. */
+.appointments-stat-grid-wrap {
+  position: relative;
+}
+
+/* Section intro — the "eyebrow + heading + description + count badge"
+   row both organizations.css (.organization-list-header) and
+   inventoryManage.css (.manage-intro) use ahead of their main content.
+   This page jumped straight from stats into the filter tabs with no
+   equivalent; adding it is what actually closes the gap, more than any
+   single decorative element does. */
+.appointments-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.appointments-section-eyebrow {
+  display: block;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.appointments-section-header h2 {
+  margin: 4px 0 4px;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.appointments-section-header p {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 13px;
+}
+
+/* Queue-mix bar — this screen's own equivalent of Inventory's per-blood-
+   type .stock-progress bars: a real proportion (scheduled/completed/
+   no-show/cancelled), not a decorative fixed fill. The blood-bag-strip
+   look (thin, rounded, segmented) is the deliberately "resembles a blood
+   donation system" touch this page was missing. */
+.appointments-mix-bar {
+  display: flex;
+  height: 8px;
+  margin: 2px 0 var(--space-md);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+}
+
+.appointments-mix-bar span {
+  display: block;
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.appointments-mix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.appointments-mix-legend div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.appointments-mix-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Small blood-drop mark — this screen's own version of Inventory's
+   reusable BloodDrop() glyph, used inline next to a real blood type
+   instead of as a big standalone badge. */
+.appointments-blood-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.appointments-count-badge {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Matching & Dispatch Agent showcase — this screen's own version of the
+   "AI Inventory Intelligence" section on /inventory. Deliberately not a
+   copy: two cards, not three, because this page genuinely has one agent
+   with two modes, not three agents — and Mode 2 is honestly marked
+   pending rather than dressed up as READY, since it isn't built yet
+   (AgentWorkflow doesn't exist server-side). The accent is the violet
+   already reserved system-wide for "this came from the agent" (AgentTag,
+   --color-agent) rather than reusing Inventory's rose-tinted card style —
+   that's this section's own suitable palette, still consistent because
+   it's a colour the rest of the app already assigns this exact meaning. */
+.appointments-ai-section {
+  position: relative;
+  overflow: hidden;
+  margin: var(--space-lg) 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-hairline);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(37, 99, 235, 0.06), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 255, 0.98));
+  box-shadow: 0 15px 38px rgba(23, 32, 51, 0.06);
+  animation: appointments-ai-section-in 0.6s ease 0.1s both;
+}
+
+/* Concentric corner rings — same technique as the Inventory AI section's
+   ::before, recoloured to this section's own violet instead of copying
+   its red. Purely decorative, never intercepts clicks. */
+.appointments-ai-section::before {
+  content: "";
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  right: -100px;
+  bottom: -130px;
+  border-radius: 50%;
+  border: 1px solid rgba(37, 99, 235, 0.08);
+  box-shadow:
+    0 0 0 18px rgba(37, 99, 235, 0.018),
+    0 0 0 38px rgba(37, 99, 235, 0.011);
+  pointer-events: none;
+}
+
+.appointments-ai-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.appointments-ai-heading h2 {
+  margin: 2px 0 6px;
+  color: var(--color-ink);
+  font-size: clamp(20px, 2.4vw, 26px);
+  letter-spacing: -0.03em;
+}
+
+.appointments-ai-heading p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.appointments-ai-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #d7e0fb;
+  border-radius: 999px;
+  background: var(--color-agent-subtle);
+  color: var(--color-agent);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.appointments-ai-badge i {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--color-agent);
+  animation: appointments-ai-badge-pulse 1.8s ease-in-out infinite;
+}
+
+.appointments-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+.appointments-ai-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  border: 1px solid var(--color-hairline);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 8px 22px rgba(23, 32, 51, 0.045);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Corner glow — violet on the live card, plain ink on the pending one,
+   so the two cards read as "active" vs "idle" even before you notice
+   the status pill. */
+.appointments-ai-card::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  bottom: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.08), transparent 68%);
+  pointer-events: none;
+}
+
+.appointments-ai-card--pending::after {
+  background: radial-gradient(circle, rgba(23, 32, 51, 0.04), transparent 68%);
+}
+
+.appointments-ai-card:hover {
+  transform: translateY(-3px);
+  border-color: #c9d7f9;
+  box-shadow: 0 16px 30px rgba(23, 32, 51, 0.08);
+}
+
+.appointments-ai-card--pending {
+  opacity: 0.82;
+}
+
+.appointments-ai-card--pending:hover {
+  border-color: var(--color-hairline-strong);
+}
+
+.appointments-ai-card__top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.appointments-ai-card > div {
+  position: relative;
+  z-index: 2;
+}
+
+.appointments-ai-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--color-agent);
+  background: var(--color-agent-subtle);
+  animation: appointments-ai-scan-pulse 2.4s ease-in-out infinite;
+}
+
+.appointments-ai-icon--pending {
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunken);
+  animation: appointments-ai-idle-pulse 3.6s ease-in-out infinite;
+}
+
+.appointments-ai-status {
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.appointments-ai-status--ready {
+  color: #16805a;
+  background: #effaf5;
+}
+
+.appointments-ai-status--pending {
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunken);
+}
+
+.appointments-ai-kicker {
+  color: var(--color-agent);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.appointments-ai-card h3 {
+  margin: 5px 0 6px;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.appointments-ai-card p {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.appointments-ai-note {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--color-hairline);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
 .appointments-hero {
   position: relative;
   overflow: hidden;
@@ -236,6 +592,8 @@
 }
 
 .appointments-stat-card {
+  position: relative;
+  overflow: hidden;
   flex: 1;
   min-height: 92px;
   padding: var(--space-sm) var(--space-md);
@@ -250,9 +608,36 @@
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
+/* Corner blob, same technique as Inventory's .blood-card::after — grows
+   and brightens on hover instead of sitting there static. */
+.appointments-stat-card::after {
+  content: "";
+  position: absolute;
+  right: -32px;
+  top: -32px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: var(--color-primary-subtle);
+  opacity: 0.5;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  pointer-events: none;
+}
+
 .appointments-stat-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 18px 40px rgba(23, 32, 51, 0.1);
+}
+
+.appointments-stat-card:hover::after {
+  transform: scale(1.3);
+  opacity: 0.8;
+}
+
+.appointments-stat-card__icon,
+.appointments-stat-card > div {
+  position: relative;
+  z-index: 2;
 }
 
 .appointments-stat-card__icon {
@@ -309,6 +694,29 @@
 @keyframes appointments-trust-pulse {
   0%, 100% { box-shadow: 0 0 0 4px rgba(111, 224, 169, 0.1); }
   50% { box-shadow: 0 0 0 8px rgba(111, 224, 169, 0.03); }
+}
+
+@keyframes appointments-ai-section-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes appointments-ai-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08); }
+  50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.03); }
+}
+
+/* The live mode's icon "scans" — a quicker, more present ring pulse. */
+@keyframes appointments-ai-scan-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.02); }
+  50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.05); }
+}
+
+/* The pending mode's icon barely breathes — slower and much fainter,
+   so the two cards read as "active" vs "waiting" through motion alone. */
+@keyframes appointments-ai-idle-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(23, 32, 51, 0.02); }
+  50% { box-shadow: 0 0 0 4px rgba(23, 32, 51, 0.03); }
 }
 
 @media (max-width: 860px) {
