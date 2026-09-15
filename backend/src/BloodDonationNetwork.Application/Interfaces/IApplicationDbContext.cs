@@ -11,6 +11,11 @@ public interface IApplicationDbContext
     DbSet<DonationAppointment> DonationAppointments { get; }
     DbSet<BloodRequest> BloodRequests { get; }
 
+    // Student 2 - Agent workflow tracking
+    DbSet<AgentWorkflow> AgentWorkflows { get; }
+    DbSet<AgentStep> AgentSteps { get; }
+    DbSet<ApprovalDecision> ApprovalDecisions { get; }
+
     DbSet<BloodBankInventory> BloodBankInventories { get; }
 DbSet<InventoryTransaction> InventoryTransactions { get; }
 
