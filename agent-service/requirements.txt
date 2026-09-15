@@ -2,6 +2,10 @@
 #
 # Runtime + HTTP client used by the shared internal client and the
 # Matching & Dispatch agent node.
+langgraph
+langchain-core
+langchain-ollama
+
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 httpx==0.28.1
