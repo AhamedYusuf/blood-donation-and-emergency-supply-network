@@ -88,6 +88,7 @@ builder.Services.AddScoped<IMatchingDispatchAgentService, MatchingDispatchAgentS
 builder.Services.AddScoped<IEligibilityRuleEngine, EligibilityRuleEngine>();
 
 builder.Services.AddScoped<IRequestService, RequestService>();
+builder.Services.AddScoped<IAgentWorkflowService, AgentWorkflowService>();
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
