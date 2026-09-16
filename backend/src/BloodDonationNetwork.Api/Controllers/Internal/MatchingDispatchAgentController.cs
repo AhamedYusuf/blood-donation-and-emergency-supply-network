@@ -22,8 +22,21 @@ public class MatchingDispatchAgentController : ControllerBase
         return Ok(result);
     }
 
-    // TODO (blocked — waiting on Student 2's AgentWorkflow table):
-    // POST /api/internal/agent/dispatch per §4.4 mode 2. Must implement the
-    // server-side guard FIRST (reject if agent_workflows.status != approved)
-    // before any dispatch logic, per Tech Doc's explicit security note.
+    // Mode 2 per §4.4 — the server-side guard (reject unless the
+    // workflow is "approved") lives in MatchingDispatchAgentService,
+    // ahead of any dispatch logic, per the Tech Doc's explicit security
+    // note. AgentWorkflow landed via Student 2's PR, unblocking this.
+    [HttpPost("dispatch")]
+    public async Task<ActionResult<DispatchResponseDto>> Dispatch(DispatchRequestDto request)
+    {
+        try
+        {
+            var result = await _agentService.DispatchAsync(request);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }

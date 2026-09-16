@@ -24,6 +24,12 @@ from shared.internal_client import InternalClient, InternalClientError
 SEARCH_PATH = "/api/internal/agent/search-donors"
 DISPATCH_PATH = "/api/internal/agent/dispatch"
 
+# Used when the caller's payload doesn't specify one. Matches the cap
+# DonorRankingCalculator's proximity scoring already assumes server-side
+# (anything beyond 50km scores 0 proximity), so a wider radius here would
+# only ever return candidates that get filtered to the bottom anyway.
+DEFAULT_RADIUS_KM = 50
+
 _SEARCH_REQUIRED = ("workflowId", "bloodType", "unitsNeeded", "location", "urgencyLevel")
 _DISPATCH_REQUIRED = ("workflowId", "eligible")
 
@@ -35,7 +41,16 @@ def search(
 
     ``payload`` must contain ``workflowId``, ``bloodType``, ``unitsNeeded``
     (positive int), ``location`` (``{"lat": float, "lng": float}``) and
-    ``urgencyLevel``. ``radiusKm`` is optional and passed through.
+    ``urgencyLevel``. ``radiusKm`` is optional (defaults to
+    :data:`DEFAULT_RADIUS_KM`).
+
+    ``SearchDonorsRequestDto`` on the backend takes flat ``latitude`` /
+    ``longitude`` fields, not a nested ``location`` object, and has no
+    default for ``radiusKm`` — an omitted one is silently bound to 0,
+    which reject every donor regardless of distance. This function keeps
+    the nested ``location`` shape as its own callers' contract (Mode 1
+    predates it having any live caller) and translates it here rather
+    than pushing the DTO's exact wire shape onto every caller.
     """
     _require_fields(payload, _SEARCH_REQUIRED)
     _require_positive_int(payload, "unitsNeeded")
@@ -45,7 +60,15 @@ def search(
         raise ValueError("'location' must be an object with 'lat' and 'lng'")
 
     client = client or InternalClient()
-    result = client.post(SEARCH_PATH, payload)
+    outbound = {
+        "workflowId": payload["workflowId"],
+        "bloodType": payload["bloodType"],
+        "latitude": location["lat"],
+        "longitude": location["lng"],
+        "radiusKm": payload.get("radiusKm", DEFAULT_RADIUS_KM),
+        "urgencyLevel": payload["urgencyLevel"],
+    }
+    result = client.post(SEARCH_PATH, outbound)
 
     if not isinstance(result, dict) or "candidates" not in result:
         raise InternalClientError(
