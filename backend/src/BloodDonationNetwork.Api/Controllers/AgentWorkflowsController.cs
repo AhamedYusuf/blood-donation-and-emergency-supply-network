@@ -51,6 +51,37 @@ public class AgentWorkflowsController : ControllerBase
         });
     }
 
+    // GET /api/agent/workflows/request/{bloodRequestId}
+    [HttpGet("request/{bloodRequestId:guid}")]
+    public async Task<IActionResult> GetLatestWorkflowByBloodRequest(
+        Guid bloodRequestId)
+    {
+        var workflow =
+            await _workflowService.GetLatestByBloodRequestIdAsync(
+                bloodRequestId);
+
+        if (workflow == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "No workflow found for this blood request."
+            });
+        }
+
+        return Ok(new
+        {
+            workflow.Id,
+            workflow.BloodRequestId,
+            workflow.Status,
+            workflow.RevisionCount,
+            workflow.StartedAt,
+            workflow.UpdatedAt,
+            workflow.CompletedAt,
+            workflow.FailureReason
+        });
+    }
+
     // GET /api/agent/workflows/{id}/steps
     [HttpGet("{id:guid}/steps")]
     public async Task<IActionResult> GetSteps(Guid id)
@@ -113,8 +144,6 @@ public class AgentWorkflowsController : ControllerBase
         {
             var userId = CurrentUserId();
 
-            // Save approval in PostgreSQL first.
-            // The dispatch endpoint checks workflow status from the DB.
             var workflow = await _workflowService.ApproveAsync(
                 id,
                 userId,
@@ -148,7 +177,8 @@ public class AgentWorkflowsController : ControllerBase
 
             return Ok(new
             {
-                message = "Workflow approved and agent resumed.",
+                message =
+                    "Workflow approved and agent resumed.",
                 workflow.Id,
                 workflow.Status,
                 workflow.RevisionCount,
@@ -209,7 +239,8 @@ public class AgentWorkflowsController : ControllerBase
 
             return Ok(new
             {
-                message = "Workflow rejected and agent resumed.",
+                message =
+                    "Workflow rejected and agent resumed.",
                 workflow.Id,
                 workflow.Status,
                 workflow.CompletedAt,
@@ -250,8 +281,6 @@ public class AgentWorkflowsController : ControllerBase
                 });
             }
 
-            // Revision limit reached.
-            // Workflow has already been marked failed.
             if (workflow.Status == WorkflowStatuses.Failed)
             {
                 return Ok(new
@@ -314,7 +343,8 @@ public class AgentWorkflowsController : ControllerBase
         try
         {
             var client =
-                _httpClientFactory.CreateClient("AgentService");
+                _httpClientFactory.CreateClient(
+                    "AgentService");
 
             var response = await client.PostAsJsonAsync(
                 $"/resume-workflow/{workflowId}",

@@ -21,6 +21,16 @@ public class AgentWorkflowService : IAgentWorkflowService
             .FirstOrDefaultAsync(w => w.Id == workflowId);
     }
 
+    public async Task<AgentWorkflow?> GetLatestByBloodRequestIdAsync(
+        Guid bloodRequestId)
+    {
+        return await _context.AgentWorkflows
+            .AsNoTracking()
+            .Where(w => w.BloodRequestId == bloodRequestId)
+            .OrderByDescending(w => w.StartedAt)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<AgentStep>> GetStepsAsync(Guid workflowId)
     {
         return await _context.AgentSteps
