@@ -1,8 +1,10 @@
+using System.Text.Json;
 using BloodDonationNetwork.Application.Common;
 using BloodDonationNetwork.Application.DTOs.Agents;
 using BloodDonationNetwork.Application.DTOs.Appointments;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Application.Services;
+using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +32,8 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
 
     public async Task<SearchDonorsResponseDto> SearchDonorsAsync(SearchDonorsRequestDto request)
     {
+        var startedAt = DateTime.UtcNow;
+
         // Rough pre-filter by blood type only — real distance filtering
         // happens in-memory below, since Haversine distance can't be
         // translated into SQL by EF Core directly.
@@ -66,12 +70,24 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
         }
 
         var ranked = candidates.OrderByDescending(c => c.Score).ToList();
+        var response = new SearchDonorsResponseDto { Candidates = ranked };
 
-        return new SearchDonorsResponseDto { Candidates = ranked };
+        await LogStepAsync(
+            request.WorkflowId,
+            stepName: "search_donors",
+            status: "completed",
+            input: new { request.BloodType, request.Latitude, request.Longitude, request.RadiusKm, request.UrgencyLevel },
+            output: response,
+            narrative: $"Found {ranked.Count} candidate donor(s) for {request.BloodType} within {request.RadiusKm}km.",
+            startedAt: startedAt);
+
+        return response;
     }
 
     public async Task<DispatchResponseDto> DispatchAsync(DispatchRequestDto request)
     {
+        var startedAt = DateTime.UtcNow;
+
         var workflow = await _context.AgentWorkflows
             .FirstOrDefaultAsync(w => w.Id == request.WorkflowId)
             ?? throw new KeyNotFoundException($"Workflow {request.WorkflowId} not found.");
@@ -84,8 +100,20 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
         // for a request nobody signed off on.
         if (workflow.Status != WorkflowStatuses.Approved)
         {
-            throw new InvalidOperationException(
-                $"Workflow {workflow.Id} is not approved (status: '{workflow.Status}'). Dispatch is only allowed for approved workflows.");
+            var rejectionMessage =
+                $"Workflow {workflow.Id} is not approved (status: '{workflow.Status}'). Dispatch is only allowed for approved workflows.";
+
+            await LogStepAsync(
+                workflow.Id,
+                stepName: "dispatch",
+                status: "failed",
+                input: new { request.WorkflowId, EligibleCount = request.Eligible.Count },
+                output: null,
+                narrative: "Dispatch rejected — workflow is not approved.",
+                startedAt: startedAt,
+                errorMessage: rejectionMessage);
+
+            throw new InvalidOperationException(rejectionMessage);
         }
 
         var bloodRequest = await _context.BloodRequests
@@ -168,7 +196,7 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
             });
         }
 
-        return new DispatchResponseDto
+        var response = new DispatchResponseDto
         {
             WorkflowId = workflow.Id,
             DonorsContacted = request.Eligible.Count,
@@ -176,5 +204,58 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
             NotificationsDelivered = results.Count(r => r.NotificationDelivered),
             Results = results,
         };
+
+        await LogStepAsync(
+            workflow.Id,
+            stepName: "dispatch",
+            status: "completed",
+            input: new { request.WorkflowId, EligibleCount = request.Eligible.Count },
+            output: response,
+            narrative: $"Dispatched to {response.DonorsContacted} donor(s): {response.AppointmentsCreated} appointment(s) created, {response.NotificationsDelivered} notification(s) delivered.",
+            startedAt: startedAt);
+
+        return response;
+    }
+
+    // Tech Doc §0.7 — every agent action writes a row to the shared
+    // agent_steps table. Best-effort: if request.WorkflowId doesn't match
+    // a real AgentWorkflow (e.g. an ad-hoc/manual call not part of a
+    // tracked workflow run), this silently skips rather than failing the
+    // caller's actual request — logging is observability, not a
+    // correctness dependency for search/dispatch themselves.
+    private async Task LogStepAsync(
+        Guid workflowId,
+        string stepName,
+        string status,
+        object? input,
+        object? output,
+        string narrative,
+        DateTime startedAt,
+        string? errorMessage = null)
+    {
+        var workflowExists = await _context.AgentWorkflows
+            .AnyAsync(w => w.Id == workflowId);
+
+        if (!workflowExists)
+        {
+            return;
+        }
+
+        _context.AgentSteps.Add(new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflowId,
+            AgentName = AgentNames.MatchingDispatch,
+            StepName = stepName,
+            Status = status,
+            InputJson = input is null ? null : JsonSerializer.Serialize(input),
+            OutputJson = output is null ? null : JsonSerializer.Serialize(output),
+            Narrative = narrative,
+            StartedAt = startedAt,
+            CompletedAt = DateTime.UtcNow,
+            ErrorMessage = errorMessage,
+        });
+
+        await _context.SaveChangesAsync();
     }
 }

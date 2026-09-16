@@ -137,6 +137,102 @@ public sealed class MatchingDispatchAgentServiceTests : IDisposable
         Assert.Equal(AppointmentStatus.Scheduled, appointment.Status);
     }
 
+    // Tech Doc §0.7 — every agent action writes a row to the shared
+    // agent_steps table.
+    [Fact]
+    public async Task DispatchAsync_ApprovedWorkflow_LogsCompletedAgentStep()
+    {
+        var workflowId = await SeedWorkflowAsync(WorkflowStatuses.Approved);
+
+        await using var ctx = new TestAppDbContext(_options);
+        var sut = NewService(ctx);
+
+        await sut.DispatchAsync(new DispatchRequestDto
+        {
+            WorkflowId = workflowId,
+            Eligible = new List<DispatchCandidateDto> { new() { DonorId = DonorProfileId } },
+        });
+
+        await using var verify = new TestAppDbContext(_options);
+        var step = await verify.AgentSteps.SingleAsync(s => s.WorkflowId == workflowId);
+        Assert.Equal(AgentNames.MatchingDispatch, step.AgentName);
+        Assert.Equal("dispatch", step.StepName);
+        Assert.Equal("completed", step.Status);
+        Assert.Null(step.ErrorMessage);
+        Assert.NotNull(step.OutputJson);
+        Assert.NotNull(step.CompletedAt);
+    }
+
+    [Fact]
+    public async Task DispatchAsync_RejectedForNonApprovedWorkflow_LogsFailedAgentStep()
+    {
+        var workflowId = await SeedWorkflowAsync(WorkflowStatuses.AwaitingApproval);
+
+        await using var ctx = new TestAppDbContext(_options);
+        var sut = NewService(ctx);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sut.DispatchAsync(new DispatchRequestDto
+        {
+            WorkflowId = workflowId,
+            Eligible = new List<DispatchCandidateDto> { new() { DonorId = DonorProfileId } },
+        }));
+
+        await using var verify = new TestAppDbContext(_options);
+        var step = await verify.AgentSteps.SingleAsync(s => s.WorkflowId == workflowId);
+        Assert.Equal("failed", step.Status);
+        Assert.Contains("not approved", step.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SearchDonorsAsync_WithRealWorkflow_LogsCompletedAgentStep()
+    {
+        var workflowId = await SeedWorkflowAsync(WorkflowStatuses.Planning);
+
+        await using var ctx = new TestAppDbContext(_options);
+        var sut = NewService(ctx);
+
+        await sut.SearchDonorsAsync(new SearchDonorsRequestDto
+        {
+            WorkflowId = workflowId,
+            BloodType = "O+",
+            Latitude = 6.93,
+            Longitude = 79.86,
+            RadiusKm = 50,
+            UrgencyLevel = "critical",
+        });
+
+        await using var verify = new TestAppDbContext(_options);
+        var step = await verify.AgentSteps.SingleAsync(s => s.WorkflowId == workflowId);
+        Assert.Equal(AgentNames.MatchingDispatch, step.AgentName);
+        Assert.Equal("search_donors", step.StepName);
+        Assert.Equal("completed", step.Status);
+    }
+
+    [Fact]
+    public async Task SearchDonorsAsync_WithoutAMatchingWorkflow_SkipsLoggingWithoutThrowing()
+    {
+        // Mode 1 predates AgentWorkflow and is still called ad hoc (manual
+        // curl tests, callers with no tracked workflow) — an unrecognized
+        // WorkflowId must not break the search itself.
+        await using var ctx = new TestAppDbContext(_options);
+        var sut = NewService(ctx);
+
+        var result = await sut.SearchDonorsAsync(new SearchDonorsRequestDto
+        {
+            WorkflowId = Guid.NewGuid(),
+            BloodType = "O+",
+            Latitude = 6.93,
+            Longitude = 79.86,
+            RadiusKm = 50,
+            UrgencyLevel = "critical",
+        });
+
+        Assert.Single(result.Candidates);
+
+        await using var verify = new TestAppDbContext(_options);
+        Assert.Equal(0, await verify.AgentSteps.CountAsync());
+    }
+
     private async Task<Guid> SeedWorkflowAsync(string status)
     {
         var workflowId = Guid.NewGuid();

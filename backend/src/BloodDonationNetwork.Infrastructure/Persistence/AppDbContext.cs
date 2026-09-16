@@ -56,6 +56,18 @@ public class AppDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(a => a.DonorId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // RelatedWorkflowId was the other plain, unconstrained Guid column
+        // on DonationAppointment — nullable because a donor can book
+        // directly, not just via a dispatched workflow, and because
+        // AgentWorkflow didn't exist yet at the time. It does now. SetNull
+        // (not Cascade) because deleting the workflow's audit record
+        // shouldn't delete a donor's real, already-booked appointment.
+        modelBuilder.Entity<DonationAppointment>()
+            .HasOne<AgentWorkflow>()
+            .WithMany()
+            .HasForeignKey(a => a.RelatedWorkflowId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<DonorDevice>()
             .HasOne<User>()
             .WithMany()
