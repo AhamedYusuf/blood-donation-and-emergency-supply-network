@@ -60,6 +60,33 @@ public class WorkflowInternalController : ControllerBase
             });
     }
 
+    // GET /api/internal/agent/workflows/request/{bloodRequestId}
+    [HttpGet("request/{bloodRequestId:guid}")]
+    public async Task<IActionResult> GetBloodRequestForAgent(
+        Guid bloodRequestId)
+    {
+        var bloodRequest = await _context.BloodRequests.FindAsync(
+            bloodRequestId);
+
+        if (bloodRequest == null)
+        {
+            return NotFound(new
+            {
+                message = "Blood request not found."
+            });
+        }
+
+        return Ok(new
+        {
+            bloodRequestId = bloodRequest.Id,
+            bloodType = bloodRequest.BloodType,
+            unitsRequested = bloodRequest.UnitsRequested,
+            urgency = bloodRequest.Urgency,
+            latitude = bloodRequest.Latitude,
+            longitude = bloodRequest.Longitude
+        });
+    }
+
     // POST /api/internal/agent/workflows/{id}/status
     [HttpPost("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(
