@@ -20,13 +20,7 @@ class ResumeWorkflowRequest(BaseModel):
     comments: str | None = None
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/run-workflow")
-def run_workflow(request: RunWorkflowRequest):
+def get_backend_config():
     backend_base_url = os.getenv(
         "BACKEND_BASE_URL",
         "http://localhost:5067"
@@ -44,9 +38,21 @@ def run_workflow(request: RunWorkflowRequest):
         "X-Internal-Secret": internal_secret
     }
 
+    return backend_base_url, headers
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.post("/run-workflow")
+def run_workflow(request: RunWorkflowRequest):
+    backend_base_url, headers = get_backend_config()
+
     try:
-        # 1. Create workflow record through ASP.NET backend
-        response = requests.post(
+        # 1. Create AgentWorkflow record
+        workflow_response = requests.post(
             f"{backend_base_url}/api/internal/agent/workflows",
             json={
                 "bloodRequestId": request.bloodRequestId
@@ -55,37 +61,95 @@ def run_workflow(request: RunWorkflowRequest):
             timeout=10
         )
 
-        if response.status_code >= 400:
+        if workflow_response.status_code >= 400:
             raise HTTPException(
-                status_code=response.status_code,
-                detail=response.text
+                status_code=workflow_response.status_code,
+                detail=workflow_response.text
             )
 
-        workflow = response.json()
+        workflow = workflow_response.json()
         workflow_id = workflow["id"]
 
-        # 2. Initial coordinator state
+        # 2. Fetch BloodRequest data for the Coordinator
+        blood_request_response = requests.get(
+            (
+                f"{backend_base_url}"
+                f"/api/internal/agent/workflows/request/"
+                f"{request.bloodRequestId}"
+            ),
+            headers=headers,
+            timeout=10
+        )
+
+        if blood_request_response.status_code >= 400:
+            raise HTTPException(
+                status_code=blood_request_response.status_code,
+                detail=blood_request_response.text
+            )
+
+        blood_request = blood_request_response.json()
+
+        # 3. Validate fields required by downstream agents
+        required_fields = [
+            "bloodType",
+            "unitsRequested",
+            "urgency",
+            "latitude",
+            "longitude",
+        ]
+
+        missing_fields = [
+            field
+            for field in required_fields
+            if blood_request.get(field) is None
+        ]
+
+        if missing_fields:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Blood request is missing required fields: "
+                    + ", ".join(missing_fields)
+                )
+            )
+
+        # 4. Build complete CoordinatorState
+        #
+        # Important:
+        # matching_dispatch_agent.search() expects location
+        # as {"lat": ..., "lng": ...}
         initial_state = {
             "workflow_id": workflow_id,
             "blood_request_id": request.bloodRequestId,
+
+            "blood_type": blood_request["bloodType"],
+            "units_needed": blood_request["unitsRequested"],
+            "urgency_level": blood_request["urgency"],
+
+            "location": {
+                "lat": blood_request["latitude"],
+                "lng": blood_request["longitude"],
+            },
+
             "current_step": "planning",
+
             "plan": [
                 "stock_check",
                 "search_donors",
                 "validate_eligibility",
                 "await_approval",
-                "dispatch"
-            ]
+                "dispatch",
+            ],
         }
 
-        # 3. LangGraph thread configuration
+        # 5. LangGraph thread configuration
         config = {
             "configurable": {
                 "thread_id": workflow_id
             }
         }
 
-        # 4. Start coordinator workflow
+        # 6. Start Coordinator Agent
         result = coordinator_graph.invoke(
             initial_state,
             config=config
@@ -94,13 +158,22 @@ def run_workflow(request: RunWorkflowRequest):
         return {
             "workflowId": workflow_id,
             "status": "started",
-            "state": result
+            "state": result,
         }
+
+    except HTTPException:
+        raise
 
     except requests.RequestException as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Backend communication failed: {str(exc)}"
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start workflow: {str(exc)}"
         )
 
 
@@ -114,7 +187,7 @@ def resume_workflow(
     allowed_decisions = {
         "approve",
         "reject",
-        "revise"
+        "revise",
     }
 
     if decision not in allowed_decisions:
@@ -133,7 +206,6 @@ def resume_workflow(
     }
 
     try:
-        # Check whether this workflow checkpoint exists
         snapshot = coordinator_graph.get_state(config)
 
         if not snapshot.values:
@@ -142,12 +214,11 @@ def resume_workflow(
                 detail="Workflow checkpoint not found."
             )
 
-        # Resume the interrupt() inside await_approval_node
         result = coordinator_graph.invoke(
             Command(
                 resume={
                     "decision": decision,
-                    "comments": request.comments
+                    "comments": request.comments,
                 }
             ),
             config=config
@@ -157,7 +228,7 @@ def resume_workflow(
             "workflowId": workflow_id,
             "decision": decision,
             "status": "resumed",
-            "state": result
+            "state": result,
         }
 
     except HTTPException:

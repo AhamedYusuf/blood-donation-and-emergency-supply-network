@@ -60,6 +60,36 @@ public class WorkflowInternalController : ControllerBase
             });
     }
 
+    // GET /api/internal/agent/workflows/request/{bloodRequestId}
+    [HttpGet("request/{bloodRequestId:guid}")]
+    public async Task<IActionResult> GetBloodRequestForAgent(
+        Guid bloodRequestId)
+    {
+        var bloodRequest = await _context.BloodRequests.FindAsync(
+            bloodRequestId);
+
+        if (bloodRequest == null)
+        {
+            return NotFound(new
+            {
+                message = "Blood request not found."
+            });
+        }
+
+        var bloodType = MapBloodType(bloodRequest.BloodType);
+        var urgency = MapUrgency(bloodRequest.Urgency);
+
+        return Ok(new
+        {
+            bloodRequestId = bloodRequest.Id,
+            bloodType,
+            unitsRequested = bloodRequest.UnitsRequested,
+            urgency,
+            latitude = bloodRequest.Latitude,
+            longitude = bloodRequest.Longitude
+        });
+    }
+
     // POST /api/internal/agent/workflows/{id}/status
     [HttpPost("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(
@@ -151,12 +181,49 @@ public class WorkflowInternalController : ControllerBase
             step.CompletedAt
         });
     }
+
+    private static string MapBloodType(BloodType bloodType)
+    {
+        return bloodType switch
+        {
+            BloodType.APositive => BloodTypes.APositive,
+            BloodType.ANegative => BloodTypes.ANegative,
+            BloodType.BPositive => BloodTypes.BPositive,
+            BloodType.BNegative => BloodTypes.BNegative,
+            BloodType.ABPositive => BloodTypes.ABPositive,
+            BloodType.ABNegative => BloodTypes.ABNegative,
+            BloodType.OPositive => BloodTypes.OPositive,
+            BloodType.ONegative => BloodTypes.ONegative,
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(bloodType),
+                bloodType,
+                "Unsupported blood type.")
+        };
+    }
+
+    private static string MapUrgency(RequestUrgency urgency)
+    {
+        return urgency switch
+        {
+            RequestUrgency.Normal => "routine",
+            RequestUrgency.Urgent => "urgent",
+            RequestUrgency.Critical => "critical",
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(urgency),
+                urgency,
+                "Unsupported request urgency.")
+        };
+    }
 }
+
 
 public class CreateWorkflowInternalRequest
 {
     public Guid BloodRequestId { get; set; }
 }
+
 
 public class UpdateWorkflowStatusInternalRequest
 {
@@ -164,6 +231,7 @@ public class UpdateWorkflowStatusInternalRequest
 
     public string? FailureReason { get; set; }
 }
+
 
 public class CreateAgentStepInternalRequest
 {
