@@ -21,6 +21,13 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     public DbSet<BloodRequest> BloodRequests => Set<BloodRequest>();
 
+    // Student 2 - Agent workflow tracking
+    public DbSet<AgentWorkflow> AgentWorkflows => Set<AgentWorkflow>();
+
+    public DbSet<AgentStep> AgentSteps => Set<AgentStep>();
+
+    public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
+
     public DbSet<BloodBankInventory> BloodBankInventories => Set<BloodBankInventory>();
 
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
@@ -54,6 +61,68 @@ public class AppDbContext : DbContext, IApplicationDbContext
             .WithMany()
             .HasForeignKey(d => d.DonorUserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Student 2 - AgentWorkflow configuration
+        modelBuilder.Entity<AgentWorkflow>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.BloodRequest)
+                .WithMany()
+                .HasForeignKey(x => x.BloodRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.Status)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(x => x.FailureReason)
+                .HasMaxLength(1000);
+        });
+
+        // Student 2 - AgentStep configuration
+        modelBuilder.Entity<AgentStep>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Workflow)
+                .WithMany(x => x.Steps)
+                .HasForeignKey(x => x.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.AgentName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.StepName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Status)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(x => x.ErrorMessage)
+                .HasMaxLength(1000);
+        });
+
+        // Student 2 - ApprovalDecision configuration
+        modelBuilder.Entity<ApprovalDecision>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Workflow)
+                .WithMany(x => x.ApprovalDecisions)
+                .HasForeignKey(x => x.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.Decision)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(x => x.Comments)
+                .HasMaxLength(1000);
+        });
 
         modelBuilder.Entity<BloodBankInventory>(entity =>
         {
