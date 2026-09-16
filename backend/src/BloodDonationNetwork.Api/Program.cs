@@ -27,7 +27,8 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler<BloodDonationNetwork.Api.Middleware.ApiExceptionHandler>();
+builder.Services.AddExceptionHandler<
+    BloodDonationNetwork.Api.Middleware.ApiExceptionHandler>();
 
 // =====================================================
 // EXTERNAL CLIENTS
@@ -38,65 +39,119 @@ builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
         "User-Agent",
         "BloodDonationNetwork/1.0"));
 
+// Python Agent Service
+builder.Services.AddHttpClient("AgentService", client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["AgentService:BaseUrl"]
+        ?? "http://localhost:8001");
+});
+
 // =====================================================
 // PUSH NOTIFICATIONS (Firebase Cloud Messaging)
 // =====================================================
 // If no service-account key is configured the app still runs — a no-op
 // sender is used and NotificationService reports "not configured".
 
-var fcmOptions = builder.Configuration.GetSection("Fcm").Get<FcmOptions>() ?? new FcmOptions();
+var fcmOptions =
+    builder.Configuration.GetSection("Fcm").Get<FcmOptions>()
+    ?? new FcmOptions();
 
 if (fcmOptions.HasCredentials)
 {
-    var keyJson = !string.IsNullOrWhiteSpace(fcmOptions.ServiceAccountKeyJson)
-        ? fcmOptions.ServiceAccountKeyJson!
-        : File.ReadAllText(fcmOptions.ServiceAccountKeyPath!);
-    var serviceAccount = ServiceAccountKey.Parse(keyJson);
-    var projectId = fcmOptions.ProjectId ?? serviceAccount.ProjectId;
+    var keyJson =
+        !string.IsNullOrWhiteSpace(
+            fcmOptions.ServiceAccountKeyJson)
+            ? fcmOptions.ServiceAccountKeyJson!
+            : File.ReadAllText(
+                fcmOptions.ServiceAccountKeyPath!);
+
+    var serviceAccount =
+        ServiceAccountKey.Parse(keyJson);
+
+    var projectId =
+        fcmOptions.ProjectId
+        ?? serviceAccount.ProjectId;
 
     builder.Services.AddHttpClient("fcm-token");
     builder.Services.AddHttpClient("fcm-send");
 
-    builder.Services.AddSingleton(sp => new GoogleAccessTokenProvider(
-        serviceAccount,
-        sp.GetRequiredService<IHttpClientFactory>().CreateClient("fcm-token")));
+    builder.Services.AddSingleton(sp =>
+        new GoogleAccessTokenProvider(
+            serviceAccount,
+            sp.GetRequiredService<IHttpClientFactory>()
+                .CreateClient("fcm-token")));
 
-    builder.Services.AddScoped<IFcmSender>(sp => new FcmHttpSender(
-        sp.GetRequiredService<IHttpClientFactory>().CreateClient("fcm-send"),
-        sp.GetRequiredService<GoogleAccessTokenProvider>(),
-        projectId,
-        TimeSpan.FromSeconds(fcmOptions.RequestTimeoutSeconds)));
+    builder.Services.AddScoped<IFcmSender>(sp =>
+        new FcmHttpSender(
+            sp.GetRequiredService<IHttpClientFactory>()
+                .CreateClient("fcm-send"),
+            sp.GetRequiredService<
+                GoogleAccessTokenProvider>(),
+            projectId,
+            TimeSpan.FromSeconds(
+                fcmOptions.RequestTimeoutSeconds)));
 }
 else
 {
-    builder.Services.AddScoped<IFcmSender, NoOpFcmSender>();
+    builder.Services.AddScoped<
+        IFcmSender,
+        NoOpFcmSender>();
 }
 
 // =====================================================
 // APPLICATION SERVICES
 // =====================================================
 
-builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<
+    INotificationService,
+    NotificationService>();
 
-builder.Services.AddScoped<IDonorService, DonorService>();
-builder.Services.AddScoped<IInventoryService, InventoryService>();
-builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+builder.Services.AddScoped<
+    IDonorService,
+    DonorService>();
+
+builder.Services.AddScoped<
+    IInventoryService,
+    InventoryService>();
+
+builder.Services.AddScoped<
+    IOrganizationService,
+    OrganizationService>();
 
 builder.Services.AddScoped<DonorRankingCalculator>();
-builder.Services.AddScoped<IMatchingDispatchAgentService, MatchingDispatchAgentService>();
 
-builder.Services.AddScoped<IEligibilityRuleEngine, EligibilityRuleEngine>();
+builder.Services.AddScoped<
+    IMatchingDispatchAgentService,
+    MatchingDispatchAgentService>();
 
-builder.Services.AddScoped<IRequestService, RequestService>();
-builder.Services.AddScoped<IAgentWorkflowService, AgentWorkflowService>();
+builder.Services.AddScoped<
+    IEligibilityRuleEngine,
+    EligibilityRuleEngine>();
 
-builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<
+    IRequestService,
+    RequestService>();
 
-builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<
+    IAgentWorkflowService,
+    AgentWorkflowService>();
 
-builder.Services.AddScoped<IStaffInvitationService, StaffInvitationService>();
+builder.Services.AddScoped<
+    IJwtTokenService,
+    JwtTokenService>();
 
-builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<
+    IAuthService,
+    AuthService>();
+
+builder.Services.AddScoped<
+    IStaffInvitationService,
+    StaffInvitationService>();
+
+builder.Services.AddScoped<
+    IAppointmentService,
+    AppointmentService>();
 
 // =====================================================
 // DATABASE
@@ -104,14 +159,16 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
 var dataSourceBuilder =
     new Npgsql.NpgsqlDataSourceBuilder(
-        builder.Configuration.GetConnectionString("Default"));
+        builder.Configuration.GetConnectionString(
+            "Default"));
 
 dataSourceBuilder.EnableDynamicJson();
 
 var dataSource = dataSourceBuilder.Build();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(dataSource));
+builder.Services.AddDbContext<AppDbContext>(
+    options =>
+        options.UseNpgsql(dataSource));
 
 builder.Services.AddScoped<IApplicationDbContext>(
     sp => sp.GetRequiredService<AppDbContext>());
@@ -133,15 +190,18 @@ builder.Services.AddAuthentication(
                 ValidateIssuerSigningKey = true,
 
                 ValidIssuer =
-                    builder.Configuration["Jwt:Issuer"],
+                    builder.Configuration[
+                        "Jwt:Issuer"],
 
                 ValidAudience =
-                    builder.Configuration["Jwt:Audience"],
+                    builder.Configuration[
+                        "Jwt:Audience"],
 
                 IssuerSigningKey =
                     new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(
-                            builder.Configuration["Jwt:Key"]!))
+                            builder.Configuration[
+                                "Jwt:Key"]!))
             };
     });
 
@@ -167,30 +227,37 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition(
         "Bearer",
-        new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        new Microsoft.OpenApi.Models
+            .OpenApiSecurityScheme
         {
             Name = "Authorization",
             Type =
-                Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+                Microsoft.OpenApi.Models
+                    .SecuritySchemeType.Http,
             Scheme = "bearer",
             BearerFormat = "JWT",
             In =
-                Microsoft.OpenApi.Models.ParameterLocation.Header,
+                Microsoft.OpenApi.Models
+                    .ParameterLocation.Header,
             Description =
                 "Enter your JWT token. Example: Bearer {your token}"
         });
 
     options.AddSecurityRequirement(
-        new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+        new Microsoft.OpenApi.Models
+            .OpenApiSecurityRequirement
         {
             {
-                new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                new Microsoft.OpenApi.Models
+                    .OpenApiSecurityScheme
                 {
                     Reference =
-                        new Microsoft.OpenApi.Models.OpenApiReference
+                        new Microsoft.OpenApi.Models
+                            .OpenApiReference
                         {
                             Type =
-                                Microsoft.OpenApi.Models.ReferenceType
+                                Microsoft.OpenApi.Models
+                                    .ReferenceType
                                     .SecurityScheme,
                             Id = "Bearer"
                         }
@@ -215,46 +282,70 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Bootstraps the very first admin account. There's no other way to
-    // get one: public registration always creates a donor (AuthService),
-    // and staff accounts require an admin-issued invitation
-    // (StaffInvitationService) — so without this, a fresh database has
-    // no user who could ever issue that first invitation. Runs once per
-    // startup, is a no-op once any admin exists, and only runs in
-    // Development — production admin provisioning is a separate,
-    // deliberately manual concern (this seeder is not safe to run
-    // unattended against a real database).
-    using var seedScope = app.Services.CreateScope();
-    var seedContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-    if (!await seedContext.Users.AnyAsync(u => u.Role == BloodDonationNetwork.Domain.Entities.UserRole.Admin))
-    {
-        var adminEmail = (app.Configuration["Seed:AdminEmail"] ?? "admin@blooddonation.local").Trim().ToLowerInvariant();
-        var adminPassword = app.Configuration["Seed:AdminPassword"] ?? "ChangeMe123!";
+    // Bootstraps the very first admin account.
+    // Public registration creates donors only,
+    // while staff accounts require an admin-issued invitation.
+    using var seedScope =
+        app.Services.CreateScope();
 
-        seedContext.Users.Add(new BloodDonationNetwork.Domain.Entities.User
-        {
-            Id = Guid.NewGuid(),
-            Email = adminEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-            Role = BloodDonationNetwork.Domain.Entities.UserRole.Admin,
-            FullName = "Admin",
-            PhoneNumber = string.Empty,
-            OrganizationId = null,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-        });
+    var seedContext =
+        seedScope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+    if (!await seedContext.Users.AnyAsync(
+            u =>
+                u.Role ==
+                BloodDonationNetwork.Domain.Entities
+                    .UserRole.Admin))
+    {
+        var adminEmail =
+            (
+                app.Configuration[
+                    "Seed:AdminEmail"]
+                ?? "admin@blooddonation.local"
+            )
+            .Trim()
+            .ToLowerInvariant();
+
+        var adminPassword =
+            app.Configuration[
+                "Seed:AdminPassword"]
+            ?? "ChangeMe123!";
+
+        seedContext.Users.Add(
+            new BloodDonationNetwork.Domain.Entities.User
+            {
+                Id = Guid.NewGuid(),
+                Email = adminEmail,
+                PasswordHash =
+                    BCrypt.Net.BCrypt.HashPassword(
+                        adminPassword),
+                Role =
+                    BloodDonationNetwork.Domain.Entities
+                        .UserRole.Admin,
+                FullName = "Admin",
+                PhoneNumber = string.Empty,
+                OrganizationId = null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            });
+
         await seedContext.SaveChangesAsync();
 
         app.Logger.LogWarning(
-            "Seeded first admin account {Email} — set Seed:AdminEmail/Seed:AdminPassword in " +
-            "appsettings.Development.json to override, and change this password after logging in.",
+            "Seeded first admin account {Email} — " +
+            "set Seed:AdminEmail/Seed:AdminPassword in " +
+            "appsettings.Development.json to override, " +
+            "and change this password after logging in.",
             adminEmail);
     }
 }
 
 app.UseHttpsRedirection();
 
-app.UseMiddleware<BloodDonationNetwork.Api.Middleware.InternalSecretMiddleware>();
+app.UseMiddleware<
+    BloodDonationNetwork.Api.Middleware
+        .InternalSecretMiddleware>();
 
 // Authentication must come before Authorization
 app.UseAuthentication();
