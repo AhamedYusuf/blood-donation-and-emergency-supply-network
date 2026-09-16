@@ -6,6 +6,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from agents.matching_dispatch_agent import dispatch as run_dispatch
+from agents.matching_dispatch_agent import search as run_search
+from shared.internal_client import InternalClientError
+
 
 class CoordinatorState(TypedDict, total=False):
     # Workflow identity
@@ -70,17 +74,35 @@ def route_after_stock_check(state: CoordinatorState) -> str:
 
 def search_donors_node(state: CoordinatorState) -> dict[str, Any]:
     """
-    Temporary Student 4 stub.
+    Mode 1 of the Matching & Dispatch Agent (Tech Doc §4.4).
 
-    Later this node will call the real donor-search logic.
+    Calls POST /api/internal/agent/search-donors via
+    matching_dispatch_agent.search(), using the request details the
+    Coordinator's initial state carries (blood_type, units_needed,
+    location, urgency_level). A failed call (bad payload, backend
+    unreachable) is recorded on the state rather than raised, so one
+    agent's failure doesn't crash the whole workflow run.
     """
-    return {
-        "current_step": "search_donors",
-        "donor_search_result": {
-            "candidates": [],
-            "message": "Temporary donor-search stub.",
-        },
-    }
+    try:
+        result = run_search(
+            {
+                "workflowId": state.get("workflow_id"),
+                "bloodType": state.get("blood_type"),
+                "unitsNeeded": state.get("units_needed"),
+                "location": state.get("location"),
+                "urgencyLevel": state.get("urgency_level"),
+            }
+        )
+        return {
+            "current_step": "search_donors",
+            "donor_search_result": result,
+        }
+    except (InternalClientError, ValueError) as exc:
+        return {
+            "current_step": "search_donors",
+            "donor_search_result": {"candidates": []},
+            "error": f"search_donors failed: {exc}",
+        }
 
 
 def validate_eligibility_node(
@@ -150,17 +172,33 @@ def route_after_approval(state: CoordinatorState) -> str:
 
 def dispatch_node(state: CoordinatorState) -> dict[str, Any]:
     """
-    Temporary Student 4 dispatch stub.
+    Mode 2 of the Matching & Dispatch Agent (Tech Doc §4.4).
 
-    Later this node will call the real dispatch implementation.
+    Only reached via route_after_approval when a staff/admin approved the
+    workflow, but matching_dispatch_agent.dispatch() calls the backend's
+    own approval-status guard regardless — belt and suspenders, since the
+    graph's in-memory state isn't the source of truth for approval.
     """
-    return {
-        "current_step": "dispatch",
-        "dispatch_result": {
-            "status": "pending_real_dispatch_integration",
-            "message": "Temporary dispatch stub.",
-        },
-    }
+    eligibility_result = state.get("eligibility_result", {})
+    eligible = eligibility_result.get("eligible", [])
+
+    try:
+        result = run_dispatch(
+            {
+                "workflowId": state.get("workflow_id"),
+                "eligible": eligible,
+            }
+        )
+        return {
+            "current_step": "dispatch",
+            "dispatch_result": result,
+        }
+    except (InternalClientError, ValueError) as exc:
+        return {
+            "current_step": "dispatch",
+            "dispatch_result": {"status": "failed"},
+            "error": f"dispatch failed: {exc}",
+        }
 
 
 def build_coordinator_graph() -> StateGraph:
