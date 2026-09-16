@@ -26,11 +26,13 @@ export const validateCreateRequest = (
   }
 
   if (values.unitsRequested < 1) {
-    errors.unitsRequested = "Units requested must be at least 1.";
+    errors.unitsRequested =
+      "Units requested must be at least 1.";
   }
 
   if (values.unitsRequested > 100) {
-    errors.unitsRequested = "Units requested cannot exceed 100.";
+    errors.unitsRequested =
+      "Units requested cannot exceed 100.";
   }
 
   if (!values.hospitalName.trim()) {
@@ -45,9 +47,23 @@ export const validateCreateRequest = (
       "Latitude must be between -90 and 90.";
   }
 
-  if (values.longitude < -180 || values.longitude > 180) {
+  if (
+    values.longitude < -180 ||
+    values.longitude > 180
+  ) {
     errors.longitude =
       "Longitude must be between -180 and 180.";
+  }
+
+  // Prevent the default 0,0 location from being submitted.
+  if (
+    values.latitude === 0 &&
+    values.longitude === 0
+  ) {
+    errors.latitude =
+      "Please enter the hospital location.";
+    errors.longitude =
+      "Please enter the hospital location.";
   }
 
   if (values.notes.length > 1000) {

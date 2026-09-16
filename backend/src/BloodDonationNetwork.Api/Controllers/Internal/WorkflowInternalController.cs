@@ -76,12 +76,15 @@ public class WorkflowInternalController : ControllerBase
             });
         }
 
+        var bloodType = MapBloodType(bloodRequest.BloodType);
+        var urgency = MapUrgency(bloodRequest.Urgency);
+
         return Ok(new
         {
             bloodRequestId = bloodRequest.Id,
-            bloodType = bloodRequest.BloodType,
+            bloodType,
             unitsRequested = bloodRequest.UnitsRequested,
-            urgency = bloodRequest.Urgency,
+            urgency,
             latitude = bloodRequest.Latitude,
             longitude = bloodRequest.Longitude
         });
@@ -178,12 +181,49 @@ public class WorkflowInternalController : ControllerBase
             step.CompletedAt
         });
     }
+
+    private static string MapBloodType(BloodType bloodType)
+    {
+        return bloodType switch
+        {
+            BloodType.APositive => BloodTypes.APositive,
+            BloodType.ANegative => BloodTypes.ANegative,
+            BloodType.BPositive => BloodTypes.BPositive,
+            BloodType.BNegative => BloodTypes.BNegative,
+            BloodType.ABPositive => BloodTypes.ABPositive,
+            BloodType.ABNegative => BloodTypes.ABNegative,
+            BloodType.OPositive => BloodTypes.OPositive,
+            BloodType.ONegative => BloodTypes.ONegative,
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(bloodType),
+                bloodType,
+                "Unsupported blood type.")
+        };
+    }
+
+    private static string MapUrgency(RequestUrgency urgency)
+    {
+        return urgency switch
+        {
+            RequestUrgency.Normal => "routine",
+            RequestUrgency.Urgent => "urgent",
+            RequestUrgency.Critical => "critical",
+
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(urgency),
+                urgency,
+                "Unsupported request urgency.")
+        };
+    }
 }
+
 
 public class CreateWorkflowInternalRequest
 {
     public Guid BloodRequestId { get; set; }
 }
+
 
 public class UpdateWorkflowStatusInternalRequest
 {
@@ -191,6 +231,7 @@ public class UpdateWorkflowStatusInternalRequest
 
     public string? FailureReason { get; set; }
 }
+
 
 public class CreateAgentStepInternalRequest
 {
