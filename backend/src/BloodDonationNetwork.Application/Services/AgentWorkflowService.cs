@@ -101,8 +101,12 @@ public class AgentWorkflowService : IAgentWorkflowService
             return null;
         }
 
+        EnsureDecisionAllowed(workflow);
+
+        var now = DateTime.UtcNow;
+
         workflow.Status = WorkflowStatuses.Approved;
-        workflow.UpdatedAt = DateTime.UtcNow;
+        workflow.UpdatedAt = now;
 
         var decision = new ApprovalDecision
         {
@@ -110,7 +114,7 @@ public class AgentWorkflowService : IAgentWorkflowService
             DecidedByUserId = decidedByUserId,
             Decision = ApprovalDecisions.Approved,
             Comments = comments,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
 
         _context.ApprovalDecisions.Add(decision);
@@ -133,9 +137,13 @@ public class AgentWorkflowService : IAgentWorkflowService
             return null;
         }
 
+        EnsureDecisionAllowed(workflow);
+
+        var now = DateTime.UtcNow;
+
         workflow.Status = WorkflowStatuses.Rejected;
-        workflow.UpdatedAt = DateTime.UtcNow;
-        workflow.CompletedAt = DateTime.UtcNow;
+        workflow.UpdatedAt = now;
+        workflow.CompletedAt = now;
 
         var decision = new ApprovalDecision
         {
@@ -143,7 +151,7 @@ public class AgentWorkflowService : IAgentWorkflowService
             DecidedByUserId = decidedByUserId,
             Decision = ApprovalDecisions.Rejected,
             Comments = comments,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
 
         _context.ApprovalDecisions.Add(decision);
@@ -165,6 +173,8 @@ public class AgentWorkflowService : IAgentWorkflowService
         {
             return null;
         }
+
+        EnsureDecisionAllowed(workflow);
 
         var now = DateTime.UtcNow;
 
@@ -210,5 +220,21 @@ public class AgentWorkflowService : IAgentWorkflowService
         await _context.SaveChangesAsync();
 
         return workflow;
+    }
+
+    private static void EnsureDecisionAllowed(
+        AgentWorkflow workflow)
+    {
+        var decisionAllowed =
+            workflow.Status == WorkflowStatuses.Planning ||
+            workflow.Status == WorkflowStatuses.AwaitingApproval;
+
+        if (!decisionAllowed)
+        {
+            throw new InvalidOperationException(
+                $"Workflow '{workflow.Id}' cannot receive another " +
+                $"approval decision while its status is " +
+                $"'{workflow.Status}'.");
+        }
     }
 }
