@@ -29,9 +29,23 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     public DbSet<StaffInvitation> StaffInvitations => Set<StaffInvitation>();
 
+    public DbSet<AgentStep> AgentSteps => Set<AgentStep>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        modelBuilder.Entity<AgentStep>(entity =>
+        {
+            entity.ToTable("agent_steps");
+            entity.HasKey(step => step.Id);
+            entity.Property(step => step.AgentName).IsRequired();
+            entity.Property(step => step.InputData).IsRequired();
+            entity.Property(step => step.Status).IsRequired();
+            entity.Property(step => step.StartedAt).IsRequired();
+            entity.Property(step => step.RetryCount).IsRequired();
+            entity.HasIndex(step => step.WorkflowId);
+        });
 
         base.OnModelCreating(modelBuilder);
 

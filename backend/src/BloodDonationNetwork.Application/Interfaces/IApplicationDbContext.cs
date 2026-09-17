@@ -17,6 +17,7 @@ DbSet<InventoryTransaction> InventoryTransactions { get; }
     DbSet<DonorDevice> DonorDevices { get; }
 
     DbSet<StaffInvitation> StaffInvitations { get; }
+    DbSet<AgentStep> AgentSteps { get; }
 
     Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default);
