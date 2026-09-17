@@ -47,9 +47,6 @@ class CoordinatorState(TypedDict, total=False):
 def utc_now_iso() -> str:
     """
     Return an explicit UTC ISO timestamp.
-
-    The Z suffix is important because PostgreSQL timestamp with time zone
-    expects UTC values through Npgsql.
     """
     return (
         datetime.now(timezone.utc)
@@ -271,6 +268,42 @@ def validate_eligibility_node(
     }
 
 
+def mark_awaiting_approval_node(
+    state: CoordinatorState,
+) -> dict[str, Any]:
+    """
+    Persist awaiting_approval before LangGraph pauses.
+    """
+    workflow_id = state.get("workflow_id")
+
+    if not workflow_id:
+        raise ValueError(
+            "workflow_id is required before awaiting approval."
+        )
+
+    try:
+        InternalClient().post(
+            (
+                "/api/internal/agent/workflows/"
+                f"{workflow_id}/status"
+            ),
+            {
+                "status": "awaiting_approval",
+                "failureReason": None,
+            },
+        )
+
+    except InternalClientError as exc:
+        raise ValueError(
+            "Failed to mark workflow as "
+            f"awaiting approval: {exc}"
+        ) from exc
+
+    return {
+        "current_step": "awaiting_approval",
+    }
+
+
 def await_approval_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
@@ -349,14 +382,75 @@ def await_approval_node(
     }
 
 
+def revision_replan_node(
+    state: CoordinatorState,
+) -> dict[str, Any]:
+    """
+    Re-plan the workflow after a human requests a revision.
+
+    The backend already increments RevisionCount and enforces
+    the maximum revision limit.
+    """
+    started_at = utc_now_iso()
+
+    comments = state.get(
+        "approval_comments"
+    )
+
+    revised_plan = [
+        "stock_check",
+        "search_donors",
+        "validate_eligibility",
+        "await_approval",
+        "dispatch",
+    ]
+
+    log_workflow_step(
+        state,
+        agent_name="Coordinator Agent",
+        step_name="revision_replan",
+        status="completed",
+        input_data={
+            "decision": "revise",
+            "comments": comments,
+        },
+        output_data={
+            "plan": revised_plan,
+        },
+        narrative=(
+            "Human revision requested. "
+            "Coordinator restarted the workflow "
+            "using the provided feedback."
+        ),
+        started_at=started_at,
+        completed_at=utc_now_iso(),
+    )
+
+    return {
+        "current_step": "revision_replan",
+        "plan": revised_plan,
+
+        # Clear previous-cycle results.
+        "stock_result": {},
+        "donor_search_result": {},
+        "eligibility_result": {},
+        "dispatch_result": {},
+
+        # The next approval interrupt will populate this again.
+        "approval_decision": "",
+        "error": None,
+    }
+
+
 def route_after_approval(
     state: CoordinatorState,
 ) -> str:
     """
-    Approved workflows continue to dispatch.
+    Route according to the human decision.
 
-    Reject and revise currently end this graph execution.
-    Full revision-loop behavior will be improved separately.
+    approve -> dispatch
+    revise  -> re-plan and run workflow again
+    reject  -> end
     """
     decision = state.get(
         "approval_decision",
@@ -365,6 +459,9 @@ def route_after_approval(
 
     if decision == "approve":
         return "dispatch"
+
+    if decision == "revise":
+        return "revision_replan"
 
     return "end"
 
@@ -440,8 +537,18 @@ def build_coordinator_graph() -> StateGraph:
     )
 
     builder.add_node(
+        "mark_awaiting_approval",
+        mark_awaiting_approval_node,
+    )
+
+    builder.add_node(
         "await_approval",
         await_approval_node,
+    )
+
+    builder.add_node(
+        "revision_replan",
+        revision_replan_node,
     )
 
     builder.add_node(
@@ -461,7 +568,7 @@ def build_coordinator_graph() -> StateGraph:
         route_after_stock_check,
         {
             "search_donors": "search_donors",
-            "await_approval": "await_approval",
+            "await_approval": "mark_awaiting_approval",
         },
     )
 
@@ -471,9 +578,15 @@ def build_coordinator_graph() -> StateGraph:
         "validate_eligibility",
     )
 
-    # Eligibility -> human approval
+    # Eligibility -> persist awaiting approval status
     builder.add_edge(
         "validate_eligibility",
+        "mark_awaiting_approval",
+    )
+
+    # Persist status -> human approval interrupt
+    builder.add_edge(
+        "mark_awaiting_approval",
         "await_approval",
     )
 
@@ -483,11 +596,18 @@ def build_coordinator_graph() -> StateGraph:
         route_after_approval,
         {
             "dispatch": "dispatch",
+            "revision_replan": "revision_replan",
             "end": END,
         },
     )
 
-    # Dispatch ends this workflow execution
+    # Revise -> re-run workflow
+    builder.add_edge(
+        "revision_replan",
+        "stock_check",
+    )
+
+    # Dispatch ends workflow
     builder.add_edge(
         "dispatch",
         END,
@@ -497,9 +617,6 @@ def build_coordinator_graph() -> StateGraph:
 
 
 # In-memory LangGraph checkpoint storage.
-#
-# This allows interrupt() to pause and later resume the workflow
-# while the Python process is still running.
 memory = MemorySaver()
 
 coordinator_graph = (

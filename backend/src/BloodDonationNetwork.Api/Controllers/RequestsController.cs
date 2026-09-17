@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Security.Claims;
 using BloodDonationNetwork.Application.DTOs.Requests;
 using BloodDonationNetwork.Application.Interfaces;
@@ -7,21 +8,23 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BloodDonationNetwork.Api.Controllers;
 
-// Previously had no [Authorize] anywhere — anonymous callers could
-// create/edit/delete/close any organization's blood requests. Reads stay
-// open to any authenticated user (donors need to see compatible requests);
-// writes are staff/admin, org-scoped in RequestService the same way
-// AppointmentsController/AppointmentService scope appointment completion.
 [ApiController]
 [Route("api/requests")]
 [Authorize]
 public class RequestsController : ControllerBase
 {
     private readonly IRequestService _requestService;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<RequestsController> _logger;
 
-    public RequestsController(IRequestService requestService)
+    public RequestsController(
+        IRequestService requestService,
+        IHttpClientFactory httpClientFactory,
+        ILogger<RequestsController> logger)
     {
         _requestService = requestService;
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
     }
 
     // POST /api/requests
@@ -34,7 +37,58 @@ public class RequestsController : ControllerBase
 
         try
         {
-            var request = await _requestService.CreateAsync(userId, userId, isAdmin, dto);
+            // 1. Create and save the Blood Request first
+            var request = await _requestService.CreateAsync(
+                userId,
+                userId,
+                isAdmin,
+                dto);
+
+            // 2. Automatically start the Coordinator Agent workflow
+            try
+            {
+                var agentClient =
+                    _httpClientFactory.CreateClient("AgentService");
+
+                var agentResponse = await agentClient.PostAsJsonAsync(
+                    "/run-workflow",
+                    new
+                    {
+                        bloodRequestId = request.Id.ToString()
+                    });
+
+                if (!agentResponse.IsSuccessStatusCode)
+                {
+                    var errorBody =
+                        await agentResponse.Content.ReadAsStringAsync();
+
+                    _logger.LogWarning(
+                        "Blood request {BloodRequestId} was created, " +
+                        "but the agent workflow could not be started. " +
+                        "Status: {StatusCode}. Response: {Response}",
+                        request.Id,
+                        agentResponse.StatusCode,
+                        errorBody);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Agent workflow started automatically for " +
+                        "blood request {BloodRequestId}.",
+                        request.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Important:
+                // Agent failure must not undo a successfully-created
+                // Blood Request.
+                _logger.LogError(
+                    ex,
+                    "Blood request {BloodRequestId} was created, " +
+                    "but the Agent Service could not be reached.",
+                    request.Id);
+            }
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -100,7 +154,12 @@ public class RequestsController : ControllerBase
 
         try
         {
-            var request = await _requestService.UpdateStatusAsync(id, userId, isAdmin, dto);
+            var request =
+                await _requestService.UpdateStatusAsync(
+                    id,
+                    userId,
+                    isAdmin,
+                    dto);
 
             if (request == null)
             {
@@ -127,7 +186,11 @@ public class RequestsController : ControllerBase
 
         try
         {
-            var deleted = await _requestService.DeleteAsync(id, userId, isAdmin);
+            var deleted =
+                await _requestService.DeleteAsync(
+                    id,
+                    userId,
+                    isAdmin);
 
             if (!deleted)
             {
@@ -154,7 +217,11 @@ public class RequestsController : ControllerBase
 
         try
         {
-            var request = await _requestService.CloseAsync(id, userId, isAdmin);
+            var request =
+                await _requestService.CloseAsync(
+                    id,
+                    userId,
+                    isAdmin);
 
             if (request == null)
             {
@@ -174,8 +241,14 @@ public class RequestsController : ControllerBase
 
     private (Guid UserId, bool IsAdmin) CurrentUser()
     {
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var isAdmin = User.FindFirstValue(ClaimTypes.Role) == "admin";
+        var userId = Guid.Parse(
+            User.FindFirstValue(
+                ClaimTypes.NameIdentifier)!);
+
+        var isAdmin =
+            User.FindFirstValue(
+                ClaimTypes.Role) == "admin";
+
         return (userId, isAdmin);
     }
 }
