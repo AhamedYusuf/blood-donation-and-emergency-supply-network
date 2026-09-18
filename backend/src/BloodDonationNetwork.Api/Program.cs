@@ -44,7 +44,11 @@ builder.Services.AddHttpClient("AgentService", client =>
 {
     client.BaseAddress = new Uri(
         builder.Configuration["AgentService:BaseUrl"]
-        ?? "http://localhost:8001");
+        // agent-service/README.md documents `uvicorn main:app --port 8000`
+        // with no env var to change it — this fallback must match that,
+        // not an arbitrary port, or approve/reject/revise resume and the
+        // auto-start-on-request-creation call both silently fail.
+        ?? "http://localhost:8000");
 });
 
 // =====================================================
