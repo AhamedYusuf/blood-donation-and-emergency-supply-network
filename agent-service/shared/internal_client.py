@@ -16,11 +16,13 @@ Configuration (environment variables):
 from __future__ import annotations
 
 import os
+import time
 
 import httpx
 
 DEFAULT_BASE_URL = "http://localhost:5067"
 DEFAULT_TIMEOUT_SECONDS = 30.0
+MAX_RETRIES = 2
 
 
 class InternalClientError(RuntimeError):
@@ -58,12 +60,20 @@ class InternalClient:
         url = f"{self._base_url}/{path.lstrip('/')}"
         headers = {"X-Internal-Secret": self._secret}
 
-        try:
-            response = httpx.post(
-                url, json=payload, headers=headers, timeout=self._timeout
-            )
-        except httpx.RequestError as exc:
-            raise InternalClientError(f"request to {url} failed: {exc}") from exc
+        last_error: Exception | None = None
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                response = httpx.post(
+                    url, json=payload, headers=headers, timeout=self._timeout
+                )
+                break
+            except httpx.RequestError as exc:
+                last_error = exc
+                if attempt == MAX_RETRIES:
+                    raise InternalClientError(f"request to {url} failed after {MAX_RETRIES + 1} attempts: {exc}") from exc
+                time.sleep(0.5 * (attempt + 1))
+        else:  # pragma: no cover - the loop either breaks or raises
+            raise InternalClientError(f"request to {url} failed: {last_error}")
 
         if response.status_code >= 400:
             raise InternalClientError(
@@ -76,3 +86,11 @@ class InternalClient:
             raise InternalClientError(
                 f"{path} returned a non-JSON body"
             ) from exc
+
+
+InternalCallError = InternalClientError
+
+
+def call_internal(path: str, payload: dict, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> dict:
+    """Call an internal endpoint using the shared configured client."""
+    return InternalClient(timeout=timeout).post(path, payload)
