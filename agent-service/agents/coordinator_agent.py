@@ -8,6 +8,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from agents.eligibility_validation_agent import run as run_eligibility
 from agents.matching_dispatch_agent import dispatch as run_dispatch
 from agents.matching_dispatch_agent import search as run_search
 from shared.internal_client import InternalClient, InternalClientError
@@ -220,51 +221,89 @@ def validate_eligibility_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
-    Temporary Student 1 stub.
+    Student 1 Eligibility Validation Agent.
 
-    Later this node will call Student 1's real eligibility-validation
-    agent.
+    Student 4's search agent returns candidate donor objects. The
+    eligibility agent expects donor IDs plus the required blood type,
+    so the Coordinator adapts the data between both agents.
+
+    Student 1's endpoint owns its AgentStep logging, so the Coordinator
+    does not create a duplicate eligibility step.
     """
-    started_at = utc_now_iso()
+    donor_search_result = state.get(
+        "donor_search_result",
+        {},
+    )
+
+    candidates = donor_search_result.get(
+        "candidates",
+        [],
+    )
+
+    candidate_donor_ids = [
+        candidate.get("donorId")
+        for candidate in candidates
+        if isinstance(candidate, dict)
+        and candidate.get("donorId")
+    ]
 
     eligibility_input = {
-        "candidates": (
-            state.get(
-                "donor_search_result",
-                {},
-            ).get(
-                "candidates",
-                [],
-            )
-        ),
+        "workflow_id": state.get("workflow_id"),
+        "candidate_donor_ids": candidate_donor_ids,
+        "required_blood_type": state.get("blood_type"),
     }
 
-    result = {
-        "eligible": [],
-        "excluded": [],
-        "message": (
-            "Temporary eligibility-validation stub."
-        ),
-    }
-
-    log_workflow_step(
-        state,
-        agent_name="Eligibility Validation Agent",
-        step_name="validate_eligibility",
-        status="completed",
-        input_data=eligibility_input,
-        output_data=result,
-        narrative=(
-            "Validated donor eligibility. "
-            "Temporary Student 1 stub is currently in use."
-        ),
-        started_at=started_at,
-        completed_at=utc_now_iso(),
+    result = run_eligibility(
+        eligibility_input
     )
+
+    error = result.get("error")
+
+    if error:
+        return {
+            "current_step": "validate_eligibility",
+            "eligibility_result": {
+                "eligible": [],
+                "excluded": result.get(
+                    "excluded_donors",
+                    [],
+                ),
+            },
+            "error": (
+                "validate_eligibility failed: "
+                f"{error}"
+            ),
+        }
+
+    eligible_ids = {
+        str(donor_id)
+        for donor_id in result.get(
+            "eligible_donor_ids",
+            [],
+        )
+    }
+
+    eligible = [
+        {
+            "donorId": candidate.get("donorId")
+        }
+        for candidate in candidates
+        if isinstance(candidate, dict)
+        and candidate.get("donorId") is not None
+        and str(candidate.get("donorId")) in eligible_ids
+    ]
+
+    eligibility_result = {
+        "eligible": eligible,
+        "excluded": result.get(
+            "excluded_donors",
+            [],
+        ),
+    }
 
     return {
         "current_step": "validate_eligibility",
-        "eligibility_result": result,
+        "eligibility_result": eligibility_result,
     }
 
 
@@ -436,7 +475,7 @@ def revision_replan_node(
         "eligibility_result": {},
         "dispatch_result": {},
 
-        # The next approval interrupt will populate this again.
+        # Next approval interrupt will populate these again.
         "approval_decision": "",
         "error": None,
     }
@@ -500,6 +539,9 @@ def dispatch_node(
         return {
             "current_step": "dispatch",
             "dispatch_result": result,
+
+            # Clear any old error because dispatch succeeded.
+            "error": None,
         }
 
     except (InternalClientError, ValueError) as exc:
@@ -514,6 +556,91 @@ def dispatch_node(
             },
             "error": error_message,
         }
+
+
+def finalize_workflow_node(
+    state: CoordinatorState,
+) -> dict[str, Any]:
+    """
+    Persist the final workflow status after dispatch.
+
+    Successful dispatch -> completed
+    Failed dispatch     -> failed
+    """
+    workflow_id = state.get(
+        "workflow_id"
+    )
+
+    if not workflow_id:
+        raise ValueError(
+            "workflow_id is required to finalize workflow."
+        )
+
+    dispatch_result = state.get(
+        "dispatch_result",
+        {},
+    )
+
+    dispatch_failed = (
+        dispatch_result.get("status") == "failed"
+    )
+
+    if dispatch_failed:
+        final_status = "failed"
+        failure_reason = (
+            state.get("error")
+            or "Dispatch failed."
+        )
+    else:
+        final_status = "completed"
+        failure_reason = None
+
+    try:
+        InternalClient().post(
+            (
+                "/api/internal/agent/workflows/"
+                f"{workflow_id}/status"
+            ),
+            {
+                "status": final_status,
+                "failureReason": failure_reason,
+            },
+        )
+
+    except InternalClientError as exc:
+        raise ValueError(
+            "Failed to persist final workflow "
+            f"status: {exc}"
+        ) from exc
+
+    log_workflow_step(
+        state,
+        agent_name="Coordinator Agent",
+        step_name="finalize_workflow",
+        status="completed",
+        input_data={
+            "dispatchResult": dispatch_result,
+        },
+        output_data={
+            "workflowStatus": final_status,
+            "failureReason": failure_reason,
+        },
+        narrative=(
+            f"Workflow finalized with status "
+            f"'{final_status}'."
+        ),
+        completed_at=utc_now_iso(),
+        error_message=failure_reason,
+    )
+
+    return {
+        "current_step": "finalize_workflow",
+        "error": (
+            failure_reason
+            if dispatch_failed
+            else None
+        ),
+    }
 
 
 def build_coordinator_graph() -> StateGraph:
@@ -556,6 +683,11 @@ def build_coordinator_graph() -> StateGraph:
         dispatch_node,
     )
 
+    builder.add_node(
+        "finalize_workflow",
+        finalize_workflow_node,
+    )
+
     # Start workflow
     builder.add_edge(
         START,
@@ -578,7 +710,7 @@ def build_coordinator_graph() -> StateGraph:
         "validate_eligibility",
     )
 
-    # Eligibility -> persist awaiting approval status
+    # Eligibility -> persist awaiting approval
     builder.add_edge(
         "validate_eligibility",
         "mark_awaiting_approval",
@@ -607,9 +739,15 @@ def build_coordinator_graph() -> StateGraph:
         "stock_check",
     )
 
-    # Dispatch ends workflow
+    # Dispatch -> final DB status
     builder.add_edge(
         "dispatch",
+        "finalize_workflow",
+    )
+
+    # Final status -> end
+    builder.add_edge(
+        "finalize_workflow",
         END,
     )
 
