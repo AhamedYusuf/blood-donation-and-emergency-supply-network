@@ -224,6 +224,158 @@ public class AgentWorkflowServiceTests : IDisposable
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task GetByIdAsync_ReturnsWorkflow()
+    {
+        var workflow = await CreateWorkflowAsync();
+
+        var result = await _service.GetByIdAsync(
+            workflow.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(
+            workflow.Id,
+            result.Id);
+
+        Assert.Equal(
+            workflow.BloodRequestId,
+            result.BloodRequestId);
+
+        Assert.Equal(
+            WorkflowStatuses.AwaitingApproval,
+            result.Status);
+    }
+
+    [Fact]
+    public async Task GetStepsAsync_ReturnsStepsInStartedAtOrder()
+    {
+        var workflow = await CreateWorkflowAsync();
+
+        var baseTime = DateTime.UtcNow;
+
+        var laterStep = new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflow.Id,
+            AgentName = "Agent B",
+            StepName = "second_step",
+            Status = "completed",
+            StartedAt = baseTime.AddMinutes(2),
+            CompletedAt = baseTime.AddMinutes(3)
+        };
+
+        var earlierStep = new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflow.Id,
+            AgentName = "Agent A",
+            StepName = "first_step",
+            Status = "completed",
+            StartedAt = baseTime,
+            CompletedAt = baseTime.AddMinutes(1)
+        };
+
+        _context.AgentSteps.AddRange(
+            laterStep,
+            earlierStep);
+
+        await _context.SaveChangesAsync();
+
+        var result =
+            await _service.GetStepsAsync(
+                workflow.Id);
+
+        Assert.Equal(2, result.Count);
+
+        Assert.Equal(
+            "first_step",
+            result[0].StepName);
+
+        Assert.Equal(
+            "second_step",
+            result[1].StepName);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_ReturnsWorkflowSummary()
+    {
+        var workflow = await CreateWorkflowAsync();
+
+        var baseTime = DateTime.UtcNow;
+
+        var completedStep = new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflow.Id,
+            AgentName = "Agent A",
+            StepName = "completed_step",
+            Status = "completed",
+            StartedAt = baseTime,
+            CompletedAt = baseTime.AddSeconds(1),
+            ErrorMessage = null
+        };
+
+        var failedStep = new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflow.Id,
+            AgentName = "Agent B",
+            StepName = "failed_step",
+            Status = "failed",
+            StartedAt = baseTime.AddSeconds(2),
+            CompletedAt = baseTime.AddSeconds(3),
+            ErrorMessage = "Test failure"
+        };
+
+        _context.AgentSteps.AddRange(
+            completedStep,
+            failedStep);
+
+        await _context.SaveChangesAsync();
+
+        var result =
+            await _service.GetSummaryAsync(
+                workflow.Id);
+
+        Assert.NotNull(result);
+
+        var json =
+            System.Text.Json.JsonSerializer.Serialize(
+                result);
+
+        using var document =
+            System.Text.Json.JsonDocument.Parse(
+                json);
+
+        var root =
+            document.RootElement;
+
+        Assert.Equal(
+            workflow.Id,
+            root.GetProperty("Id")
+                .GetGuid());
+
+        Assert.Equal(
+            workflow.BloodRequestId,
+            root.GetProperty("BloodRequestId")
+                .GetGuid());
+
+        Assert.Equal(
+            2,
+            root.GetProperty("TotalSteps")
+                .GetInt32());
+
+        Assert.Equal(
+            1,
+            root.GetProperty("CompletedSteps")
+                .GetInt32());
+
+        Assert.Equal(
+            1,
+            root.GetProperty("FailedSteps")
+                .GetInt32());
+    }
+
     public void Dispose()
     {
         _context.Dispose();
