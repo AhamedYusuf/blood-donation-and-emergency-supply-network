@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
 import {
   useCloseRequestMutation,
@@ -9,6 +13,10 @@ import {
 } from "./requestsApi";
 
 import {
+  useGetLatestWorkflowByBloodRequestQuery,
+} from "../workflowMonitor/workflowMonitorApi";
+
+import {
   BloodRequestStatus,
   RequestUrgency,
   BloodType,
@@ -16,7 +24,10 @@ import {
 
 import "./requests.css";
 
-const getBloodTypeLabel = (bloodType: BloodType) => {
+
+const getBloodTypeLabel = (
+  bloodType: BloodType
+) => {
   const labels: Record<BloodType, string> = {
     [BloodType.APositive]: "A+",
     [BloodType.ANegative]: "A-",
@@ -31,141 +42,285 @@ const getBloodTypeLabel = (bloodType: BloodType) => {
   return labels[bloodType] ?? "Unknown";
 };
 
-const getUrgencyLabel = (urgency: RequestUrgency) => {
+
+const getUrgencyLabel = (
+  urgency: RequestUrgency
+) => {
   switch (urgency) {
     case RequestUrgency.Normal:
       return "Normal";
+
     case RequestUrgency.Urgent:
       return "Urgent";
+
     case RequestUrgency.Critical:
       return "Critical";
+
     default:
       return "Unknown";
   }
 };
 
-const getStatusLabel = (status: BloodRequestStatus) => {
+
+const getStatusLabel = (
+  status: BloodRequestStatus
+) => {
   switch (status) {
     case BloodRequestStatus.Pending:
       return "Pending";
+
     case BloodRequestStatus.AwaitingApproval:
       return "Awaiting Approval";
+
     case BloodRequestStatus.Approved:
       return "Approved";
+
     case BloodRequestStatus.Dispatched:
       return "Dispatched";
+
     case BloodRequestStatus.Fulfilled:
       return "Fulfilled";
+
     case BloodRequestStatus.Closed:
       return "Closed";
+
     case BloodRequestStatus.Cancelled:
       return "Cancelled";
+
     default:
       return "Unknown";
   }
 };
 
+
 export default function RequestDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{
+    id: string;
+  }>();
+
   const navigate = useNavigate();
+
 
   const {
     data: request,
     isLoading,
     isError,
     refetch,
-  } = useGetRequestByIdQuery(id ?? "", {
-    skip: !id,
-  });
-
-  const [updateStatus, { isLoading: isUpdating }] =
-    useUpdateRequestStatusMutation();
-
-  const [closeRequest, { isLoading: isClosing }] =
-    useCloseRequestMutation();
-
-  const [deleteRequest, { isLoading: isDeleting }] =
-    useDeleteRequestMutation();
-
-  const [selectedStatus, setSelectedStatus] =
-    useState<BloodRequestStatus | null>(null);
-
-  const [actionMessage, setActionMessage] =
-    useState<string | null>(null);
-
-  const [actionError, setActionError] =
-    useState<string | null>(null);
-
-  const handleUpdateStatus = async () => {
-    if (!request || selectedStatus === null) return;
-
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      await updateStatus({
-        id: request.id,
-        body: {
-          status: selectedStatus,
-        },
-      }).unwrap();
-
-      setActionMessage("Request status updated successfully.");
-      setSelectedStatus(null);
-      refetch();
-    } catch {
-      setActionError("Unable to update request status.");
+  } = useGetRequestByIdQuery(
+    id ?? "",
+    {
+      skip: !id,
     }
-  };
+  );
 
-  const handleCloseRequest = async () => {
-    if (!request) return;
 
-    const confirmed = window.confirm(
-      "Are you sure you want to close this blood request?"
-    );
-
-    if (!confirmed) return;
-
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      await closeRequest(request.id).unwrap();
-
-      setActionMessage("Blood request closed successfully.");
-      refetch();
-    } catch {
-      setActionError("Unable to close this request.");
+  const {
+    data: workflow,
+    isFetching: isWorkflowLoading,
+    isError: workflowLookupFailed,
+    refetch: refetchWorkflow,
+  } = useGetLatestWorkflowByBloodRequestQuery(
+    request?.id ?? "",
+    {
+      skip: !request?.id,
     }
-  };
+  );
 
-  const handleDeleteRequest = async () => {
-    if (!request) return;
 
-    const confirmed = window.confirm(
-      "Delete this blood request permanently?"
-    );
+  const [
+    updateStatus,
+    {
+      isLoading: isUpdating,
+    },
+  ] = useUpdateRequestStatusMutation();
 
-    if (!confirmed) return;
 
-    setActionError(null);
+  const [
+    closeRequest,
+    {
+      isLoading: isClosing,
+    },
+  ] = useCloseRequestMutation();
 
-    try {
-      await deleteRequest(request.id).unwrap();
 
-      navigate("/requests");
-    } catch {
-      setActionError("Unable to delete this request.");
-    }
-  };
+  const [
+    deleteRequest,
+    {
+      isLoading: isDeleting,
+    },
+  ] = useDeleteRequestMutation();
+
+
+  const [
+    selectedStatus,
+    setSelectedStatus,
+  ] = useState<
+    BloodRequestStatus | null
+  >(null);
+
+
+  const [
+    actionMessage,
+    setActionMessage,
+  ] = useState<string | null>(
+    null
+  );
+
+
+  const [
+    actionError,
+    setActionError,
+  ] = useState<string | null>(
+    null
+  );
+
+
+  const handleUpdateStatus =
+    async () => {
+      if (
+        !request ||
+        selectedStatus === null
+      ) {
+        return;
+      }
+
+      setActionError(null);
+      setActionMessage(null);
+
+      try {
+        await updateStatus({
+          id: request.id,
+          body: {
+            status: selectedStatus,
+          },
+        }).unwrap();
+
+        setActionMessage(
+          "Request status updated successfully."
+        );
+
+        setSelectedStatus(null);
+
+        refetch();
+      } catch {
+        setActionError(
+          "Unable to update request status."
+        );
+      }
+    };
+
+
+  const handleCloseRequest =
+    async () => {
+      if (!request) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          "Are you sure you want to close this blood request?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setActionError(null);
+      setActionMessage(null);
+
+      try {
+        await closeRequest(
+          request.id
+        ).unwrap();
+
+        setActionMessage(
+          "Blood request closed successfully."
+        );
+
+        refetch();
+      } catch {
+        setActionError(
+          "Unable to close this request."
+        );
+      }
+    };
+
+
+  const handleDeleteRequest =
+    async () => {
+      if (!request) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          "Delete this blood request permanently?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setActionError(null);
+
+      try {
+        await deleteRequest(
+          request.id
+        ).unwrap();
+
+        navigate("/requests");
+      } catch {
+        setActionError(
+          "Unable to delete this request."
+        );
+      }
+    };
+
+
+  const handleOpenWorkflow =
+    async () => {
+      setActionError(null);
+
+      if (workflow?.id) {
+        navigate(
+          `/workflows/${workflow.id}`
+        );
+
+        return;
+      }
+
+      try {
+        const result =
+          await refetchWorkflow();
+
+        if (result.data?.id) {
+          navigate(
+            `/workflows/${result.data.id}`
+          );
+
+          return;
+        }
+
+        setActionError(
+          "No workflow has been created for this blood request yet."
+        );
+      } catch {
+        setActionError(
+          "Unable to load workflow information."
+        );
+      }
+    };
+
 
   if (!id) {
     return (
       <main className="requests-page">
         <section className="requests-error-state">
           <h3>Invalid request</h3>
-          <p>No request ID was provided.</p>
+
+          <p>
+            No request ID was provided.
+          </p>
 
           <Link
             to="/requests"
@@ -177,6 +332,7 @@ export default function RequestDetailsPage() {
       </main>
     );
   }
+
 
   if (isLoading) {
     return (
@@ -192,21 +348,27 @@ export default function RequestDetailsPage() {
     );
   }
 
+
   if (isError || !request) {
     return (
       <main className="requests-page">
         <section className="requests-error-state">
-          <h3>Unable to load blood request</h3>
+          <h3>
+            Unable to load blood request
+          </h3>
 
           <p>
-            The request may not exist or could not be loaded.
+            The request may not exist or
+            could not be loaded.
           </p>
 
           <div className="request-details-actions">
             <button
               type="button"
               className="requests-secondary-button"
-              onClick={() => refetch()}
+              onClick={() =>
+                refetch()
+              }
             >
               Retry
             </button>
@@ -223,27 +385,41 @@ export default function RequestDetailsPage() {
     );
   }
 
+
   return (
     <main className="requests-page">
+
       <section className="request-details-hero">
         <div>
           <span className="requests-eyebrow">
             BLOOD REQUEST DETAILS
           </span>
 
-          <h1>{request.hospitalName}</h1>
+          <h1>
+            {request.hospitalName}
+          </h1>
 
           <div className="request-details-hero-meta">
             <span
-              className={`request-pill request-pill--urgency-${request.urgency}`}
+              className={
+                `request-pill ` +
+                `request-pill--urgency-${request.urgency}`
+              }
             >
-              {getUrgencyLabel(request.urgency)}
+              {getUrgencyLabel(
+                request.urgency
+              )}
             </span>
 
             <span
-              className={`request-pill request-pill--status-${request.status}`}
+              className={
+                `request-pill ` +
+                `request-pill--status-${request.status}`
+              }
             >
-              {getStatusLabel(request.status)}
+              {getStatusLabel(
+                request.status
+              )}
             </span>
           </div>
         </div>
@@ -256,11 +432,13 @@ export default function RequestDetailsPage() {
         </Link>
       </section>
 
+
       {actionMessage && (
         <div className="request-form-alert request-form-alert--success">
           {actionMessage}
         </div>
       )}
+
 
       {actionError && (
         <div
@@ -271,84 +449,148 @@ export default function RequestDetailsPage() {
         </div>
       )}
 
+
       <section className="request-details-layout">
+
         <div className="request-details-card">
+
           <div className="request-details-heading">
             <span className="requests-eyebrow">
               REQUEST INFORMATION
             </span>
 
-            <h2>Blood Requirement</h2>
+            <h2>
+              Blood Requirement
+            </h2>
           </div>
 
+
           <div className="request-details-grid">
+
             <div className="request-detail-item">
-              <span>Blood Type</span>
+              <span>
+                Blood Type
+              </span>
+
               <strong>
-                {getBloodTypeLabel(request.bloodType)}
+                {getBloodTypeLabel(
+                  request.bloodType
+                )}
               </strong>
             </div>
 
-            <div className="request-detail-item">
-              <span>Units Requested</span>
-              <strong>{request.unitsRequested}</strong>
-            </div>
 
             <div className="request-detail-item">
-              <span>Urgency</span>
+              <span>
+                Units Requested
+              </span>
+
               <strong>
-                {getUrgencyLabel(request.urgency)}
+                {request.unitsRequested}
               </strong>
             </div>
 
+
             <div className="request-detail-item">
-              <span>Status</span>
+              <span>
+                Urgency
+              </span>
+
               <strong>
-                {getStatusLabel(request.status)}
+                {getUrgencyLabel(
+                  request.urgency
+                )}
               </strong>
             </div>
 
+
             <div className="request-detail-item">
-              <span>Created At</span>
+              <span>
+                Status
+              </span>
+
               <strong>
-                {new Date(request.createdAt).toLocaleString()}
+                {getStatusLabel(
+                  request.status
+                )}
               </strong>
             </div>
 
+
             <div className="request-detail-item">
-              <span>Request ID</span>
+              <span>
+                Created At
+              </span>
+
+              <strong>
+                {new Date(
+                  request.createdAt
+                ).toLocaleString()}
+              </strong>
+            </div>
+
+
+            <div className="request-detail-item">
+              <span>
+                Request ID
+              </span>
+
               <strong className="request-detail-id">
                 {request.id}
               </strong>
             </div>
 
+
             <div className="request-detail-item">
-              <span>Organization ID</span>
+              <span>
+                Organization ID
+              </span>
+
               <strong className="request-detail-id">
                 {request.organizationId}
               </strong>
             </div>
 
+
             <div className="request-detail-item">
-              <span>Requester ID</span>
+              <span>
+                Requester ID
+              </span>
+
               <strong className="request-detail-id">
                 {request.requesterId}
               </strong>
             </div>
 
-            <div className="request-detail-item">
-              <span>Latitude</span>
-              <strong>{request.latitude}</strong>
-            </div>
 
             <div className="request-detail-item">
-              <span>Longitude</span>
-              <strong>{request.longitude}</strong>
+              <span>
+                Latitude
+              </span>
+
+              <strong>
+                {request.latitude}
+              </strong>
             </div>
+
+
+            <div className="request-detail-item">
+              <span>
+                Longitude
+              </span>
+
+              <strong>
+                {request.longitude}
+              </strong>
+            </div>
+
 
             {request.fulfilledAt && (
               <div className="request-detail-item">
-                <span>Fulfilled At</span>
+                <span>
+                  Fulfilled At
+                </span>
+
                 <strong>
                   {new Date(
                     request.fulfilledAt
@@ -357,9 +599,13 @@ export default function RequestDetailsPage() {
               </div>
             )}
 
+
             {request.closedAt && (
               <div className="request-detail-item">
-                <span>Closed At</span>
+                <span>
+                  Closed At
+                </span>
+
                 <strong>
                   {new Date(
                     request.closedAt
@@ -367,10 +613,14 @@ export default function RequestDetailsPage() {
                 </strong>
               </div>
             )}
+
           </div>
 
+
           <div className="request-details-notes">
-            <span>Notes</span>
+            <span>
+              Notes
+            </span>
 
             <p>
               {request.notes.trim()
@@ -378,19 +628,27 @@ export default function RequestDetailsPage() {
                 : "No additional notes were provided."}
             </p>
           </div>
+
         </div>
 
+
         <aside className="request-actions-card">
+
           <span className="requests-eyebrow">
             REQUEST ACTIONS
           </span>
 
-          <h3>Manage Request</h3>
+          <h3>
+            Manage Request
+          </h3>
 
           <p>
-            Update the operational status or close the
-            request when coordination is complete.
+            Update the operational status,
+            monitor the agent workflow or
+            close the request when
+            coordination is complete.
           </p>
+
 
           <div className="request-action-group">
             <label htmlFor="requestStatus">
@@ -408,17 +666,24 @@ export default function RequestDetailsPage() {
                 setSelectedStatus(
                   event.target.value === ""
                     ? null
-                    : (Number(
-                        event.target.value
-                      ) as BloodRequestStatus)
+                    : (
+                        Number(
+                          event.target.value
+                        ) as BloodRequestStatus
+                      )
                 )
               }
             >
+
               <option value="">
                 Select new status
               </option>
 
-              <option value={BloodRequestStatus.Pending}>
+              <option
+                value={
+                  BloodRequestStatus.Pending
+                }
+              >
                 Pending
               </option>
 
@@ -430,32 +695,51 @@ export default function RequestDetailsPage() {
                 Awaiting Approval
               </option>
 
-              <option value={BloodRequestStatus.Approved}>
+              <option
+                value={
+                  BloodRequestStatus.Approved
+                }
+              >
                 Approved
               </option>
 
               <option
-                value={BloodRequestStatus.Dispatched}
+                value={
+                  BloodRequestStatus.Dispatched
+                }
               >
                 Dispatched
               </option>
 
-              <option value={BloodRequestStatus.Fulfilled}>
+              <option
+                value={
+                  BloodRequestStatus.Fulfilled
+                }
+              >
                 Fulfilled
               </option>
 
-              <option value={BloodRequestStatus.Cancelled}>
+              <option
+                value={
+                  BloodRequestStatus.Cancelled
+                }
+              >
                 Cancelled
               </option>
+
             </select>
+
 
             <button
               type="button"
               className="requests-primary-button"
               disabled={
-                selectedStatus === null || isUpdating
+                selectedStatus === null ||
+                isUpdating
               }
-              onClick={handleUpdateStatus}
+              onClick={
+                handleUpdateStatus
+              }
             >
               {isUpdating
                 ? "Updating..."
@@ -463,7 +747,43 @@ export default function RequestDetailsPage() {
             </button>
           </div>
 
+
           <div className="request-actions-divider" />
+
+
+          <button
+            type="button"
+            className="requests-primary-button"
+            disabled={
+              isWorkflowLoading
+            }
+            onClick={
+              handleOpenWorkflow
+            }
+          >
+            {isWorkflowLoading
+              ? "Loading Workflow..."
+              : workflow?.id
+                ? "Open Workflow Monitor"
+                : "Find Workflow"}
+          </button>
+
+
+          {workflowLookupFailed && (
+            <p
+              style={{
+                marginTop: "8px",
+                fontSize: "13px",
+              }}
+            >
+              No workflow is currently
+              available for this request.
+            </p>
+          )}
+
+
+          <div className="request-actions-divider" />
+
 
           <button
             type="button"
@@ -473,7 +793,9 @@ export default function RequestDetailsPage() {
               request.status ===
                 BloodRequestStatus.Closed
             }
-            onClick={handleCloseRequest}
+            onClick={
+              handleCloseRequest
+            }
           >
             {request.status ===
             BloodRequestStatus.Closed
@@ -483,18 +805,26 @@ export default function RequestDetailsPage() {
                 : "Close Request"}
           </button>
 
+
           <button
             type="button"
             className="request-delete-button"
-            disabled={isDeleting}
-            onClick={handleDeleteRequest}
+            disabled={
+              isDeleting
+            }
+            onClick={
+              handleDeleteRequest
+            }
           >
             {isDeleting
               ? "Deleting..."
               : "Delete Request"}
           </button>
+
         </aside>
+
       </section>
+
     </main>
   );
 }

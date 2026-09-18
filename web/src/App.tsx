@@ -28,6 +28,9 @@ import RequestsPage from "./features/requests/RequestsPage";
 import CreateRequestPage from "./features/requests/CreateRequestPage";
 import RequestDetailsPage from "./features/requests/RequestDetailsPage";
 
+import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage";
+
+
 // =====================================================
 // AUTH GUARDS
 // =====================================================
@@ -48,6 +51,7 @@ function RequireAuth({
   return <>{children}</>;
 }
 
+
 function RedirectIfAuthed({
   children,
 }: {
@@ -64,6 +68,7 @@ function RedirectIfAuthed({
   return <>{children}</>;
 }
 
+
 function RequireRole({
   children,
   roles,
@@ -72,19 +77,25 @@ function RequireRole({
   roles: string[];
 }) {
   const role = useSelector(
-    (state: RootState) => state.auth.role ?? ""
+    (state: RootState) =>
+      state.auth.role ?? ""
   );
 
   const allowedRoles = roles.map((r) =>
     r.toLowerCase()
   );
 
-  if (!allowedRoles.includes(role.toLowerCase())) {
+  if (
+    !allowedRoles.includes(
+      role.toLowerCase()
+    )
+  ) {
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 }
+
 
 /**
  * Donors must complete their donor profile before
@@ -105,10 +116,14 @@ function RequireDonorProfile({
   );
 
   const donorId = useSelector(
-    (state: RootState) => state.auth.donorId
+    (state: RootState) =>
+      state.auth.donorId
   );
 
-  if (role === "donor" && !donorId) {
+  if (
+    role === "donor" &&
+    !donorId
+  ) {
     return (
       <Navigate
         to="/register/donor-profile"
@@ -120,6 +135,7 @@ function RequireDonorProfile({
   return <>{children}</>;
 }
 
+
 // =====================================================
 // APP
 // =====================================================
@@ -128,6 +144,7 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
+
         {/* =================================================
             PUBLIC AUTH
            ================================================= */}
@@ -150,6 +167,7 @@ export function App() {
           }
         />
 
+
         {/* =================================================
             DONOR PROFILE REGISTRATION
            ================================================= */}
@@ -158,12 +176,15 @@ export function App() {
           path="/register/donor-profile"
           element={
             <RequireAuth>
-              <RequireRole roles={["donor"]}>
+              <RequireRole
+                roles={["donor"]}
+              >
                 <DonorProfilePage />
               </RequireRole>
             </RequireAuth>
           }
         />
+
 
         {/* =================================================
             MAIN CONSOLE
@@ -182,6 +203,7 @@ export function App() {
           }
         />
 
+
         {/* =================================================
             DONOR MODULE
            ================================================= */}
@@ -190,7 +212,9 @@ export function App() {
           path="/donors/search"
           element={
             <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
+              <RequireRole
+                roles={["staff", "admin"]}
+              >
                 <AppShell>
                   <DonorSearchPage />
                 </AppShell>
@@ -203,7 +227,9 @@ export function App() {
           path="/donors/verification-queue"
           element={
             <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
+              <RequireRole
+                roles={["staff", "admin"]}
+              >
                 <AppShell>
                   <DonorVerificationQueuePage />
                 </AppShell>
@@ -212,23 +238,18 @@ export function App() {
           }
         />
 
+
         {/* =================================================
             ORGANIZATION MODULE
-
-            Admin only, not staff+admin: this is create/edit/delete-
-            an-organization, an admin action per the workflow ("Admin
-            creates the blood bank/hospital organization"). The
-            backend's OrganizationsController only allows admin past
-            [Authorize(Roles = "admin")] on every write endpoint, so
-            staff landing here would just see a "+ Add Organization"
-            button and edit/delete controls that 403 on click.
            ================================================= */}
 
         <Route
           path="/organizations"
           element={
             <RequireAuth>
-              <RequireRole roles={["admin"]}>
+              <RequireRole
+                roles={["admin"]}
+              >
                 <AppShell>
                   <OrganizationsPage />
                 </AppShell>
@@ -237,23 +258,18 @@ export function App() {
           }
         />
 
+
         {/* =================================================
             INVENTORY MODULE
-
-            Staff + Admin, per the workflow: "Staff create/manage
-            blood requests and inventory for their organization."
-            All four of these routes (this one and Organizations
-            above) were missing AppShell entirely until now — there
-            was no nav rail on any of them, so landing here left no
-            way back to Appointments except the browser's back
-            button.
            ================================================= */}
 
         <Route
           path="/inventory"
           element={
             <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
+              <RequireRole
+                roles={["staff", "admin"]}
+              >
                 <AppShell>
                   <InventoryPage />
                 </AppShell>
@@ -266,7 +282,9 @@ export function App() {
           path="/inventory/manage"
           element={
             <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
+              <RequireRole
+                roles={["staff", "admin"]}
+              >
                 <AppShell>
                   <InventoryManagePage />
                 </AppShell>
@@ -279,7 +297,9 @@ export function App() {
           path="/inventory/emergency"
           element={
             <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
+              <RequireRole
+                roles={["staff", "admin"]}
+              >
                 <AppShell>
                   <InventoryEmergencyPage />
                 </AppShell>
@@ -288,18 +308,9 @@ export function App() {
           }
         />
 
+
         {/* =================================================
             BLOOD REQUEST MODULE
-
-            For now, authenticated users can access these
-            routes while we finish and test the request
-            workflow. Exact role restrictions can be added
-            later when the workflow roles are finalized.
-
-            Wrapped in AppShell like every other module —
-            these three were the only routes still missing it
-            after the Inventory/Organizations fix, and would
-            have left users stranded here the same way.
            ================================================= */}
 
         <Route
@@ -341,6 +352,27 @@ export function App() {
           }
         />
 
+
+        {/* =================================================
+            AGENT WORKFLOW MONITOR
+           ================================================= */}
+
+        <Route
+          path="/workflows/:id"
+          element={
+            <RequireAuth>
+              <RequireRole
+                roles={["staff", "admin"]}
+              >
+                <AppShell>
+                  <WorkflowMonitorPage />
+                </AppShell>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
+
         {/* =================================================
             CATCH ALL
            ================================================= */}
@@ -348,9 +380,13 @@ export function App() {
         <Route
           path="*"
           element={
-            <Navigate to="/requests" replace />
+            <Navigate
+              to="/requests"
+              replace
+            />
           }
         />
+
       </Routes>
     </BrowserRouter>
   );

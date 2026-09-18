@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BloodDonationNetwork.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260917130307_AddAgentSteps")]
-    partial class AddAgentSteps
+    [Migration("20260916102055_AddDonationAppointmentWorkflowFk")]
+    partial class AddDonationAppointmentWorkflowFk
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -34,30 +34,37 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
 
                     b.Property<string>("AgentName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("InputJson")
                         .HasColumnType("text");
 
-                    b.Property<string>("InputData")
-                        .IsRequired()
+                    b.Property<string>("Narrative")
                         .HasColumnType("text");
 
-                    b.Property<string>("OutputData")
+                    b.Property<string>("OutputJson")
                         .HasColumnType("text");
-
-                    b.Property<int>("RetryCount")
-                        .HasColumnType("integer");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("StepName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<Guid>("WorkflowId")
                         .HasColumnType("uuid");
@@ -66,7 +73,75 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
 
                     b.HasIndex("WorkflowId");
 
-                    b.ToTable("agent_steps", (string)null);
+                    b.ToTable("AgentSteps");
+                });
+
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.AgentWorkflow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BloodRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("RevisionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BloodRequestId");
+
+                    b.ToTable("AgentWorkflows");
+                });
+
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.ApprovalDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DecidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowId");
+
+                    b.ToTable("ApprovalDecisions");
                 });
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodBankInventory", b =>
@@ -190,6 +265,8 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.HasIndex("DonorId");
 
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("RelatedWorkflowId");
 
                     b.ToTable("DonationAppointments");
                 });
@@ -451,6 +528,39 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.AgentStep", b =>
+                {
+                    b.HasOne("BloodDonationNetwork.Domain.Entities.AgentWorkflow", "Workflow")
+                        .WithMany("Steps")
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Workflow");
+                });
+
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.AgentWorkflow", b =>
+                {
+                    b.HasOne("BloodDonationNetwork.Domain.Entities.BloodRequest", "BloodRequest")
+                        .WithMany()
+                        .HasForeignKey("BloodRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BloodRequest");
+                });
+
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.ApprovalDecision", b =>
+                {
+                    b.HasOne("BloodDonationNetwork.Domain.Entities.AgentWorkflow", "Workflow")
+                        .WithMany("ApprovalDecisions")
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Workflow");
+                });
+
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodBankInventory", b =>
                 {
                     b.HasOne("BloodDonationNetwork.Domain.Entities.Organization", "Organization")
@@ -494,6 +604,11 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("BloodDonationNetwork.Domain.Entities.AgentWorkflow", null)
+                        .WithMany()
+                        .HasForeignKey("RelatedWorkflowId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Organization");
                 });
@@ -542,6 +657,13 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                         .HasForeignKey("OrganizationId");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.AgentWorkflow", b =>
+                {
+                    b.Navigation("ApprovalDecisions");
+
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.BloodBankInventory", b =>
