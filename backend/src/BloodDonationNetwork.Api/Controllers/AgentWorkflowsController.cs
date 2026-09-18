@@ -1,6 +1,8 @@
+using System.Net.Http.Json;
 using System.Security.Claims;
 using BloodDonationNetwork.Application.DTOs.Workflows;
 using BloodDonationNetwork.Application.Interfaces;
+using BloodDonationNetwork.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,10 +14,14 @@ namespace BloodDonationNetwork.Api.Controllers;
 public class AgentWorkflowsController : ControllerBase
 {
     private readonly IAgentWorkflowService _workflowService;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public AgentWorkflowsController(IAgentWorkflowService workflowService)
+    public AgentWorkflowsController(
+        IAgentWorkflowService workflowService,
+        IHttpClientFactory httpClientFactory)
     {
         _workflowService = workflowService;
+        _httpClientFactory = httpClientFactory;
     }
 
     // GET /api/agent/workflows/{id}
@@ -29,6 +35,37 @@ public class AgentWorkflowsController : ControllerBase
             return NotFound(new
             {
                 message = "Workflow not found."
+            });
+        }
+
+        return Ok(new
+        {
+            workflow.Id,
+            workflow.BloodRequestId,
+            workflow.Status,
+            workflow.RevisionCount,
+            workflow.StartedAt,
+            workflow.UpdatedAt,
+            workflow.CompletedAt,
+            workflow.FailureReason
+        });
+    }
+
+    // GET /api/agent/workflows/request/{bloodRequestId}
+    [HttpGet("request/{bloodRequestId:guid}")]
+    public async Task<IActionResult> GetLatestWorkflowByBloodRequest(
+        Guid bloodRequestId)
+    {
+        var workflow =
+            await _workflowService.GetLatestByBloodRequestIdAsync(
+                bloodRequestId);
+
+        if (workflow == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "No workflow found for this blood request."
             });
         }
 
@@ -103,29 +140,59 @@ public class AgentWorkflowsController : ControllerBase
         Guid id,
         [FromBody] WorkflowDecisionDto dto)
     {
-        var userId = CurrentUserId();
-
-        var workflow = await _workflowService.ApproveAsync(
-            id,
-            userId,
-            dto.Comments);
-
-        if (workflow == null)
+        try
         {
-            return NotFound(new
+            var userId = CurrentUserId();
+
+            var workflow = await _workflowService.ApproveAsync(
+                id,
+                userId,
+                dto.Comments);
+
+            if (workflow == null)
             {
-                message = "Workflow not found."
+                return NotFound(new
+                {
+                    message = "Workflow not found."
+                });
+            }
+
+            var resumeResult = await ResumePythonWorkflowAsync(
+                id,
+                "approve",
+                dto.Comments);
+
+            if (!resumeResult.Success)
+            {
+                return StatusCode(502, new
+                {
+                    message =
+                        "Workflow was approved in the database, " +
+                        "but the agent workflow could not be resumed.",
+                    workflow.Id,
+                    workflow.Status,
+                    agentError = resumeResult.Error
+                });
+            }
+
+            return Ok(new
+            {
+                message =
+                    "Workflow approved and agent resumed.",
+                workflow.Id,
+                workflow.Status,
+                workflow.RevisionCount,
+                workflow.UpdatedAt,
+                agentResumed = true
             });
         }
-
-        return Ok(new
+        catch (InvalidOperationException ex)
         {
-            message = "Workflow approved.",
-            workflow.Id,
-            workflow.Status,
-            workflow.RevisionCount,
-            workflow.UpdatedAt
-        });
+            return Conflict(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
     // POST /api/agent/workflows/{id}/reject
@@ -135,29 +202,59 @@ public class AgentWorkflowsController : ControllerBase
         Guid id,
         [FromBody] WorkflowDecisionDto dto)
     {
-        var userId = CurrentUserId();
-
-        var workflow = await _workflowService.RejectAsync(
-            id,
-            userId,
-            dto.Comments);
-
-        if (workflow == null)
+        try
         {
-            return NotFound(new
+            var userId = CurrentUserId();
+
+            var workflow = await _workflowService.RejectAsync(
+                id,
+                userId,
+                dto.Comments);
+
+            if (workflow == null)
             {
-                message = "Workflow not found."
+                return NotFound(new
+                {
+                    message = "Workflow not found."
+                });
+            }
+
+            var resumeResult = await ResumePythonWorkflowAsync(
+                id,
+                "reject",
+                dto.Comments);
+
+            if (!resumeResult.Success)
+            {
+                return StatusCode(502, new
+                {
+                    message =
+                        "Workflow was rejected in the database, " +
+                        "but the agent workflow could not be resumed.",
+                    workflow.Id,
+                    workflow.Status,
+                    agentError = resumeResult.Error
+                });
+            }
+
+            return Ok(new
+            {
+                message =
+                    "Workflow rejected and agent resumed.",
+                workflow.Id,
+                workflow.Status,
+                workflow.CompletedAt,
+                workflow.UpdatedAt,
+                agentResumed = true
             });
         }
-
-        return Ok(new
+        catch (InvalidOperationException ex)
         {
-            message = "Workflow rejected.",
-            workflow.Id,
-            workflow.Status,
-            workflow.CompletedAt,
-            workflow.UpdatedAt
-        });
+            return Conflict(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
     // POST /api/agent/workflows/{id}/revise
@@ -167,47 +264,132 @@ public class AgentWorkflowsController : ControllerBase
         Guid id,
         [FromBody] WorkflowDecisionDto dto)
     {
-        var userId = CurrentUserId();
-
-        var workflow = await _workflowService.ReviseAsync(
-            id,
-            userId,
-            dto.Comments);
-
-        if (workflow == null)
+        try
         {
-            return NotFound(new
+            var userId = CurrentUserId();
+
+            var workflow = await _workflowService.ReviseAsync(
+                id,
+                userId,
+                dto.Comments);
+
+            if (workflow == null)
             {
-                message = "Workflow not found."
-            });
-        }
+                return NotFound(new
+                {
+                    message = "Workflow not found."
+                });
+            }
 
-        if (workflow.Status == "failed")
-        {
+            if (workflow.Status == WorkflowStatuses.Failed)
+            {
+                return Ok(new
+                {
+                    message =
+                        "Maximum revision limit exceeded. " +
+                        "Workflow failed.",
+                    workflow.Id,
+                    workflow.Status,
+                    workflow.RevisionCount,
+                    workflow.FailureReason,
+                    workflow.CompletedAt
+                });
+            }
+
+            var resumeResult = await ResumePythonWorkflowAsync(
+                id,
+                "revise",
+                dto.Comments);
+
+            if (!resumeResult.Success)
+            {
+                return StatusCode(502, new
+                {
+                    message =
+                        "Revision was recorded in the database, " +
+                        "but the agent workflow could not be resumed.",
+                    workflow.Id,
+                    workflow.Status,
+                    workflow.RevisionCount,
+                    agentError = resumeResult.Error
+                });
+            }
+
             return Ok(new
             {
-                message = "Maximum revision limit exceeded. Workflow failed.",
+                message =
+                    "Workflow revision requested and agent resumed.",
                 workflow.Id,
                 workflow.Status,
                 workflow.RevisionCount,
-                workflow.FailureReason,
-                workflow.CompletedAt
+                workflow.UpdatedAt,
+                agentResumed = true
             });
         }
-
-        return Ok(new
+        catch (InvalidOperationException ex)
         {
-            message = "Workflow revision requested.",
-            workflow.Id,
-            workflow.Status,
-            workflow.RevisionCount,
-            workflow.UpdatedAt
-        });
+            return Conflict(new
+            {
+                message = ex.Message
+            });
+        }
+    }
+
+    private async Task<AgentResumeResult> ResumePythonWorkflowAsync(
+        Guid workflowId,
+        string decision,
+        string? comments)
+    {
+        try
+        {
+            var client =
+                _httpClientFactory.CreateClient(
+                    "AgentService");
+
+            var response = await client.PostAsJsonAsync(
+                $"/resume-workflow/{workflowId}",
+                new
+                {
+                    decision,
+                    comments
+                });
+
+            if (response.IsSuccessStatusCode)
+            {
+                return new AgentResumeResult(
+                    true,
+                    null);
+            }
+
+            var errorBody =
+                await response.Content.ReadAsStringAsync();
+
+            return new AgentResumeResult(
+                false,
+                errorBody);
+        }
+        catch (HttpRequestException ex)
+        {
+            return new AgentResumeResult(
+                false,
+                ex.Message);
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new AgentResumeResult(
+                false,
+                ex.Message);
+        }
     }
 
     private Guid CurrentUserId()
     {
         return Guid.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            User.FindFirstValue(
+                ClaimTypes.NameIdentifier)!);
     }
+
+    private record AgentResumeResult(
+        bool Success,
+        string? Error);
 }
