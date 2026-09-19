@@ -14,11 +14,18 @@ export interface CreateOrganizationRequest {
   name: string;
   type: string;
   address: string;
-  latitude: number;
-  longitude: number;
   phoneNumber: string;
 }
 
 export type UpdateOrganizationRequest = CreateOrganizationRequest;
 
-export type OrganizationFormData = CreateOrganizationRequest;
+export interface OrganizationFormData
+  extends CreateOrganizationRequest {
+  latitude: number;
+  longitude: number;
+}
+
+export interface GeocodeOrganizationResponse {
+  latitude: number;
+  longitude: number;
+}

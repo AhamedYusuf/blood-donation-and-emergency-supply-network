@@ -8,10 +8,14 @@ namespace BloodDonationNetwork.Application.Services;
 public class OrganizationService : IOrganizationService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IGeocodingClient _geocodingClient;
 
-    public OrganizationService(IApplicationDbContext context)
+    public OrganizationService(
+        IApplicationDbContext context,
+        IGeocodingClient geocodingClient)
     {
         _context = context;
+        _geocodingClient = geocodingClient;
     }
 
     public async Task<IReadOnlyList<OrganizationResponse>> GetAllAsync(
@@ -35,20 +39,46 @@ public class OrganizationService : IOrganizationService
         return organization == null ? null : ToResponse(organization);
     }
 
+    public async Task<(double Latitude, double Longitude)> GeocodeAddressAsync(
+        string address,
+        CancellationToken ct)
+    {
+        var normalizedAddress = address.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedAddress))
+        {
+            throw new ArgumentException("Organization address is required.");
+        }
+
+        var coordinates = await _geocodingClient.GeocodeAsync(
+            normalizedAddress,
+            ct);
+
+        if (coordinates is null)
+        {
+            throw new InvalidOperationException(
+                "We could not find a location for this address. Please enter a more complete address.");
+        }
+
+        return coordinates.Value;
+    }
+
     public async Task<OrganizationResponse> CreateAsync(
         CreateOrganizationRequest request,
         CancellationToken ct)
     {
         var type = ParseOrganizationType(request.Type);
+        var address = request.Address.Trim();
+        var coordinates = await GeocodeAddressAsync(address, ct);
 
         var organization = new Organization
         {
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Type = type,
-            Address = request.Address.Trim(),
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
+            Address = address,
+            Latitude = coordinates.Latitude,
+            Longitude = coordinates.Longitude,
             PhoneNumber = request.PhoneNumber.Trim(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -77,9 +107,16 @@ public class OrganizationService : IOrganizationService
 
         organization.Name = request.Name.Trim();
         organization.Type = ParseOrganizationType(request.Type);
-        organization.Address = request.Address.Trim();
-        organization.Latitude = request.Latitude;
-        organization.Longitude = request.Longitude;
+
+        var newAddress = request.Address.Trim();
+        if (!string.Equals(organization.Address, newAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            var coordinates = await GeocodeAddressAsync(newAddress, ct);
+            organization.Address = newAddress;
+            organization.Latitude = coordinates.Latitude;
+            organization.Longitude = coordinates.Longitude;
+        }
+
         organization.PhoneNumber = request.PhoneNumber.Trim();
         organization.UpdatedAt = DateTime.UtcNow;
 

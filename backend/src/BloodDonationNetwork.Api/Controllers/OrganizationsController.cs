@@ -47,19 +47,54 @@ public class OrganizationsController : ControllerBase
         return Ok(organization);
     }
 
+    [HttpPost("geocode")]
+    [Authorize(Roles = "admin")]
+    public async Task<ActionResult> Geocode(
+        [FromBody] GeocodeOrganizationRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            var coordinates = await _organizationService.GeocodeAddressAsync(
+                request.Address,
+                ct);
+
+            return Ok(new
+            {
+                latitude = coordinates.Latitude,
+                longitude = coordinates.Longitude
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost]
     [Authorize(Roles = "admin")]
     public async Task<ActionResult<OrganizationResponse>> Create(
         [FromBody] CreateOrganizationRequest request,
         CancellationToken ct)
     {
-        var organization =
-            await _organizationService.CreateAsync(request, ct);
+        try
+        {
+            var organization =
+                await _organizationService.CreateAsync(request, ct);
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = organization.Id },
-            organization);
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = organization.Id },
+                organization);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -69,10 +104,17 @@ public class OrganizationsController : ControllerBase
         [FromBody] UpdateOrganizationRequest request,
         CancellationToken ct)
     {
-        var organization =
-            await _organizationService.UpdateAsync(id, request, ct);
+        try
+        {
+            var organization =
+                await _organizationService.UpdateAsync(id, request, ct);
 
-        return Ok(organization);
+            return Ok(organization);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:guid}")]

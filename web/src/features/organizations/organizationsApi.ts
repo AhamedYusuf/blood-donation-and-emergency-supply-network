@@ -1,6 +1,7 @@
 import { baseApi } from "../../api/baseApi";
 import type {
   CreateOrganizationRequest,
+  GeocodeOrganizationResponse,
   Organization,
   UpdateOrganizationRequest,
 } from "./organizationTypes";
@@ -15,6 +16,17 @@ export const organizationsApi = baseApi.injectEndpoints({
     getOrganization: builder.query<Organization, string>({
       query: (id) => `/organizations/${id}`,
       providesTags: ["Organization"],
+    }),
+
+    geocodeOrganizationAddress: builder.mutation<
+      GeocodeOrganizationResponse,
+      { address: string }
+    >({
+      query: (body) => ({
+        url: "/organizations/geocode",
+        method: "POST",
+        body,
+      }),
     }),
 
     createOrganization: builder.mutation<
@@ -57,6 +69,7 @@ export const organizationsApi = baseApi.injectEndpoints({
 export const {
   useGetOrganizationsQuery,
   useGetOrganizationQuery,
+  useGeocodeOrganizationAddressMutation,
   useCreateOrganizationMutation,
   useUpdateOrganizationMutation,
   useDeleteOrganizationMutation,

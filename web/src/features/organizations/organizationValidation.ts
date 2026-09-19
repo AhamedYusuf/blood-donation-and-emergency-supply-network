@@ -40,14 +40,14 @@ export function validateOrganizationForm(
     errors.phoneNumber = "Phone number must contain exactly 10 digits.";
 
   if (Number.isNaN(form.latitude))
-    errors.latitude = "Latitude is required.";
+    errors.latitude = "Location has not been detected yet.";
   else if (form.latitude < -90 || form.latitude > 90)
-    errors.latitude = "Latitude must be between -90 and 90.";
+    errors.latitude = "Detected latitude is invalid.";
 
   if (Number.isNaN(form.longitude))
-    errors.longitude = "Longitude is required.";
+    errors.longitude = "Location has not been detected yet.";
   else if (form.longitude < -180 || form.longitude > 180)
-    errors.longitude = "Longitude must be between -180 and 180.";
+    errors.longitude = "Detected longitude is invalid.";
 
   return errors;
 }
