@@ -16,19 +16,18 @@ public class DispatchCandidateDto
     public Guid DonorId { get; set; }
 }
 
+// Shape matches Tech Doc §4.4 Mode 2 output exactly: notifiedDonorIds and
+// appointmentsCreated as ID arrays, failedNotifications as {donorId, reason}.
 public class DispatchResponseDto
 {
     public Guid WorkflowId { get; set; }
-    public int DonorsContacted { get; set; }
-    public int AppointmentsCreated { get; set; }
-    public int NotificationsDelivered { get; set; }
-    public List<DispatchDonorResultDto> Results { get; set; } = new();
+    public List<Guid> NotifiedDonorIds { get; set; } = new();
+    public List<Guid> AppointmentsCreated { get; set; } = new();
+    public List<FailedNotificationDto> FailedNotifications { get; set; } = new();
 }
 
-public class DispatchDonorResultDto
+public class FailedNotificationDto
 {
     public Guid DonorId { get; set; }
-    public Guid? AppointmentId { get; set; }
-    public bool NotificationDelivered { get; set; }
-    public string? FailureReason { get; set; }
+    public string Reason { get; set; } = string.Empty;
 }

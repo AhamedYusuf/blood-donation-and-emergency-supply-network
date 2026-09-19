@@ -33,6 +33,8 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
     public async Task<SearchDonorsResponseDto> SearchDonorsAsync(SearchDonorsRequestDto request)
     {
         var startedAt = DateTime.UtcNow;
+        var lat = request.Location.Lat;
+        var lng = request.Location.Lng;
 
         // Rough pre-filter by blood type only — real distance filtering
         // happens in-memory below, since Haversine distance can't be
@@ -44,12 +46,15 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
                      && d.Longitude != null)
             .ToListAsync();
 
-        var candidates = new List<DonorCandidateDto>();
+        // (distance, score, donor) — score is used only to sort; the
+        // public contract (Tech Doc §4.4) exposes the resulting ordinal
+        // position as "rank", not the raw score.
+        var scored = new List<(double DistanceKm, double Score, Domain.Entities.DonorProfile Donor)>();
 
         foreach (var donor in candidateDonors)
         {
             var distanceKm = GeoUtils.DistanceKm(
-                request.Latitude, request.Longitude,
+                lat, lng,
                 donor.Latitude!.Value, donor.Longitude!.Value);
 
             if (distanceKm > request.RadiusKm)
@@ -60,23 +65,27 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
             var score = _rankingCalculator.CalculateScore(
                 distanceKm, request.UrgencyLevel, (double)donor.ReliabilityScore);
 
-            candidates.Add(new DonorCandidateDto
-            {
-                DonorId = donor.Id,
-                DistanceKm = Math.Round(distanceKm, 2),
-                Score = Math.Round(score, 4),
-                ReliabilityScore = donor.ReliabilityScore
-            });
+            scored.Add((distanceKm, score, donor));
         }
 
-        var ranked = candidates.OrderByDescending(c => c.Score).ToList();
+        var ranked = scored
+            .OrderByDescending(c => c.Score)
+            .Select((c, index) => new DonorCandidateDto
+            {
+                DonorId = c.Donor.Id,
+                DistanceKm = Math.Round(c.DistanceKm, 2),
+                ReliabilityScore = c.Donor.ReliabilityScore,
+                Rank = index + 1,
+            })
+            .ToList();
+
         var response = new SearchDonorsResponseDto { Candidates = ranked };
 
         await LogStepAsync(
             request.WorkflowId,
             stepName: "search_donors",
             status: "completed",
-            input: new { request.BloodType, request.Latitude, request.Longitude, request.RadiusKm, request.UrgencyLevel },
+            input: new { request.BloodType, request.UnitsNeeded, Location = new { lat, lng }, request.RadiusKm, request.UrgencyLevel },
             output: response,
             narrative: $"Found {ranked.Count} candidate donor(s) for {request.BloodType} within {request.RadiusKm}km.",
             startedAt: startedAt);
@@ -133,7 +142,16 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
         };
         var scheduledTime = DateTime.UtcNow.Add(window);
 
-        var results = new List<DispatchDonorResultDto>();
+        // Tech Doc §4.4 Mode 2 output: notifiedDonorIds and
+        // appointmentsCreated as ID arrays, failedNotifications as
+        // {donorId, reason}. A donor whose appointment can't even be
+        // created (bad profile, DB error) is reported the same way as a
+        // failed notification — the spec has no separate slot for that,
+        // and the caller still needs to know why this candidate produced
+        // nothing.
+        var notifiedDonorIds = new List<Guid>();
+        var appointmentsCreated = new List<Guid>();
+        var failedNotifications = new List<FailedNotificationDto>();
 
         foreach (var candidate in request.Eligible)
         {
@@ -148,15 +166,15 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
 
             if (donorProfile is null)
             {
-                results.Add(new DispatchDonorResultDto
+                failedNotifications.Add(new FailedNotificationDto
                 {
                     DonorId = candidate.DonorId,
-                    FailureReason = "Donor profile not found.",
+                    Reason = "Donor profile not found.",
                 });
                 continue;
             }
 
-            Guid? appointmentId = null;
+            Guid appointmentId;
             try
             {
                 var appointment = await _appointmentService.CreateAsync(donorProfile.UserId, new CreateAppointmentDto
@@ -169,13 +187,15 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
             }
             catch (Exception ex)
             {
-                results.Add(new DispatchDonorResultDto
+                failedNotifications.Add(new FailedNotificationDto
                 {
                     DonorId = candidate.DonorId,
-                    FailureReason = $"Could not create appointment: {ex.Message}",
+                    Reason = $"Could not create appointment: {ex.Message}",
                 });
                 continue;
             }
+
+            appointmentsCreated.Add(appointmentId);
 
             var notification = await _notificationService.SendToDonorAsync(
                 donorProfile.UserId,
@@ -184,25 +204,29 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
                 new Dictionary<string, string>
                 {
                     ["workflowId"] = workflow.Id.ToString(),
-                    ["appointmentId"] = appointmentId?.ToString() ?? string.Empty,
+                    ["appointmentId"] = appointmentId.ToString(),
                 });
 
-            results.Add(new DispatchDonorResultDto
+            if (notification.AnyDelivered)
             {
-                DonorId = candidate.DonorId,
-                AppointmentId = appointmentId,
-                NotificationDelivered = notification.AnyDelivered,
-                FailureReason = notification.AnyDelivered ? null : notification.FailureReason,
-            });
+                notifiedDonorIds.Add(candidate.DonorId);
+            }
+            else
+            {
+                failedNotifications.Add(new FailedNotificationDto
+                {
+                    DonorId = candidate.DonorId,
+                    Reason = notification.FailureReason ?? "Notification not delivered.",
+                });
+            }
         }
 
         var response = new DispatchResponseDto
         {
             WorkflowId = workflow.Id,
-            DonorsContacted = request.Eligible.Count,
-            AppointmentsCreated = results.Count(r => r.AppointmentId.HasValue),
-            NotificationsDelivered = results.Count(r => r.NotificationDelivered),
-            Results = results,
+            NotifiedDonorIds = notifiedDonorIds,
+            AppointmentsCreated = appointmentsCreated,
+            FailedNotifications = failedNotifications,
         };
 
         await LogStepAsync(
@@ -211,7 +235,7 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
             status: "completed",
             input: new { request.WorkflowId, EligibleCount = request.Eligible.Count },
             output: response,
-            narrative: $"Dispatched to {response.DonorsContacted} donor(s): {response.AppointmentsCreated} appointment(s) created, {response.NotificationsDelivered} notification(s) delivered.",
+            narrative: $"Dispatched to {request.Eligible.Count} donor(s): {response.AppointmentsCreated.Count} appointment(s) created, {response.NotifiedDonorIds.Count} notification(s) delivered.",
             startedAt: startedAt);
 
         return response;

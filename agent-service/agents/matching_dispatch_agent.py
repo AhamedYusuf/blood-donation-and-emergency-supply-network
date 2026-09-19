@@ -44,13 +44,9 @@ def search(
     ``urgencyLevel``. ``radiusKm`` is optional (defaults to
     :data:`DEFAULT_RADIUS_KM`).
 
-    ``SearchDonorsRequestDto`` on the backend takes flat ``latitude`` /
-    ``longitude`` fields, not a nested ``location`` object, and has no
-    default for ``radiusKm`` — an omitted one is silently bound to 0,
-    which reject every donor regardless of distance. This function keeps
-    the nested ``location`` shape as its own callers' contract (Mode 1
-    predates it having any live caller) and translates it here rather
-    than pushing the DTO's exact wire shape onto every caller.
+    Wire shape matches Tech Doc §4.4 Mode 1 exactly — nested ``location``,
+    not flat ``latitude``/``longitude`` — so this forwards the payload
+    with only ``radiusKm`` defaulted in, rather than reshaping it.
     """
     _require_fields(payload, _SEARCH_REQUIRED)
     _require_positive_int(payload, "unitsNeeded")
@@ -63,10 +59,10 @@ def search(
     outbound = {
         "workflowId": payload["workflowId"],
         "bloodType": payload["bloodType"],
-        "latitude": location["lat"],
-        "longitude": location["lng"],
-        "radiusKm": payload.get("radiusKm", DEFAULT_RADIUS_KM),
+        "unitsNeeded": payload["unitsNeeded"],
+        "location": {"lat": location["lat"], "lng": location["lng"]},
         "urgencyLevel": payload["urgencyLevel"],
+        "radiusKm": payload.get("radiusKm", DEFAULT_RADIUS_KM),
     }
     result = client.post(SEARCH_PATH, outbound)
 
