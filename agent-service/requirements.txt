@@ -2,11 +2,17 @@
 #
 # Runtime + HTTP client used by the shared internal client and the
 # Matching & Dispatch agent node.
+langgraph
+langchain-core
+langchain-ollama
+
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 httpx==0.28.1
 pydantic==2.10.4
 python-dotenv==1.0.1
+requests==2.32.3
+pytest-mock==3.14.0
 
 # Test tooling
 pytest==8.3.4
