@@ -27,7 +27,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler<BloodDonationNetwork.Api.Middleware.ApiExceptionHandler>();
+builder.Services.AddExceptionHandler<BloodDonationNetwork.Api.Middleware.DatabaseExceptionHandler>();
 
 // =====================================================
 // EXTERNAL CLIENTS

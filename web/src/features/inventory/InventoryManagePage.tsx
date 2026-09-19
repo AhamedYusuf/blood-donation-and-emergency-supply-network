@@ -1,6 +1,4 @@
 import { FormEvent, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../app/store";
 import {
   useAdjustInventoryMutation,
   useCreateTransactionMutation,
@@ -14,6 +12,9 @@ import type {
   InventoryTransactionType,
 } from "./inventoryTypes";
 import "./inventoryManage.css";
+
+const ORGANIZATION_ID =
+  import.meta.env.VITE_INVENTORY_ORGANIZATION_ID as string;
 
 const BLOOD_TYPES: BloodType[] = [
   "APositive",
@@ -144,26 +145,21 @@ function getStatus(item: InventoryResponse) {
 }
 
 export function InventoryManagePage() {
-  // Was reading a build-time env var nothing in this repo sets — see
-  // InventoryPage.tsx for the full explanation. Read from the signed-in
-  // user's own organization instead.
-  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
-  const skip = !organizationId;
-
   const {
     data: inventory = [],
     isLoading: inventoryLoading,
     isError: inventoryError,
     refetch: refetchInventory,
-  } = useGetInventoryQuery(organizationId ?? "", { skip });
+  } = useGetInventoryQuery(ORGANIZATION_ID);
 
   const {
     data: transactionData,
     isLoading: transactionsLoading,
-  } = useGetTransactionsQuery(
-    { organizationId: organizationId ?? "", page: 1, pageSize: 20 },
-    { skip }
-  );
+  } = useGetTransactionsQuery({
+    organizationId: ORGANIZATION_ID,
+    page: 1,
+    pageSize: 20,
+  });
 
   const {
     data: organizations = [],
@@ -236,9 +232,9 @@ export function InventoryManagePage() {
   const transferOrganizations = useMemo(
     () =>
       organizations.filter(
-        (organization) => organization.id !== organizationId
+        (organization) => organization.id !== ORGANIZATION_ID
       ),
-    [organizations, organizationId],
+    [organizations],
   );
 
   const isTransfer =
@@ -351,7 +347,7 @@ export function InventoryManagePage() {
 
     if (
       isTransfer &&
-      relatedTransferOrgId === organizationId
+      relatedTransferOrgId === ORGANIZATION_ID
     ) {
       setFormError(
         "The transfer organization must be different from the current organization."
@@ -371,7 +367,7 @@ export function InventoryManagePage() {
 
     try {
       await createTransaction({
-        organizationId: organizationId ?? "",
+        organizationId: ORGANIZATION_ID,
         bloodType,
         units: numericUnits,
         transactionType,
@@ -466,15 +462,6 @@ export function InventoryManagePage() {
         "The inventory adjustment failed. Please try again."
       );
     }
-  }
-
-  if (!organizationId) {
-    return (
-      <div className="manage-loading">
-        <h2>No organization linked</h2>
-        <p>Your account isn't linked to an organization, so there's no inventory to manage here.</p>
-      </div>
-    );
   }
 
   if (inventoryLoading) {

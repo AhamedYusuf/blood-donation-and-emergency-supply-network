@@ -27,9 +27,9 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Appointments", icon: "◧", path: "/" },
-  { label: "Requests", icon: "◇", path: "/requests" },
+  { label: "Requests", icon: "◇", path: "/requests", built: false },
   { label: "Inventory", icon: "▤", path: "/inventory", allowedRoles: ["staff", "admin"] },
-  { label: "Organizations", icon: "▦", path: "/organizations", allowedRoles: ["admin"] },
+  { label: "Organizations", icon: "▦", path: "/organizations", allowedRoles: ["staff", "admin"] },
   {
     label: "Donors",
     icon: "◎",

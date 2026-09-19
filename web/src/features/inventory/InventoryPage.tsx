@@ -1,6 +1,4 @@
 import { useMemo } from "react";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../app/store";
 import {
   useGetInventoryQuery,
   useGetLowStockQuery,
@@ -13,6 +11,9 @@ import type {
   InventoryTransactionResponse,
 } from "./inventoryTypes";
 import "./inventory.css";
+
+const ORGANIZATION_ID =
+  import.meta.env.VITE_INVENTORY_ORGANIZATION_ID as string;
 
 const BLOOD_TYPES: BloodType[] = [
   "APositive",
@@ -285,36 +286,29 @@ function TransactionRow({
 }
 
 export function InventoryPage() {
-  // Was reading a build-time env var (VITE_INVENTORY_ORGANIZATION_ID)
-  // that nothing in this repo ever sets — every user, regardless of
-  // which organization they actually belong to, was querying inventory
-  // for an undefined org id. Read it from the signed-in user instead,
-  // the same way AppointmentsConsolePage does.
-  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
-  const skip = !organizationId;
-
   const {
     data: inventory = [],
     isLoading,
     isError,
     refetch,
-  } = useGetInventoryQuery(organizationId ?? "", { skip });
+  } = useGetInventoryQuery(ORGANIZATION_ID);
 
   const {
     data: lowStock = [],
-  } = useGetLowStockQuery(organizationId ?? "", { skip });
+  } = useGetLowStockQuery(ORGANIZATION_ID);
 
   const {
     data: stockRisk,
     isFetching: isStockRiskFetching,
-  } = useGetStockRiskQuery(organizationId ?? "", { skip });
+  } = useGetStockRiskQuery(ORGANIZATION_ID);
 
   const {
     data: transactionData,
-  } = useGetTransactionsQuery(
-    { organizationId: organizationId ?? "", page: 1, pageSize: 5 },
-    { skip }
-  );
+  } = useGetTransactionsQuery({
+    organizationId: ORGANIZATION_ID,
+    page: 1,
+    pageSize: 5,
+  });
 
   const inventoryMap = useMemo(() => {
     const map = new Map<BloodType, InventoryResponse>();
@@ -349,17 +343,6 @@ export function InventoryPage() {
 
   const transactions =
     transactionData?.items ?? [];
-
-  if (!organizationId) {
-    return (
-      <div className="inventory-shell">
-        <p style={{ padding: "var(--space-xl)" }}>
-          Your account isn't linked to an organization, so there's no
-          inventory to show here.
-        </p>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return <LoadingState />;
