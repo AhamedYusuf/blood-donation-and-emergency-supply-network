@@ -19,12 +19,23 @@ function formatDate(value: string | null) {
 }
 
 function apiMessage(error: unknown) {
-  const value = error as { data?: { message?: string } } | undefined;
+  const value = error as { status?: number | string; data?: { message?: string } } | undefined;
+  if (value?.status === 401 || value?.status === 403) {
+    return "Only an authenticated admin can create staff invitations. Please sign in again with an admin account.";
+  }
+  if (value?.status === 404) return value.data?.message ?? "The selected organization was not found.";
+  if (value?.status === 409) return value.data?.message ?? "An invitation already exists for this email.";
+  if (value?.status === "FETCH_ERROR") return "The backend could not be reached. Check that the API is running and try again.";
   return value?.data?.message ?? "Could not create the invitation. Please try again.";
 }
 
 export function StaffInvitationsPage() {
-  const { data: organizations = [], isLoading: loadingOrganizations } = useGetOrganizationsQuery();
+  const {
+    data: organizations = [],
+    isLoading: loadingOrganizations,
+    isError: organizationsError,
+    error: organizationQueryError,
+  } = useGetOrganizationsQuery();
   const [organizationId, setOrganizationId] = useState("");
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState({ email: false, organization: false });
@@ -33,6 +44,9 @@ export function StaffInvitationsPage() {
   const [copied, setCopied] = useState(false);
   const [createInvitation, createState] = useCreateStaffInvitationMutation();
   const { data: invitations = [], isLoading: loadingInvitations } = useGetStaffInvitationsQuery(organizationId, { skip: !organizationId });
+  const organizationLoadMessage = organizationsError
+    ? apiMessage(organizationQueryError)
+    : null;
 
   const emailError = touched.email && !email.trim() ? "Email is required." : touched.email && !EMAIL_RE.test(email.trim()) ? "Enter a valid email address." : "";
   const organizationError = touched.organization && !organizationId ? "Select an organization." : "";
@@ -76,11 +90,12 @@ export function StaffInvitationsPage() {
               <FormField id="staff-invite-email" label="Invitee email" type="email" required value={email} placeholder="staff@example.com" error={emailError} onChange={(event) => setEmail(event.target.value)} onBlur={() => setTouched((current) => ({ ...current, email: true }))} />
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label htmlFor="staff-invite-organization" className="text-label" style={{ color: "var(--color-ink-secondary)" }}>Organization <span style={{ color: "var(--color-critical)" }}>*</span></label>
-                <select id="staff-invite-organization" required value={organizationId} disabled={loadingOrganizations} onChange={(event) => setOrganizationId(event.target.value)} onBlur={() => setTouched((current) => ({ ...current, organization: true }))} style={{ padding: "8px 12px", border: organizationError ? "1px solid var(--color-critical)" : "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", background: "var(--color-surface)", color: "var(--color-ink)", font: "inherit" }}>
+                <select id="staff-invite-organization" required value={organizationId} disabled={loadingOrganizations || organizationsError} onChange={(event) => setOrganizationId(event.target.value)} onBlur={() => setTouched((current) => ({ ...current, organization: true }))} style={{ padding: "8px 12px", border: organizationError ? "1px solid var(--color-critical)" : "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", background: "var(--color-surface)", color: "var(--color-ink)", font: "inherit" }}>
                   <option value="">{loadingOrganizations ? "Loading organizations…" : "Select an organization…"}</option>
                   {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
                 </select>
                 {organizationError && <span className="text-caption" style={{ color: "var(--color-critical)" }}>{organizationError}</span>}
+                {organizationLoadMessage && <span role="alert" className="text-caption" style={{ color: "var(--color-critical)" }}>{organizationLoadMessage}</span>}
               </div>
               {apiError && <div role="alert" className="text-body-sm" style={{ color: "var(--color-critical)", background: "var(--color-critical-subtle)", padding: "10px 12px", borderRadius: "var(--radius-sm)" }}>{apiError}</div>}
               <button type="submit" disabled={createState.isLoading || loadingOrganizations} style={{ border: 0, borderRadius: "var(--radius-sm)", padding: "10px 14px", background: "var(--color-primary)", color: "var(--color-on-primary)", font: "inherit", fontWeight: 700, cursor: createState.isLoading ? "wait" : "pointer" }}>{createState.isLoading ? "Creating…" : "Create invitation"}</button>

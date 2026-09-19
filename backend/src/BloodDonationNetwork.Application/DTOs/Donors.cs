@@ -18,6 +18,7 @@ public class DonorUpdateRequest {
 public class DonorProfileResponse { 
     public Guid Id {get;set;} 
     public Guid UserId {get;set;} 
+    public string FullName {get;set;} = string.Empty;
     public string BloodType {get;set;} = default!; 
     public string EligibilityStatus {get;set;} = default!; 
     public DateOnly DateOfBirth {get;set;} 

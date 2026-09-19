@@ -54,7 +54,14 @@ public class DonorService : IDonorService
     public async Task<DonorProfileResponse?> GetByIdAsync(Guid id, CancellationToken ct)
     {
         var profile = await _db.DonorProfiles.FindAsync(new object[] { id }, ct);
-        return profile is null ? null : ToResponse(profile);
+        if (profile is null) return null;
+
+        var fullName = await _db.Users
+            .Where(user => user.Id == profile.UserId)
+            .Select(user => user.FullName)
+            .FirstOrDefaultAsync(ct);
+
+        return ToResponse(profile, fullName);
     }
 
     public async Task<DonorProfileResponse> UpdateAsync(Guid id, DonorUpdateRequest request, CancellationToken ct)
@@ -79,17 +86,29 @@ public class DonorService : IDonorService
         return ToResponse(profile);
     }
 
-    public async Task<PagedResult<DonorProfileResponse>> SearchAsync(string bloodType, double? lat, double? lng, double? radiusKm, int page, int pageSize, CancellationToken ct)
+    public async Task<PagedResult<DonorProfileResponse>> SearchAsync(string? bloodType, double? lat, double? lng, double? radiusKm, int page, int pageSize, CancellationToken ct)
     {
         var query = _db.DonorProfiles.AsQueryable();
         if (!string.IsNullOrWhiteSpace(bloodType)) query = query.Where(d => d.BloodType == bloodType);
 
         var total = await query.CountAsync(ct);
         var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var userIds = items.Select(profile => profile.UserId).Distinct().ToList();
+        var names = await _db.Users
+            .Where(user => userIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.FullName, ct);
         // Distance filtering (lat/lng/radiusKm) needs Student 3's GeoUtils Haversine helper —
         // wire that in once their branch merges into development; for now this is type-filtered only.
 
-        return new PagedResult<DonorProfileResponse> { Items = items.Select(ToResponse).ToList(), Page = page, PageSize = pageSize, TotalCount = total };
+        return new PagedResult<DonorProfileResponse>
+        {
+            Items = items.Select(profile => ToResponse(
+                profile,
+                names.GetValueOrDefault(profile.UserId, ""))).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
+        };
     }
 
     public async Task VerifyAsync(Guid id, CancellationToken ct)
@@ -115,9 +134,10 @@ public class DonorService : IDonorService
     return new EligibilityResponse { IsEligible = isEligible, Reason = reason, DaysUntilEligible = daysUntil };
     }
 
-    private static DonorProfileResponse ToResponse(DonorProfile p) => new()
+    private static DonorProfileResponse ToResponse(DonorProfile p, string? fullName = null) => new()
     {
         Id = p.Id, UserId = p.UserId, BloodType = p.BloodType, EligibilityStatus = p.EligibilityStatus,
+        FullName = fullName ?? string.Empty,
         DateOfBirth = p.DateOfBirth, LastDonationDate = p.LastDonationDate, Address = p.Address,
         MedicalFlags = p.MedicalFlags,
         Latitude = p.Latitude, Longitude = p.Longitude, LocationVerified = p.LocationVerified, VerifiedByAdmin = p.VerifiedByAdmin

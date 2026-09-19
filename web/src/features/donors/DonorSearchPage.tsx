@@ -132,13 +132,16 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
         {donor.bloodType}
       </span>
 
-      {/* ID + address */}
+      {/* Name + secondary ID and address */}
       <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span
           className="text-body-sm tabular-nums"
           style={{ color: "var(--color-ink-secondary)" }}
         >
-          {donor.id.slice(0, 8).toUpperCase()}
+          {donor.fullName || "Unnamed donor"}
+        </span>
+        <span className="text-caption tabular-nums" style={{ color: "var(--color-ink-faint)" }}>
+          Profile ID: {donor.id.slice(0, 8).toUpperCase()}
         </span>
         {donor.address ? (
           <span
