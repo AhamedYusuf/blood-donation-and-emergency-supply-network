@@ -46,9 +46,10 @@ def valid_search_payload(**overrides):
 
 # --------------------------------------------------------------------- search
 
-def test_search_translates_payload_to_the_backend_dto_shape():
-    # SearchDonorsRequestDto takes flat latitude/longitude, not a nested
-    # location object, and radiusKm has no server-side default.
+def test_search_forwards_payload_matching_the_backend_dto_shape():
+    # SearchDonorsRequestDto (Tech Doc §4.4 Mode 1) takes a nested
+    # location object and unitsNeeded — this forwards the payload as-is,
+    # only defaulting radiusKm.
     client = FakeClient(response={"candidates": [{"donorId": "d1", "rank": 1}]})
 
     result = search(valid_search_payload(), client=client)
@@ -59,10 +60,10 @@ def test_search_translates_payload_to_the_backend_dto_shape():
         {
             "workflowId": "wf-1",
             "bloodType": "O-",
-            "latitude": 6.9271,
-            "longitude": 79.8612,
-            "radiusKm": 15,
+            "unitsNeeded": 2,
+            "location": {"lat": 6.9271, "lng": 79.8612},
             "urgencyLevel": "critical",
+            "radiusKm": 15,
         },
     )]
 
