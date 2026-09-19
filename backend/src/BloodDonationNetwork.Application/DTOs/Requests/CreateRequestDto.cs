@@ -1,25 +1,27 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using BloodDonationNetwork.Application.Serialization;
 using BloodDonationNetwork.Domain.Enums;
 
 namespace BloodDonationNetwork.Application.DTOs.Requests;
 
 public class CreateRequestDto : IValidatableObject
 {
-    // RequesterId is intentionally not here — the requester is always the
-    // authenticated caller (RequestsController derives it from the JWT).
-    // A client-supplied requester id would let anyone file a request
-    // "as" someone else.
+    // RequesterId is intentionally not here.
+    // The requester is always taken from the authenticated JWT user.
     [Required]
     public Guid OrganizationId { get; set; }
 
     [Required]
+    [JsonConverter(typeof(BloodTypeJsonConverter))]
     public BloodType BloodType { get; set; }
 
     [Range(1, 100)]
     public int UnitsRequested { get; set; }
 
     [Required]
+    [JsonConverter(typeof(RequestUrgencyJsonConverter))]
     public RequestUrgency Urgency { get; set; }
 
     [Required]

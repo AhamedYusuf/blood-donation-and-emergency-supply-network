@@ -50,17 +50,20 @@ public class RequestsController : ControllerBase
                 var agentClient =
                     _httpClientFactory.CreateClient("AgentService");
 
-                var agentResponse = await agentClient.PostAsJsonAsync(
-                    "/run-workflow",
-                    new
-                    {
-                        bloodRequestId = request.Id.ToString()
-                    });
+                var agentResponse =
+                    await agentClient.PostAsJsonAsync(
+                        "/run-workflow",
+                        new
+                        {
+                            bloodRequestId =
+                                request.Id.ToString()
+                        });
 
                 if (!agentResponse.IsSuccessStatusCode)
                 {
                     var errorBody =
-                        await agentResponse.Content.ReadAsStringAsync();
+                        await agentResponse.Content
+                            .ReadAsStringAsync();
 
                     _logger.LogWarning(
                         "Blood request {BloodRequestId} was created, " +
@@ -80,7 +83,6 @@ public class RequestsController : ControllerBase
             }
             catch (Exception ex)
             {
-                // Important:
                 // Agent failure must not undo a successfully-created
                 // Blood Request.
                 _logger.LogError(
@@ -103,9 +105,11 @@ public class RequestsController : ControllerBase
 
     // GET /api/requests/{id}
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<RequestResponseDto>> GetById(Guid id)
+    public async Task<ActionResult<RequestResponseDto>> GetById(
+        Guid id)
     {
-        var request = await _requestService.GetByIdAsync(id);
+        var request =
+            await _requestService.GetByIdAsync(id);
 
         if (request == null)
         {
@@ -120,27 +124,39 @@ public class RequestsController : ControllerBase
 
     // GET /api/requests
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<RequestResponseDto>>> GetAll(
-        [FromQuery] BloodType? bloodType = null,
-        [FromQuery] RequestUrgency? urgency = null,
-        [FromQuery] BloodRequestStatus? status = null,
-        [FromQuery] Guid? organizationId = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string sortBy = "createdAt",
-        [FromQuery] bool descending = true)
+    public async Task<ActionResult<IEnumerable<RequestResponseDto>>>
+        GetAll(
+            [FromQuery] BloodType? bloodType = null,
+            [FromQuery] RequestUrgency? urgency = null,
+            [FromQuery] string? status = null,
+            [FromQuery] Guid? organizationId = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string sortBy = "createdAt",
+            [FromQuery] bool descending = true)
     {
-        var requests = await _requestService.GetAllAsync(
-            bloodType,
-            urgency,
-            status,
-            organizationId,
-            page,
-            pageSize,
-            sortBy,
-            descending);
+        try
+        {
+            var requests =
+                await _requestService.GetAllAsync(
+                    bloodType,
+                    urgency,
+                    status,
+                    organizationId,
+                    page,
+                    pageSize,
+                    sortBy,
+                    descending);
 
-        return Ok(requests);
+            return Ok(requests);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
     // PUT /api/requests/{id}/status
@@ -174,6 +190,13 @@ public class RequestsController : ControllerBase
         catch (UnauthorizedAccessException)
         {
             return Forbid();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
         }
     }
 
@@ -211,7 +234,8 @@ public class RequestsController : ControllerBase
     // POST /api/requests/{id}/close
     [HttpPost("{id:guid}/close")]
     [Authorize(Roles = "staff,admin")]
-    public async Task<ActionResult<RequestResponseDto>> Close(Guid id)
+    public async Task<ActionResult<RequestResponseDto>> Close(
+        Guid id)
     {
         var (userId, isAdmin) = CurrentUser();
 
@@ -247,7 +271,7 @@ public class RequestsController : ControllerBase
 
         var isAdmin =
             User.FindFirstValue(
-                ClaimTypes.Role) == "admin";
+                ClaimTypes.Role) == UserRoles.Admin;
 
         return (userId, isAdmin);
     }
