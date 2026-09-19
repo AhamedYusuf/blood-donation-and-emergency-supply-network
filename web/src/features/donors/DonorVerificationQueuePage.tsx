@@ -122,7 +122,7 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
         {donor.bloodType}
       </span>
 
-      {/* Donor ID fragment + address */}
+      {/* Donor name + secondary identifiers and address */}
       <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span
           className="text-body-sm tabular-nums"
@@ -133,13 +133,13 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
             whiteSpace: "nowrap",
           }}
         >
-          Profile ID: {donor.id}
+          {donor.fullName || "Unnamed donor"}
         </span>
         <span
           className="text-caption tabular-nums"
           style={{ color: "var(--color-ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
         >
-          Account ID: {donor.userId}
+          Profile ID: {donor.id} · Account ID: {donor.userId}
         </span>
         {donor.address && (
           <span
