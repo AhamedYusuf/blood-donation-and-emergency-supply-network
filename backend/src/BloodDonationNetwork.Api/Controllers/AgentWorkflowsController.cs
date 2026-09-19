@@ -28,7 +28,8 @@ public class AgentWorkflowsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetWorkflow(Guid id)
     {
-        var workflow = await _workflowService.GetByIdAsync(id);
+        var workflow =
+            await _workflowService.GetByIdAsync(id);
 
         if (workflow == null)
         {
@@ -42,6 +43,8 @@ public class AgentWorkflowsController : ControllerBase
         {
             workflow.Id,
             workflow.BloodRequestId,
+            workflow.Objective,
+            workflow.CurrentAgent,
             workflow.Status,
             workflow.RevisionCount,
             workflow.StartedAt,
@@ -53,12 +56,14 @@ public class AgentWorkflowsController : ControllerBase
 
     // GET /api/agent/workflows/request/{bloodRequestId}
     [HttpGet("request/{bloodRequestId:guid}")]
-    public async Task<IActionResult> GetLatestWorkflowByBloodRequest(
-        Guid bloodRequestId)
+    public async Task<IActionResult>
+        GetLatestWorkflowByBloodRequest(
+            Guid bloodRequestId)
     {
         var workflow =
-            await _workflowService.GetLatestByBloodRequestIdAsync(
-                bloodRequestId);
+            await _workflowService
+                .GetLatestByBloodRequestIdAsync(
+                    bloodRequestId);
 
         if (workflow == null)
         {
@@ -73,6 +78,8 @@ public class AgentWorkflowsController : ControllerBase
         {
             workflow.Id,
             workflow.BloodRequestId,
+            workflow.Objective,
+            workflow.CurrentAgent,
             workflow.Status,
             workflow.RevisionCount,
             workflow.StartedAt,
@@ -84,9 +91,11 @@ public class AgentWorkflowsController : ControllerBase
 
     // GET /api/agent/workflows/{id}/steps
     [HttpGet("{id:guid}/steps")]
-    public async Task<IActionResult> GetSteps(Guid id)
+    public async Task<IActionResult> GetSteps(
+        Guid id)
     {
-        var workflow = await _workflowService.GetByIdAsync(id);
+        var workflow =
+            await _workflowService.GetByIdAsync(id);
 
         if (workflow == null)
         {
@@ -96,31 +105,37 @@ public class AgentWorkflowsController : ControllerBase
             });
         }
 
-        var steps = await _workflowService.GetStepsAsync(id);
+        var steps =
+            await _workflowService.GetStepsAsync(id);
 
-        var response = steps.Select(step => new
-        {
-            step.Id,
-            step.WorkflowId,
-            step.AgentName,
-            step.StepName,
-            step.Status,
-            step.InputJson,
-            step.OutputJson,
-            step.Narrative,
-            step.StartedAt,
-            step.CompletedAt,
-            step.ErrorMessage
-        });
+        var response =
+            steps.Select(step => new
+            {
+                step.Id,
+                step.WorkflowId,
+                step.AgentName,
+                step.StepName,
+                step.Status,
+                step.InputJson,
+                step.OutputJson,
+                step.Narrative,
+                step.RetryCount,
+                step.StartedAt,
+                step.CompletedAt,
+                step.ErrorMessage
+            });
 
         return Ok(response);
     }
 
     // GET /api/agent/workflows/{id}/summary
     [HttpGet("{id:guid}/summary")]
-    public async Task<IActionResult> GetSummary(Guid id)
+    public async Task<IActionResult> GetSummary(
+        Guid id)
     {
-        var summary = await _workflowService.GetSummaryAsync(id);
+        var summary =
+            await _workflowService
+                .GetSummaryAsync(id);
 
         if (summary == null)
         {
@@ -144,10 +159,11 @@ public class AgentWorkflowsController : ControllerBase
         {
             var userId = CurrentUserId();
 
-            var workflow = await _workflowService.ApproveAsync(
-                id,
-                userId,
-                dto.Comments);
+            var workflow =
+                await _workflowService.ApproveAsync(
+                    id,
+                    userId,
+                    dto.Comments);
 
             if (workflow == null)
             {
@@ -157,10 +173,11 @@ public class AgentWorkflowsController : ControllerBase
                 });
             }
 
-            var resumeResult = await ResumePythonWorkflowAsync(
-                id,
-                "approve",
-                dto.Comments);
+            var resumeResult =
+                await ResumePythonWorkflowAsync(
+                    id,
+                    "approve",
+                    dto.Comments);
 
             if (!resumeResult.Success)
             {
@@ -171,6 +188,8 @@ public class AgentWorkflowsController : ControllerBase
                         "but the agent workflow could not be resumed.",
                     workflow.Id,
                     workflow.Status,
+                    workflow.Objective,
+                    workflow.CurrentAgent,
                     agentError = resumeResult.Error
                 });
             }
@@ -181,6 +200,8 @@ public class AgentWorkflowsController : ControllerBase
                     "Workflow approved and agent resumed.",
                 workflow.Id,
                 workflow.Status,
+                workflow.Objective,
+                workflow.CurrentAgent,
                 workflow.RevisionCount,
                 workflow.UpdatedAt,
                 agentResumed = true
@@ -206,10 +227,11 @@ public class AgentWorkflowsController : ControllerBase
         {
             var userId = CurrentUserId();
 
-            var workflow = await _workflowService.RejectAsync(
-                id,
-                userId,
-                dto.Comments);
+            var workflow =
+                await _workflowService.RejectAsync(
+                    id,
+                    userId,
+                    dto.Comments);
 
             if (workflow == null)
             {
@@ -219,10 +241,11 @@ public class AgentWorkflowsController : ControllerBase
                 });
             }
 
-            var resumeResult = await ResumePythonWorkflowAsync(
-                id,
-                "reject",
-                dto.Comments);
+            var resumeResult =
+                await ResumePythonWorkflowAsync(
+                    id,
+                    "reject",
+                    dto.Comments);
 
             if (!resumeResult.Success)
             {
@@ -233,6 +256,8 @@ public class AgentWorkflowsController : ControllerBase
                         "but the agent workflow could not be resumed.",
                     workflow.Id,
                     workflow.Status,
+                    workflow.Objective,
+                    workflow.CurrentAgent,
                     agentError = resumeResult.Error
                 });
             }
@@ -243,6 +268,8 @@ public class AgentWorkflowsController : ControllerBase
                     "Workflow rejected and agent resumed.",
                 workflow.Id,
                 workflow.Status,
+                workflow.Objective,
+                workflow.CurrentAgent,
                 workflow.CompletedAt,
                 workflow.UpdatedAt,
                 agentResumed = true
@@ -268,10 +295,11 @@ public class AgentWorkflowsController : ControllerBase
         {
             var userId = CurrentUserId();
 
-            var workflow = await _workflowService.ReviseAsync(
-                id,
-                userId,
-                dto.Comments);
+            var workflow =
+                await _workflowService.ReviseAsync(
+                    id,
+                    userId,
+                    dto.Comments);
 
             if (workflow == null)
             {
@@ -281,7 +309,8 @@ public class AgentWorkflowsController : ControllerBase
                 });
             }
 
-            if (workflow.Status == WorkflowStatuses.Failed)
+            if (workflow.Status ==
+                WorkflowStatuses.Failed)
             {
                 return Ok(new
                 {
@@ -290,16 +319,19 @@ public class AgentWorkflowsController : ControllerBase
                         "Workflow failed.",
                     workflow.Id,
                     workflow.Status,
+                    workflow.Objective,
+                    workflow.CurrentAgent,
                     workflow.RevisionCount,
                     workflow.FailureReason,
                     workflow.CompletedAt
                 });
             }
 
-            var resumeResult = await ResumePythonWorkflowAsync(
-                id,
-                "revise",
-                dto.Comments);
+            var resumeResult =
+                await ResumePythonWorkflowAsync(
+                    id,
+                    "revise",
+                    dto.Comments);
 
             if (!resumeResult.Success)
             {
@@ -310,6 +342,8 @@ public class AgentWorkflowsController : ControllerBase
                         "but the agent workflow could not be resumed.",
                     workflow.Id,
                     workflow.Status,
+                    workflow.Objective,
+                    workflow.CurrentAgent,
                     workflow.RevisionCount,
                     agentError = resumeResult.Error
                 });
@@ -321,6 +355,8 @@ public class AgentWorkflowsController : ControllerBase
                     "Workflow revision requested and agent resumed.",
                 workflow.Id,
                 workflow.Status,
+                workflow.Objective,
+                workflow.CurrentAgent,
                 workflow.RevisionCount,
                 workflow.UpdatedAt,
                 agentResumed = true
@@ -335,10 +371,11 @@ public class AgentWorkflowsController : ControllerBase
         }
     }
 
-    private async Task<AgentResumeResult> ResumePythonWorkflowAsync(
-        Guid workflowId,
-        string decision,
-        string? comments)
+    private async Task<AgentResumeResult>
+        ResumePythonWorkflowAsync(
+            Guid workflowId,
+            string decision,
+            string? comments)
     {
         try
         {
@@ -346,13 +383,14 @@ public class AgentWorkflowsController : ControllerBase
                 _httpClientFactory.CreateClient(
                     "AgentService");
 
-            var response = await client.PostAsJsonAsync(
-                $"/resume-workflow/{workflowId}",
-                new
-                {
-                    decision,
-                    comments
-                });
+            var response =
+                await client.PostAsJsonAsync(
+                    $"/resume-workflow/{workflowId}",
+                    new
+                    {
+                        decision,
+                        comments
+                    });
 
             if (response.IsSuccessStatusCode)
             {
@@ -362,7 +400,8 @@ public class AgentWorkflowsController : ControllerBase
             }
 
             var errorBody =
-                await response.Content.ReadAsStringAsync();
+                await response.Content
+                    .ReadAsStringAsync();
 
             return new AgentResumeResult(
                 false,

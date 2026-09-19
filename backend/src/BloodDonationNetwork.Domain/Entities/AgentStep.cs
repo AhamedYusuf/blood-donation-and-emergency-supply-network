@@ -18,7 +18,12 @@ public class AgentStep
 
     public string? Narrative { get; set; }
 
-    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    // Number of retry attempts made for this step.
+    // 0 means the step succeeded or failed on its first attempt.
+    public int RetryCount { get; set; } = 0;
+
+    public DateTime StartedAt { get; set; } =
+        DateTime.UtcNow;
 
     public DateTime? CompletedAt { get; set; }
 

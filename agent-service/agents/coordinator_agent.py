@@ -65,12 +65,17 @@ def log_workflow_step(
     input_data: Any = None,
     output_data: Any = None,
     narrative: str | None = None,
+    retry_count: int = 0,
     started_at: str | None = None,
     completed_at: str | None = None,
     error_message: str | None = None,
 ) -> None:
     """
     Save a coordinator-owned workflow step to the ASP.NET backend.
+
+    retry_count:
+        Number of retry attempts for this workflow step.
+        0 means the step ran on the first attempt.
 
     Logging failure must not crash the main workflow.
     """
@@ -98,6 +103,7 @@ def log_workflow_step(
             else None
         ),
         "narrative": narrative,
+        "retryCount": retry_count,
         "startedAt": started_at or utc_now_iso(),
         "completedAt": completed_at,
         "errorMessage": error_message,
@@ -149,6 +155,7 @@ def stock_check_node(
             "Checked available blood stock. "
             "Temporary Student 3 stub is currently in use."
         ),
+        retry_count=0,
         started_at=started_at,
         completed_at=utc_now_iso(),
     )
@@ -223,12 +230,13 @@ def validate_eligibility_node(
     """
     Student 1 Eligibility Validation Agent.
 
-    Student 4's search agent returns candidate donor objects. The
-    eligibility agent expects donor IDs plus the required blood type,
-    so the Coordinator adapts the data between both agents.
+    Student 4's search agent returns candidate donor objects.
+    The eligibility agent expects donor IDs plus the required
+    blood type, so the Coordinator adapts the data between
+    both agents.
 
-    Student 1's endpoint owns its AgentStep logging, so the Coordinator
-    does not create a duplicate eligibility step.
+    Student 1's endpoint owns its AgentStep logging, so the
+    Coordinator does not create a duplicate eligibility step.
     """
     donor_search_result = state.get(
         "donor_search_result",
@@ -290,7 +298,8 @@ def validate_eligibility_node(
         for candidate in candidates
         if isinstance(candidate, dict)
         and candidate.get("donorId") is not None
-        and str(candidate.get("donorId")) in eligible_ids
+        and str(candidate.get("donorId"))
+        in eligible_ids
     ]
 
     eligibility_result = {
@@ -410,12 +419,13 @@ def await_approval_node(
             "Human approval decision received: "
             f"{approval_decision}."
         ),
+        retry_count=0,
         started_at=started_at,
         completed_at=utc_now_iso(),
     )
 
     return {
-        "current_step": "await_approval",
+        "current_step": "awaiting_approval",
         "approval_decision": approval_decision,
         "approval_comments": approval_comments,
     }
@@ -461,6 +471,7 @@ def revision_replan_node(
             "Coordinator restarted the workflow "
             "using the provided feedback."
         ),
+        retry_count=0,
         started_at=started_at,
         completed_at=utc_now_iso(),
     )
@@ -511,8 +522,8 @@ def dispatch_node(
     """
     Student 4 Matching & Dispatch Agent - dispatch mode.
 
-    Student 4's dispatch agent owns its own logging, so the Coordinator
-    must not create a duplicate dispatch AgentStep.
+    Student 4's dispatch agent owns its own logging, so the
+    Coordinator must not create a duplicate dispatch AgentStep.
     """
     eligibility_result = state.get(
         "eligibility_result",
@@ -539,8 +550,6 @@ def dispatch_node(
         return {
             "current_step": "dispatch",
             "dispatch_result": result,
-
-            # Clear any old error because dispatch succeeded.
             "error": None,
         }
 
@@ -629,6 +638,7 @@ def finalize_workflow_node(
             f"Workflow finalized with status "
             f"'{final_status}'."
         ),
+        retry_count=0,
         completed_at=utc_now_iso(),
         error_message=failure_reason,
     )
@@ -700,7 +710,8 @@ def build_coordinator_graph() -> StateGraph:
         route_after_stock_check,
         {
             "search_donors": "search_donors",
-            "await_approval": "mark_awaiting_approval",
+            "await_approval":
+                "mark_awaiting_approval",
         },
     )
 
@@ -728,7 +739,8 @@ def build_coordinator_graph() -> StateGraph:
         route_after_approval,
         {
             "dispatch": "dispatch",
-            "revision_replan": "revision_replan",
+            "revision_replan":
+                "revision_replan",
             "end": END,
         },
     )

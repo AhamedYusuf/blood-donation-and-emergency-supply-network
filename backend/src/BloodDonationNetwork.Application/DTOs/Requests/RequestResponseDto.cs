@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using BloodDonationNetwork.Application.Serialization;
 using BloodDonationNetwork.Domain.Enums;
 
 namespace BloodDonationNetwork.Application.DTOs.Requests;
@@ -10,13 +12,15 @@ public class RequestResponseDto
 
     public Guid OrganizationId { get; set; }
 
+    [JsonConverter(typeof(BloodTypeJsonConverter))]
     public BloodType BloodType { get; set; }
 
     public int UnitsRequested { get; set; }
 
+    [JsonConverter(typeof(RequestUrgencyJsonConverter))]
     public RequestUrgency Urgency { get; set; }
 
-    public BloodRequestStatus Status { get; set; }
+    public string Status { get; set; } = string.Empty;
 
     public string HospitalName { get; set; } = string.Empty;
 
