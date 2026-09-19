@@ -113,14 +113,12 @@ export function DonorProfilePage() {
   const [bloodType, setBloodType] = useState("");
   const [dob, setDob] = useState("");
   const [address, setAddress] = useState("");
-  const [lastDonationDate, setLastDonationDate] = useState("");
   const [medicalFlags, setMedicalFlags] = useState<Record<string, boolean>>(
     Object.fromEntries(Object.keys(MEDICAL_FLAG_LABELS).map((k) => [k, false]))
   );
 
-  const [touched, setTouched] = useState({ bloodType: false, dob: false, address: false, lastDonationDate: false });
+  const [touched, setTouched] = useState({ bloodType: false, dob: false, address: false });
   const [apiError, setApiError] = useState<string | null>(null);
-  const today = new Date().toISOString().split("T")[0];
 
   const [registerDonorProfile, { isLoading }] = useRegisterDonorProfileMutation();
 
@@ -128,17 +126,10 @@ export function DonorProfilePage() {
     bloodType: touched.bloodType ? validateBloodType(bloodType) : "",
     dob: touched.dob ? validateDob(dob) : "",
     address: touched.address && !address.trim() ? "Address is required." : "",
-    lastDonationDate:
-      touched.lastDonationDate && lastDonationDate > today
-        ? "Last donation date cannot be in the future."
-        : "",
   };
 
   const isFormValid =
-    !validateBloodType(bloodType) &&
-    !validateDob(dob) &&
-    !!address.trim() &&
-    (!lastDonationDate || lastDonationDate <= today);
+    !validateBloodType(bloodType) && !validateDob(dob) && !!address.trim();
 
   const handleFlagChange = (key: string, e: ChangeEvent<HTMLInputElement>) => {
     setMedicalFlags((prev) => ({ ...prev, [key]: e.target.checked }));
@@ -153,7 +144,7 @@ export function DonorProfilePage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setTouched({ bloodType: true, dob: true, address: true, lastDonationDate: true });
+    setTouched({ bloodType: true, dob: true, address: true });
     setApiError(null);
 
     if (!isFormValid) return;
@@ -168,7 +159,6 @@ export function DonorProfilePage() {
         bloodType,
         dateOfBirth: dob,
         address: address.trim(),
-        ...(lastDonationDate ? { lastDonationDate } : {}),
         // All flags are stored (true and false) so the engine can evaluate each rule.
         // Only send the map if at least one flag was touched/checked.
         medicalFlags: Object.keys(activeFlags).length > 0 ? activeFlags : undefined,
@@ -262,7 +252,7 @@ export function DonorProfilePage() {
 
         <FormField
           id="donor-address"
-          label="Address"
+          label="Address (optional)"
           type="text"
           autoComplete="street-address"
           value={address}
@@ -271,17 +261,6 @@ export function DonorProfilePage() {
           error={errors.address}
           required
           placeholder="123 Main St, Colombo"
-        />
-
-        <FormField
-          id="donor-last-donation-date"
-          label="Last donation date (optional)"
-          type="date"
-          value={lastDonationDate}
-          max={today}
-          onChange={(e) => setLastDonationDate(e.target.value)}
-          onBlur={() => setTouched((t) => ({ ...t, lastDonationDate: true }))}
-          error={errors.lastDonationDate}
         />
 
         {/* Medical flags section */}

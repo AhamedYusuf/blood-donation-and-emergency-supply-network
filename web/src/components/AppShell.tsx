@@ -30,7 +30,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Requests", icon: "◇", path: "/requests" },
   { label: "Inventory", icon: "▤", path: "/inventory", allowedRoles: ["staff", "admin"] },
   { label: "Organizations", icon: "▦", path: "/organizations", allowedRoles: ["admin"] },
-  { label: "Invite staff", icon: "✉", path: "/staff-invitations", allowedRoles: ["admin"] },
   {
     label: "Donors",
     icon: "◎",

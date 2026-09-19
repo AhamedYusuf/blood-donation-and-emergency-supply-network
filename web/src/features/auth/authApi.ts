@@ -51,17 +51,6 @@ export const authApi = baseApi.injectEndpoints({
       }),
     }),
 
-    registerStaff: builder.mutation<
-      AuthResponse,
-      { token: string; password: string; fullName: string; phoneNumber: string }
-    >({
-      query: (body) => ({
-        url: "/auth/register/staff",
-        method: "POST",
-        body,
-      }),
-    }),
-
     refresh: builder.mutation<AuthResponse, string>({
       query: (refreshToken) => ({
         url: "/auth/refresh",
@@ -72,9 +61,5 @@ export const authApi = baseApi.injectEndpoints({
   }),
 });
 
-export const {
-  useLoginMutation,
-  useRegisterMutation,
-  useRegisterStaffMutation,
-  useRefreshMutation,
-} = authApi;
+export const { useLoginMutation, useRegisterMutation, useRefreshMutation } =
+  authApi;

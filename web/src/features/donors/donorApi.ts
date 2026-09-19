@@ -20,9 +20,7 @@ export interface DonorRegisterRequest {
   bloodType: string;
   /** ISO date string: "YYYY-MM-DD" — serialised from DateOnly on backend */
   dateOfBirth: string;
-  address: string;
-  /** Optional ISO date string for a donation made before registration. */
-  lastDonationDate?: string;
+  address?: string;
   /**
    * Keys MUST be snake_case matching EligibilityRuleEngine.cs TryGetValue calls:
    * recent_illness | recent_surgery | chronic_condition | hiv_positive | hepatitis
