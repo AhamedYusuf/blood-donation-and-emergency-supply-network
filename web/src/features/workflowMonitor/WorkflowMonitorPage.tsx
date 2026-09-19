@@ -284,6 +284,26 @@ export default function WorkflowMonitorPage() {
 
           <div>
             <span className="workflow-label">
+              Objective
+            </span>
+
+            <strong>
+              {workflow.objective || "-"}
+            </strong>
+          </div>
+
+          <div>
+            <span className="workflow-label">
+              Current Agent
+            </span>
+
+            <strong>
+              {workflow.currentAgent || "-"}
+            </strong>
+          </div>
+
+          <div>
+            <span className="workflow-label">
               Status
             </span>
 
@@ -462,6 +482,10 @@ export default function WorkflowMonitorPage() {
                   )}
 
                   <div className="workflow-step-times">
+                    <span>
+                      Retry Count: {step.retryCount}
+                    </span>
+
                     <span>
                       Started:{" "}
                       {formatDate(
