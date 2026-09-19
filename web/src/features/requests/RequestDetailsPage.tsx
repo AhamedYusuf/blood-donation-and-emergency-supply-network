@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   Link,
   useNavigate,
@@ -66,23 +68,26 @@ const getStatusLabel = (
   status: BloodRequestStatus
 ) => {
   switch (status) {
-    case BloodRequestStatus.Pending:
-      return "Pending";
+    case BloodRequestStatus.Open:
+      return "Open";
+
+    case BloodRequestStatus.Matching:
+      return "Matching";
 
     case BloodRequestStatus.AwaitingApproval:
       return "Awaiting Approval";
 
-    case BloodRequestStatus.Approved:
-      return "Approved";
+    case BloodRequestStatus.DonorsNotified:
+      return "Donors Notified";
 
-    case BloodRequestStatus.Dispatched:
-      return "Dispatched";
+    case BloodRequestStatus.PartiallyFulfilled:
+      return "Partially Fulfilled";
 
     case BloodRequestStatus.Fulfilled:
       return "Fulfilled";
 
-    case BloodRequestStatus.Closed:
-      return "Closed";
+    case BloodRequestStatus.Expired:
+      return "Expired";
 
     case BloodRequestStatus.Cancelled:
       return "Cancelled";
@@ -99,6 +104,13 @@ export default function RequestDetailsPage() {
   }>();
 
   const navigate = useNavigate();
+
+  const role = useSelector(
+    (state: RootState) => (state.auth.role ?? "").toLowerCase()
+  );
+
+  const canManageRequests =
+    role === "staff" || role === "admin";
 
 
   const {
@@ -632,6 +644,7 @@ export default function RequestDetailsPage() {
         </div>
 
 
+        {canManageRequests && (
         <aside className="request-actions-card">
 
           <span className="requests-eyebrow">
@@ -667,9 +680,7 @@ export default function RequestDetailsPage() {
                   event.target.value === ""
                     ? null
                     : (
-                        Number(
-                          event.target.value
-                        ) as BloodRequestStatus
+                        event.target.value as BloodRequestStatus
                       )
                 )
               }
@@ -681,10 +692,10 @@ export default function RequestDetailsPage() {
 
               <option
                 value={
-                  BloodRequestStatus.Pending
+                  BloodRequestStatus.Open
                 }
               >
-                Pending
+                Open
               </option>
 
               <option
@@ -697,18 +708,18 @@ export default function RequestDetailsPage() {
 
               <option
                 value={
-                  BloodRequestStatus.Approved
+                  BloodRequestStatus.DonorsNotified
                 }
               >
-                Approved
+                Donors Notified
               </option>
 
               <option
                 value={
-                  BloodRequestStatus.Dispatched
+                  BloodRequestStatus.PartiallyFulfilled
                 }
               >
-                Dispatched
+                Partially Fulfilled
               </option>
 
               <option
@@ -717,6 +728,14 @@ export default function RequestDetailsPage() {
                 }
               >
                 Fulfilled
+              </option>
+
+              <option
+                value={
+                  BloodRequestStatus.Expired
+                }
+              >
+                Expired
               </option>
 
               <option
@@ -791,14 +810,14 @@ export default function RequestDetailsPage() {
             disabled={
               isClosing ||
               request.status ===
-                BloodRequestStatus.Closed
+                BloodRequestStatus.Cancelled
             }
             onClick={
               handleCloseRequest
             }
           >
             {request.status ===
-            BloodRequestStatus.Closed
+            BloodRequestStatus.Cancelled
               ? "Request Closed"
               : isClosing
                 ? "Closing..."
@@ -822,6 +841,7 @@ export default function RequestDetailsPage() {
           </button>
 
         </aside>
+        )}
 
       </section>
 
