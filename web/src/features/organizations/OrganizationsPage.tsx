@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BloodDrops } from "../../components/blood-effects/BloodDrops";
 import {
   useCreateOrganizationMutation,
   useDeleteOrganizationMutation,
   useGetOrganizationsQuery,
+  useGeocodeOrganizationAddressMutation,
   useUpdateOrganizationMutation,
 } from "./organizationsApi";
 import type {
@@ -101,6 +102,9 @@ function OrganizationModal({
   setForm,
   errors,
   isSaving,
+  isGeocoding,
+  locationStatus,
+  onAddressBlur,
   onClose,
   onSubmit,
 }: {
@@ -109,6 +113,9 @@ function OrganizationModal({
   setForm: React.Dispatch<React.SetStateAction<OrganizationFormData>>;
   errors: OrganizationFieldErrors;
   isSaving: boolean;
+  isGeocoding: boolean;
+  locationStatus: string;
+  onAddressBlur: () => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
@@ -119,6 +126,9 @@ function OrganizationModal({
     setForm((current) => ({
       ...current,
       [field]: value,
+      ...(field === "address"
+        ? { latitude: Number.NaN, longitude: Number.NaN }
+        : {}),
     }));
   };
 
@@ -241,6 +251,7 @@ function OrganizationModal({
                 onChange={(event) =>
                   updateField("address", event.target.value)
                 }
+                onBlur={onAddressBlur}
                 placeholder="Enter the complete organization address"
                 aria-invalid={Boolean(errors.address)}
               />
@@ -255,8 +266,20 @@ function OrganizationModal({
               <div>
                 <strong>Location coordinates</strong>
                 <span>
-                  Used for nearby organizations and emergency routing.
+                  Automatically detected from the organization address.
                 </span>
+              </div>
+              <div
+                className={`organization-location-status ${
+                  isGeocoding
+                    ? "organization-location-status--loading"
+                    : locationStatus
+                      ? "organization-location-status--success"
+                      : ""
+                }`}
+              >
+                <span className="organization-location-status__dot" />
+                {isGeocoding ? "Locating..." : locationStatus || "Waiting for address"}
               </div>
             </div>
 
@@ -268,16 +291,10 @@ function OrganizationModal({
                 min="-90"
                 max="90"
                 step="any"
-                className={errors.latitude ? "has-error" : ""}
+                className={`${errors.latitude ? "has-error " : ""}organization-location-readonly`}
                 value={Number.isNaN(form.latitude) ? "" : form.latitude}
-                onChange={(event) =>
-                  updateField(
-                    "latitude",
-                    event.target.value === ""
-                      ? Number.NaN
-                      : Number(event.target.value),
-                  )
-                }
+                placeholder={isGeocoding ? "Detecting..." : "Automatic"}
+                readOnly
                 aria-invalid={Boolean(errors.latitude)}
               />
               {errors.latitude && (
@@ -295,16 +312,10 @@ function OrganizationModal({
                 min="-180"
                 max="180"
                 step="any"
-                className={errors.longitude ? "has-error" : ""}
+                className={`${errors.longitude ? "has-error " : ""}organization-location-readonly`}
                 value={Number.isNaN(form.longitude) ? "" : form.longitude}
-                onChange={(event) =>
-                  updateField(
-                    "longitude",
-                    event.target.value === ""
-                      ? Number.NaN
-                      : Number(event.target.value),
-                  )
-                }
+                placeholder={isGeocoding ? "Detecting..." : "Automatic"}
+                readOnly
                 aria-invalid={Boolean(errors.longitude)}
               />
               {errors.longitude && (
@@ -412,6 +423,9 @@ export function OrganizationsPage() {
   const [createOrganization, createState] =
     useCreateOrganizationMutation();
 
+  const [geocodeOrganizationAddress, geocodeState] =
+    useGeocodeOrganizationAddressMutation();
+
   const [updateOrganization, updateState] =
     useUpdateOrganizationMutation();
 
@@ -435,6 +449,9 @@ export function OrganizationsPage() {
 
   const [actionError, setActionError] = useState("");
   const [formErrors, setFormErrors] = useState<OrganizationFieldErrors>({});
+  const [locationStatus, setLocationStatus] = useState("");
+  const lastGeocodedAddressRef = useRef("");
+  const geocodeRequestIdRef = useRef(0);
 
   const filteredOrganizations = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -470,6 +487,8 @@ export function OrganizationsPage() {
   const openCreateModal = () => {
     setActionError("");
     setFormErrors({});
+    setLocationStatus("");
+    lastGeocodedAddressRef.current = "";
     setForm(EMPTY_FORM);
     setSelectedOrganization(null);
     setModalMode("create");
@@ -478,7 +497,10 @@ export function OrganizationsPage() {
   const openEditModal = (organization: Organization) => {
     setActionError("");
     setFormErrors({});
+    setLocationStatus("Location already stored");
     setSelectedOrganization(organization);
+
+    lastGeocodedAddressRef.current = organization.address.trim();
 
     setForm({
       name: organization.name,
@@ -501,6 +523,83 @@ export function OrganizationsPage() {
     setSelectedOrganization(null);
     setActionError("");
     setFormErrors({});
+    setLocationStatus("");
+  };
+
+  const geocodeAddress = async (address: string) => {
+    const normalizedAddress = address.trim();
+
+    if (normalizedAddress.length < 5) {
+      setLocationStatus("");
+      return null;
+    }
+
+    const requestId = ++geocodeRequestIdRef.current;
+    setActionError("");
+    setLocationStatus("");
+
+    try {
+      const coordinates = await geocodeOrganizationAddress({
+        address: normalizedAddress,
+      }).unwrap();
+
+      if (requestId !== geocodeRequestIdRef.current) {
+        return null;
+      }
+
+      setForm((current) => ({
+        ...current,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      }));
+      lastGeocodedAddressRef.current = normalizedAddress;
+      setLocationStatus("Location detected");
+      return coordinates;
+    } catch (requestError) {
+      if (requestId !== geocodeRequestIdRef.current) {
+        return null;
+      }
+
+      console.error(requestError);
+      setLocationStatus("");
+      setActionError(
+        "We could not detect this address. Please enter a more complete location.",
+      );
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const address = form.address.trim();
+
+    if (address.length < 5) {
+      return;
+    }
+
+    if (address === lastGeocodedAddressRef.current) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void geocodeAddress(address);
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [form.address]);
+
+  const handleAddressBlur = async () => {
+    const address = form.address.trim();
+
+    if (address.length < 5) {
+      setLocationStatus("");
+      return;
+    }
+
+    if (address === lastGeocodedAddressRef.current) {
+      return;
+    }
+
+    await geocodeAddress(address);
   };
 
   const handleSubmit = async (
@@ -509,7 +608,21 @@ export function OrganizationsPage() {
     event.preventDefault();
     setActionError("");
 
-    const errors = validateOrganizationForm(form);
+    let currentForm = form;
+
+    if (Number.isNaN(form.latitude) || Number.isNaN(form.longitude)) {
+      const coordinates = await geocodeAddress(form.address);
+
+      if (coordinates) {
+        currentForm = {
+          ...form,
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+        };
+      }
+    }
+
+    const errors = validateOrganizationForm(currentForm);
     setFormErrors(errors);
 
     if (hasOrganizationErrors(errors)) {
@@ -518,14 +631,24 @@ export function OrganizationsPage() {
 
     try {
       if (modalMode === "create") {
-        await createOrganization(form).unwrap();
+        await createOrganization({
+          name: currentForm.name,
+          type: currentForm.type,
+          address: currentForm.address,
+          phoneNumber: currentForm.phoneNumber,
+        }).unwrap();
       } else if (
         modalMode === "edit" &&
         selectedOrganization
       ) {
         await updateOrganization({
           id: selectedOrganization.id,
-          body: form,
+          body: {
+            name: currentForm.name,
+            type: currentForm.type,
+            address: currentForm.address,
+            phoneNumber: currentForm.phoneNumber,
+          },
         }).unwrap();
       }
 
@@ -906,6 +1029,9 @@ export function OrganizationsPage() {
           isSaving={
             createState.isLoading || updateState.isLoading
           }
+          isGeocoding={geocodeState.isLoading}
+          locationStatus={locationStatus}
+          onAddressBlur={handleAddressBlur}
           onClose={closeModal}
           onSubmit={handleSubmit}
         />
