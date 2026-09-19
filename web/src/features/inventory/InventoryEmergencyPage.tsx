@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   useCheckStockMutation,
   useGetEmergencyRecommendationMutation,
@@ -12,9 +14,6 @@ import type {
   InventoryResponse,
 } from "./inventoryTypes";
 import "./inventoryEmergency.css";
-
-const ORGANIZATION_ID =
-  import.meta.env.VITE_INVENTORY_ORGANIZATION_ID as string;
 
 const BLOOD_TYPES: BloodType[] = [
   "APositive",
@@ -99,22 +98,28 @@ function getRiskLevel(
 }
 
 export function InventoryEmergencyPage() {
+  // Was reading a build-time env var nothing in this repo sets — see
+  // InventoryPage.tsx for the full explanation. Read from the signed-in
+  // user's own organization instead.
+  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+  const skip = !organizationId;
+
   const {
     data: inventory = [],
     isLoading,
     isError,
     refetch,
-  } = useGetInventoryQuery(ORGANIZATION_ID);
+  } = useGetInventoryQuery(organizationId ?? "", { skip });
 
   const { data: lowStock = [] } =
-    useGetLowStockQuery(ORGANIZATION_ID);
+    useGetLowStockQuery(organizationId ?? "", { skip });
 
   const {
     data: stockRisk,
     isFetching: isRiskFetching,
     isError: isRiskError,
     refetch: refetchRisk,
-  } = useGetStockRiskQuery(ORGANIZATION_ID);
+  } = useGetStockRiskQuery(organizationId ?? "", { skip });
 
   const [checkStock, checkStockState] =
     useCheckStockMutation();
@@ -242,7 +247,7 @@ export function InventoryEmergencyPage() {
 
     try {
       const stockResult = await checkStock({
-        organizationId: ORGANIZATION_ID,
+        organizationId: organizationId ?? "",
         bloodType,
         requiredUnits: units,
       }).unwrap();
@@ -270,6 +275,15 @@ export function InventoryEmergencyPage() {
         "We could not complete the emergency stock analysis. Please check your connection and try again."
       );
     }
+  }
+
+  if (!organizationId) {
+    return (
+      <div className="emergency-loading">
+        <h2>No organization linked</h2>
+        <p>Your account isn't linked to an organization, so there's no emergency dashboard to show here.</p>
+      </div>
+    );
   }
 
   if (isLoading) {

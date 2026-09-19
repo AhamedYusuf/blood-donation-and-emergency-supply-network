@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { BloodDrops } from "../../components/blood-effects/BloodDrops";
 import {
   useGetUpcomingByOrganizationQuery,
   useCompleteAppointmentMutation,
@@ -9,6 +10,7 @@ import {
 } from "./appointmentsApi";
 import { StatusBadge, STATUS_CONFIG } from "./StatusBadge";
 import { AgentTag } from "./AgentTag";
+import "./appointments.css";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -90,30 +92,6 @@ function EmptyState({ filter }: { filter: string }) {
   );
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-hairline)",
-        borderRadius: "var(--radius-md)",
-        padding: "var(--space-sm) var(--space-md)",
-      }}
-    >
-      <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
-        {label}
-      </p>
-      <p
-        className="tabular-nums"
-        style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.3px", margin: "2px 0 0", color: accent ?? "var(--color-ink)" }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
 export function AppointmentsConsolePage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Appointment | null>(null);
@@ -121,7 +99,7 @@ export function AppointmentsConsolePage() {
 
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
 
-  const { data, isLoading, error } = useGetUpcomingByOrganizationQuery(
+  const { data, isLoading, error, isFetching, refetch } = useGetUpcomingByOrganizationQuery(
     { orgId: organizationId ?? "", page: 1, pageSize: 50 },
     { skip: !organizationId }
   );
@@ -173,8 +151,9 @@ export function AppointmentsConsolePage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100%", background: "var(--color-canvas)", fontFamily: "var(--font-sans)" }}>
+    <div className="appointments-page" style={{ display: "flex", height: "100%", fontFamily: "var(--font-sans)" }}>
       <div
+        className="appointments-dot-grid"
         style={{
           flex: 1,
           padding: "var(--space-lg)",
@@ -184,49 +163,130 @@ export function AppointmentsConsolePage() {
           overflowY: "auto",
         }}
       >
-        {/* Compact hero band — same gradient family as the Organizations
-            page (organizations.css's blood-900/800/600 stops), scaled down
-            for a working console rather than a landing hero: no floating
-            illustration, just enough to read as the same product. */}
-        <div
-          style={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: "var(--radius-lg)",
-            padding: "var(--space-lg)",
-            marginBottom: "var(--space-md)",
-            background:
-              "radial-gradient(circle at 85% 20%, rgba(211, 38, 79, 0.35), transparent 45%), " +
-              "linear-gradient(135deg, #74102B 0%, #8E1233 45%, #B91F45 100%)",
-          }}
-        >
-          <span
-            className="text-caption"
-            style={{
-              display: "inline-block",
-              color: "rgba(255,255,255,0.72)",
-              letterSpacing: "0.18em",
-              fontWeight: 800,
-              textTransform: "uppercase",
-            }}
-          >
-            Blood Bank Console
-          </span>
-          <h1 className="text-display" style={{ margin: "4px 0 0", color: "#FFFFFF" }}>
-            Upcoming Appointments
-          </h1>
-          <p className="text-body" style={{ color: "rgba(255,255,255,0.78)", margin: "6px 0 0", maxWidth: 480 }}>
-            Track, complete and manage donor appointments at your organization.
-          </p>
+        {/* Hero — deliberately built from the same recipe as the
+            Organizations page hero (see appointments.css): gradient +
+            glow, an orbiting-drop visual, a floating status card, and a
+            wave transition the stat cards float over. The refresh button
+            and "Live queue" indicator are real (refetch()), not
+            decoration — this console has no create action of its own
+            (donors book, staff don't), so it stands in for Organizations'
+            "+ Add Organization" CTA. */}
+        <section className="appointments-hero">
+          <BloodDrops count={8} intensity="subtle" />
+          <div className="appointments-hero__glow" />
+
+          <div className="appointments-hero__content">
+            <div className="appointments-hero__copy">
+              <span className="appointments-eyebrow">BLOOD BANK CONSOLE</span>
+              <h1>
+                Every appointment.
+                <br />
+                <span>One life closer to saved.</span>
+              </h1>
+              <p>
+                Track, complete and manage donor appointments at your
+                organization — from first booking to the moment blood
+                reaches someone who needs it.
+              </p>
+              <div className="appointments-hero__actions">
+                <button type="button" onClick={() => refetch()} disabled={isFetching}>
+                  {isFetching ? "Refreshing…" : "↻ Refresh queue"}
+                </button>
+                <div className="appointments-hero__live">
+                  <span className="appointments-live-dot" />
+                  Live queue data
+                </div>
+              </div>
+            </div>
+
+            <div className="appointments-hero__visual">
+              <div className="hero-blood-orbit hero-blood-orbit--one" />
+              <div className="hero-blood-orbit hero-blood-orbit--two" />
+              <div className="hero-blood-drop" />
+              <div className="appointments-hero__queue-card">
+                <span>DUE NEXT 24H</span>
+                <strong>{next24h}</strong>
+                <small>{next24h === 1 ? "appointment" : "appointments"}</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="appointments-hero__wave">
+            <div />
+            <div />
+          </div>
+        </section>
+
+        {/* Stats strip — real computed numbers, not decoration. Wrapped
+            with a bounded, quiet drop layer (never behind the table
+            below, where movement would fight legibility) so the page's
+            texture doesn't stop dead the moment the hero ends. */}
+        <div className="appointments-stat-grid-wrap">
+          <BloodDrops count={5} intensity="subtle" />
+          <div className="appointments-stat-grid">
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-urgent)" }}>◷</div>
+              <div>
+                <span>Due next 24h</span>
+                <strong>{next24h}</strong>
+              </div>
+            </div>
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-agent)" }}>✦</div>
+              <div>
+                <span>Agent-matched</span>
+                <strong>{agentCount}</strong>
+              </div>
+            </div>
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-success)" }}>✓</div>
+              <div>
+                <span>Completion rate</span>
+                <strong>{completionRate}%</strong>
+              </div>
+            </div>
+            <div className="appointments-stat-card">
+              <div className="appointments-stat-card__icon" style={{ color: "var(--color-primary)" }}>Σ</div>
+              <div>
+                <span>Total</span>
+                <strong>{data?.totalCount ?? 0}</strong>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Stats strip — real computed numbers, not decoration */}
-        <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
-          <StatCard label="DUE NEXT 24H" value={next24h} accent="var(--color-urgent)" />
-          <StatCard label="AGENT-MATCHED" value={agentCount} accent="var(--color-agent)" />
-          <StatCard label="COMPLETION RATE" value={`${completionRate}%`} accent="var(--color-success)" />
-          <StatCard label="TOTAL" value={data?.totalCount ?? 0} />
+        <div style={{ height: "var(--space-lg)" }} />
+
+        <div className="appointments-section-header">
+          <div>
+            <span className="appointments-section-eyebrow">DONOR QUEUE</span>
+            <h2>Today's appointments</h2>
+            <p>Filter, complete and manage bookings at your organization.</p>
+          </div>
+          <div className="appointments-count-badge">
+            {appointments.length} appointment{appointments.length === 1 ? "" : "s"}
+          </div>
         </div>
+
+        {/* Queue-mix bar — real proportions, not a fixed decorative
+            fill: width comes straight from `counts`, the same numbers
+            the filter pills below show. */}
+        {appointments.length > 0 && (
+          <>
+            <div className="appointments-mix-bar">
+              <span style={{ width: `${(counts.scheduled / appointments.length) * 100}%`, background: "var(--color-urgent)" }} />
+              <span style={{ width: `${(counts.completed / appointments.length) * 100}%`, background: "var(--color-success)" }} />
+              <span style={{ width: `${(counts.no_show / appointments.length) * 100}%`, background: "var(--color-critical)" }} />
+              <span style={{ width: `${(counts.cancelled / appointments.length) * 100}%`, background: "var(--color-ink-faint)" }} />
+            </div>
+            <div className="appointments-mix-legend">
+              <div><i style={{ background: "var(--color-urgent)" }} />Scheduled {counts.scheduled}</div>
+              <div><i style={{ background: "var(--color-success)" }} />Completed {counts.completed}</div>
+              <div><i style={{ background: "var(--color-critical)" }} />No-show {counts.no_show}</div>
+              <div><i style={{ background: "var(--color-ink-faint)" }} />Cancelled {counts.cancelled}</div>
+            </div>
+          </>
+        )}
 
         <div
           style={{
@@ -349,17 +409,8 @@ export function AppointmentsConsolePage() {
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         {appt.donorBloodType ? (
-                          <span
-                            className="text-body-sm"
-                            style={{
-                              fontWeight: 500,
-                              padding: "2px 6px",
-                              borderRadius: "var(--radius-xs)",
-                              background: "var(--color-surface-sunken)",
-                              color: "var(--color-ink)",
-                            }}
-                          >
-                            {appt.donorBloodType}
+                          <span className="text-body-sm appointments-blood-chip">
+                            🩸 {appt.donorBloodType}
                           </span>
                         ) : (
                           <span className="text-body-sm" style={{ color: "var(--color-ink-faint)" }}>
@@ -387,6 +438,66 @@ export function AppointmentsConsolePage() {
             </table>
           )}
         </div>
+
+        {/* Matching & Dispatch Agent — this screen's own equivalent of
+            Inventory's "AI Inventory Intelligence" section, scoped
+            honestly to what this agent actually has: one agent, two
+            modes, and Mode 2 genuinely isn't live yet. */}
+        <section className="appointments-ai-section">
+          <div className="appointments-ai-heading">
+            <div>
+              <span className="appointments-section-eyebrow" style={{ color: "var(--color-agent)" }}>
+                MATCHING &amp; DISPATCH AGENT
+              </span>
+              <h2>What's finding your donors</h2>
+              <p>
+                Every appointment tagged "Agent" above was booked through this
+                agent's donor-ranking search rather than a walk-in booking.
+              </p>
+            </div>
+            <div className="appointments-ai-badge">
+              <i />
+              {agentCount} matched
+            </div>
+          </div>
+
+          <div className="appointments-ai-grid">
+            <div className="appointments-ai-card">
+              <div className="appointments-ai-card__top">
+                <div className="appointments-ai-icon">⌕</div>
+                <span className="appointments-ai-status appointments-ai-status--ready">READY</span>
+              </div>
+              <div>
+                <span className="appointments-ai-kicker">MODE 01</span>
+                <h3>Donor Search &amp; Ranking</h3>
+                <p>
+                  Ranks nearby, verified donors by proximity, urgency and
+                  reliability score whenever a workflow requests candidates.
+                </p>
+              </div>
+            </div>
+
+            <div className="appointments-ai-card appointments-ai-card--pending">
+              <div className="appointments-ai-card__top">
+                <div className="appointments-ai-icon appointments-ai-icon--pending">⇢</div>
+                <span className="appointments-ai-status appointments-ai-status--pending">PENDING</span>
+              </div>
+              <div>
+                <span className="appointments-ai-kicker" style={{ color: "var(--color-ink-muted)" }}>MODE 02</span>
+                <h3>Notify &amp; Dispatch</h3>
+                <p>
+                  Sends push alerts and creates appointment invites once a
+                  workflow is approved — waiting on the shared workflow/
+                  approval tables before this can go live.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="appointments-ai-note">
+            Ranking weights: 50% proximity, 20% urgency, 30% donor reliability.
+          </div>
+        </section>
       </div>
 
       {selected && (
