@@ -34,6 +34,7 @@ public class DonorService : IDonorService
             BloodType = request.BloodType,
             DateOfBirth = request.DateOfBirth,
             Address = request.Address,
+            LastDonationDate = request.LastDonationDate,
             MedicalFlags = request.MedicalFlags ?? new()
         };
 

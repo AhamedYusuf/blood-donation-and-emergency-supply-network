@@ -73,7 +73,7 @@ public class DonorsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/verify")]
-    [Authorize(Roles = "staff,admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Verify(Guid id, CancellationToken ct)
     {
         await _donorService.VerifyAsync(id, ct);
