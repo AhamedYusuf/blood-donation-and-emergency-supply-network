@@ -458,6 +458,31 @@
   opacity: 0.6;
 }
 
+/* Admin-only org picker — same glass-chip treatment as the refresh
+   button next to it, since an admin isn't tied to one org and needs a
+   way to choose which blood bank's queue they're looking at. */
+.appointments-org-picker {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm);
+  padding: 10px 32px 10px 16px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='white'%3E%3Cpath d='M5.5 7.5L10 12l4.5-4.5' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+
+.appointments-org-picker option {
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+
 .appointments-hero__live {
   display: flex;
   align-items: center;
