@@ -241,6 +241,14 @@ export function App() {
 
         {/* =================================================
             ORGANIZATION MODULE
+
+            Admin only, not staff+admin: this is create/edit/delete-
+            an-organization, an admin action per the workflow ("Admin
+            creates the blood bank/hospital organization"). The
+            backend's OrganizationsController only allows admin past
+            [Authorize(Roles = "admin")] on every write endpoint, so
+            staff landing here would just see a "+ Add Organization"
+            button and edit/delete controls that 403 on click.
            ================================================= */}
 
         <Route
@@ -261,6 +269,14 @@ export function App() {
 
         {/* =================================================
             INVENTORY MODULE
+
+            Staff + Admin, per the workflow: "Staff create/manage
+            blood requests and inventory for their organization."
+            All four of these routes (this one and Organizations
+            above) were missing AppShell entirely until now — there
+            was no nav rail on any of them, so landing here left no
+            way back to Appointments except the browser's back
+            button.
            ================================================= */}
 
         <Route
@@ -311,6 +327,16 @@ export function App() {
 
         {/* =================================================
             BLOOD REQUEST MODULE
+
+            For now, authenticated users can access these
+            routes while we finish and test the request
+            workflow. Exact role restrictions can be added
+            later when the workflow roles are finalized.
+
+            Wrapped in AppShell like every other module —
+            these three were the only routes still missing it
+            after the Inventory/Organizations fix, and would
+            have left users stranded here the same way.
            ================================================= */}
 
         <Route
