@@ -9,6 +9,7 @@ assert the node surfaces the backend's rejection rather than swallowing it.
 import pytest
 
 from agents.matching_dispatch_agent import (
+    DEFAULT_RADIUS_KM,
     DISPATCH_PATH,
     SEARCH_PATH,
     dispatch,
@@ -45,13 +46,36 @@ def valid_search_payload(**overrides):
 
 # --------------------------------------------------------------------- search
 
-def test_search_forwards_payload_to_the_search_endpoint():
+def test_search_forwards_payload_matching_the_backend_dto_shape():
+    # SearchDonorsRequestDto (Tech Doc §4.4 Mode 1) takes a nested
+    # location object and unitsNeeded — this forwards the payload as-is,
+    # only defaulting radiusKm.
     client = FakeClient(response={"candidates": [{"donorId": "d1", "rank": 1}]})
 
     result = search(valid_search_payload(), client=client)
 
     assert result == {"candidates": [{"donorId": "d1", "rank": 1}]}
-    assert client.calls == [(SEARCH_PATH, valid_search_payload())]
+    assert client.calls == [(
+        SEARCH_PATH,
+        {
+            "workflowId": "wf-1",
+            "bloodType": "O-",
+            "unitsNeeded": 2,
+            "location": {"lat": 6.9271, "lng": 79.8612},
+            "urgencyLevel": "critical",
+            "radiusKm": 15,
+        },
+    )]
+
+
+def test_search_uses_default_radius_when_not_specified():
+    client = FakeClient(response={"candidates": []})
+    payload = valid_search_payload()
+    del payload["radiusKm"]
+
+    search(payload, client=client)
+
+    assert client.calls[0][1]["radiusKm"] == DEFAULT_RADIUS_KM
 
 
 @pytest.mark.parametrize("missing", ["workflowId", "bloodType", "unitsNeeded", "location", "urgencyLevel"])

@@ -21,6 +21,13 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     public DbSet<BloodRequest> BloodRequests => Set<BloodRequest>();
 
+    // Student 2 - Agent workflow tracking
+    public DbSet<AgentWorkflow> AgentWorkflows => Set<AgentWorkflow>();
+
+    public DbSet<AgentStep> AgentSteps => Set<AgentStep>();
+
+    public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
+
     public DbSet<BloodBankInventory> BloodBankInventories => Set<BloodBankInventory>();
 
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
@@ -29,23 +36,9 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     public DbSet<StaffInvitation> StaffInvitations => Set<StaffInvitation>();
 
-    public DbSet<AgentStep> AgentSteps => Set<AgentStep>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
-
-        modelBuilder.Entity<AgentStep>(entity =>
-        {
-            entity.ToTable("agent_steps");
-            entity.HasKey(step => step.Id);
-            entity.Property(step => step.AgentName).IsRequired();
-            entity.Property(step => step.InputData).IsRequired();
-            entity.Property(step => step.Status).IsRequired();
-            entity.Property(step => step.StartedAt).IsRequired();
-            entity.Property(step => step.RetryCount).IsRequired();
-            entity.HasIndex(step => step.WorkflowId);
-        });
 
         base.OnModelCreating(modelBuilder);
 
@@ -63,11 +56,85 @@ public class AppDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(a => a.DonorId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // RelatedWorkflowId was the other plain, unconstrained Guid column
+        // on DonationAppointment — nullable because a donor can book
+        // directly, not just via a dispatched workflow, and because
+        // AgentWorkflow didn't exist yet at the time. It does now. SetNull
+        // (not Cascade) because deleting the workflow's audit record
+        // shouldn't delete a donor's real, already-booked appointment.
+        modelBuilder.Entity<DonationAppointment>()
+            .HasOne<AgentWorkflow>()
+            .WithMany()
+            .HasForeignKey(a => a.RelatedWorkflowId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<DonorDevice>()
             .HasOne<User>()
             .WithMany()
             .HasForeignKey(d => d.DonorUserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Student 2 - AgentWorkflow configuration
+        modelBuilder.Entity<AgentWorkflow>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.BloodRequest)
+                .WithMany()
+                .HasForeignKey(x => x.BloodRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.Status)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(x => x.FailureReason)
+                .HasMaxLength(1000);
+        });
+
+        // Student 2 - AgentStep configuration
+        modelBuilder.Entity<AgentStep>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Workflow)
+                .WithMany(x => x.Steps)
+                .HasForeignKey(x => x.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.AgentName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.StepName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Status)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(x => x.ErrorMessage)
+                .HasMaxLength(1000);
+        });
+
+        // Student 2 - ApprovalDecision configuration
+        modelBuilder.Entity<ApprovalDecision>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Workflow)
+                .WithMany(x => x.ApprovalDecisions)
+                .HasForeignKey(x => x.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.Decision)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(x => x.Comments)
+                .HasMaxLength(1000);
+        });
 
         modelBuilder.Entity<BloodBankInventory>(entity =>
         {

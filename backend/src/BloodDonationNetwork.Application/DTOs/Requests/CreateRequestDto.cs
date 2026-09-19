@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using BloodDonationNetwork.Domain.Enums;
 
 namespace BloodDonationNetwork.Application.DTOs.Requests;
 
-public class CreateRequestDto
+public class CreateRequestDto : IValidatableObject
 {
     // RequesterId is intentionally not here — the requester is always the
     // authenticated caller (RequestsController derives it from the JWT).
@@ -33,4 +34,19 @@ public class CreateRequestDto
 
     [MaxLength(1000)]
     public string Notes { get; set; } = string.Empty;
+
+    public IEnumerable<ValidationResult> Validate(
+        ValidationContext validationContext)
+    {
+        if (Latitude == 0 && Longitude == 0)
+        {
+            yield return new ValidationResult(
+                "Hospital location must be provided.",
+                new[]
+                {
+                    nameof(Latitude),
+                    nameof(Longitude)
+                });
+        }
+    }
 }

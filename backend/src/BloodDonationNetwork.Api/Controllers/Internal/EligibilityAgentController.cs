@@ -1,7 +1,9 @@
 using System.Text.Json;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
+using BloodDonationNetwork.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BloodDonationNetwork.Api.Controllers.Internal;
 
@@ -22,16 +24,7 @@ public class EligibilityAgentController : ControllerBase
     public async Task<ActionResult<ValidateEligibilityResponse>> ValidateEligibility(
         ValidateEligibilityRequest request, CancellationToken ct)
     {
-        var step = new AgentStep
-        {
-            WorkflowId = request.WorkflowId,
-            AgentName = "eligibility_validation_agent",
-            InputData = JsonSerializer.Serialize(request),
-            Status = "running",
-            StartedAt = DateTime.UtcNow
-        };
-        _db.AgentSteps.Add(step);
-        await _db.SaveChangesAsync(ct);
+        var startedAt = DateTime.UtcNow;
 
         try
         {
@@ -53,22 +46,70 @@ public class EligibilityAgentController : ControllerBase
             }
 
             var response = new ValidateEligibilityResponse(eligible, excluded);
-            step.OutputData = JsonSerializer.Serialize(response);
-            step.Status = "completed";
-            step.CompletedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(ct);
+
+            await LogStepAsync(
+                request.WorkflowId,
+                status: "completed",
+                inputJson: JsonSerializer.Serialize(request),
+                outputJson: JsonSerializer.Serialize(response),
+                startedAt: startedAt,
+                errorMessage: null,
+                ct: ct);
 
             return Ok(response);
         }
         catch (Exception ex)
         {
-            step.Status = "failed";
-            step.ErrorMessage = ex.Message;
-            step.RetryCount += 1;
-            step.CompletedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(CancellationToken.None);
+            await LogStepAsync(
+                request.WorkflowId,
+                status: "failed",
+                inputJson: JsonSerializer.Serialize(request),
+                outputJson: null,
+                startedAt: startedAt,
+                errorMessage: ex.Message,
+                ct: CancellationToken.None);
             throw;
         }
+    }
+
+    // Tech Doc §0.7 — every agent action writes a row to the shared
+    // agent_steps table. Best-effort: if WorkflowId doesn't match a real
+    // AgentWorkflow (an ad-hoc/manual call not part of a tracked
+    // workflow run), this silently skips rather than failing the
+    // caller's actual eligibility check — logging is observability, not
+    // a correctness dependency for validation itself.
+    private async Task LogStepAsync(
+        Guid workflowId,
+        string status,
+        string? inputJson,
+        string? outputJson,
+        DateTime startedAt,
+        string? errorMessage,
+        CancellationToken ct)
+    {
+        var workflowExists = await _db.AgentWorkflows
+            .AnyAsync(w => w.Id == workflowId, ct);
+
+        if (!workflowExists)
+        {
+            return;
+        }
+
+        _db.AgentSteps.Add(new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflowId,
+            AgentName = AgentNames.EligibilityValidation,
+            StepName = "validate_eligibility",
+            Status = status,
+            InputJson = inputJson,
+            OutputJson = outputJson,
+            StartedAt = startedAt,
+            CompletedAt = DateTime.UtcNow,
+            ErrorMessage = errorMessage,
+        });
+
+        await _db.SaveChangesAsync(ct);
     }
 }
 

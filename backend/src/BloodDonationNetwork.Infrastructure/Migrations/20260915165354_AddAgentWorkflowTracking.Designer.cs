@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BloodDonationNetwork.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260915165354_AddAgentWorkflowTracking")]
+    partial class AddAgentWorkflowTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -262,8 +265,6 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.HasIndex("DonorId");
 
                     b.HasIndex("OrganizationId");
-
-                    b.HasIndex("RelatedWorkflowId");
 
                     b.ToTable("DonationAppointments");
                 });
@@ -601,11 +602,6 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("BloodDonationNetwork.Domain.Entities.AgentWorkflow", null)
-                        .WithMany()
-                        .HasForeignKey("RelatedWorkflowId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Organization");
                 });

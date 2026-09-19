@@ -24,6 +24,12 @@ from shared.internal_client import InternalClient, InternalClientError
 SEARCH_PATH = "/api/internal/agent/search-donors"
 DISPATCH_PATH = "/api/internal/agent/dispatch"
 
+# Used when the caller's payload doesn't specify one. Matches the cap
+# DonorRankingCalculator's proximity scoring already assumes server-side
+# (anything beyond 50km scores 0 proximity), so a wider radius here would
+# only ever return candidates that get filtered to the bottom anyway.
+DEFAULT_RADIUS_KM = 50
+
 _SEARCH_REQUIRED = ("workflowId", "bloodType", "unitsNeeded", "location", "urgencyLevel")
 _DISPATCH_REQUIRED = ("workflowId", "eligible")
 
@@ -35,7 +41,12 @@ def search(
 
     ``payload`` must contain ``workflowId``, ``bloodType``, ``unitsNeeded``
     (positive int), ``location`` (``{"lat": float, "lng": float}``) and
-    ``urgencyLevel``. ``radiusKm`` is optional and passed through.
+    ``urgencyLevel``. ``radiusKm`` is optional (defaults to
+    :data:`DEFAULT_RADIUS_KM`).
+
+    Wire shape matches Tech Doc §4.4 Mode 1 exactly — nested ``location``,
+    not flat ``latitude``/``longitude`` — so this forwards the payload
+    with only ``radiusKm`` defaulted in, rather than reshaping it.
     """
     _require_fields(payload, _SEARCH_REQUIRED)
     _require_positive_int(payload, "unitsNeeded")
@@ -45,7 +56,15 @@ def search(
         raise ValueError("'location' must be an object with 'lat' and 'lng'")
 
     client = client or InternalClient()
-    result = client.post(SEARCH_PATH, payload)
+    outbound = {
+        "workflowId": payload["workflowId"],
+        "bloodType": payload["bloodType"],
+        "unitsNeeded": payload["unitsNeeded"],
+        "location": {"lat": location["lat"], "lng": location["lng"]},
+        "urgencyLevel": payload["urgencyLevel"],
+        "radiusKm": payload.get("radiusKm", DEFAULT_RADIUS_KM),
+    }
+    result = client.post(SEARCH_PATH, outbound)
 
     if not isinstance(result, dict) or "candidates" not in result:
         raise InternalClientError(
