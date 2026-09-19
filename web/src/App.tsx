@@ -19,6 +19,8 @@ import { AppointmentsConsolePage } from "./features/appointments/AppointmentsCon
 import { AppShell } from "./components/AppShell";
 
 import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
+import { StaffInvitationsPage } from "./features/staff-invitations/StaffInvitationsPage";
+import { AcceptInvitationPage } from "./features/staff-invitations/AcceptInvitationPage";
 
 import { InventoryPage } from "./features/inventory/InventoryPage";
 import { InventoryManagePage } from "./features/inventory/InventoryManagePage";
@@ -150,6 +152,8 @@ export function App() {
           }
         />
 
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+
         {/* =================================================
             DONOR PROFILE REGISTRATION
            ================================================= */}
@@ -231,6 +235,19 @@ export function App() {
               <RequireRole roles={["admin"]}>
                 <AppShell>
                   <OrganizationsPage />
+                </AppShell>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/staff-invitations"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["admin"]}>
+                <AppShell>
+                  <StaffInvitationsPage />
                 </AppShell>
               </RequireRole>
             </RequireAuth>
