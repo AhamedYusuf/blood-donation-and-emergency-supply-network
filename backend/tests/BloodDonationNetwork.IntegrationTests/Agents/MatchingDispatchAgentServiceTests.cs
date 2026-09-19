@@ -121,11 +121,10 @@ public sealed class MatchingDispatchAgentServiceTests : IDisposable
             Eligible = new List<DispatchCandidateDto> { new() { DonorId = DonorProfileId } },
         });
 
-        Assert.Equal(1, result.AppointmentsCreated);
-        Assert.Equal(1, result.NotificationsDelivered);
-        Assert.Single(result.Results);
-        Assert.Null(result.Results[0].FailureReason);
-        Assert.True(result.Results[0].AppointmentId.HasValue);
+        Assert.Single(result.AppointmentsCreated);
+        Assert.Single(result.NotifiedDonorIds);
+        Assert.Empty(result.FailedNotifications);
+        Assert.Contains(DonorProfileId, result.NotifiedDonorIds);
 
         await using var verify = new TestAppDbContext(_options);
         var appointment = await verify.DonationAppointments.SingleAsync(a => a.RelatedWorkflowId == workflowId);
@@ -195,8 +194,8 @@ public sealed class MatchingDispatchAgentServiceTests : IDisposable
         {
             WorkflowId = workflowId,
             BloodType = "O+",
-            Latitude = 6.93,
-            Longitude = 79.86,
+            UnitsNeeded = 1,
+            Location = new LocationDto { Lat = 6.93, Lng = 79.86 },
             RadiusKm = 50,
             UrgencyLevel = "critical",
         });
@@ -221,8 +220,8 @@ public sealed class MatchingDispatchAgentServiceTests : IDisposable
         {
             WorkflowId = Guid.NewGuid(),
             BloodType = "O+",
-            Latitude = 6.93,
-            Longitude = 79.86,
+            UnitsNeeded = 1,
+            Location = new LocationDto { Lat = 6.93, Lng = 79.86 },
             RadiusKm = 50,
             UrgencyLevel = "critical",
         });
