@@ -270,6 +270,27 @@ export function LoginPage() {
             Register
           </Link>
         </p>
+
+        <p
+          className="text-body-sm"
+          style={{
+            margin: 0,
+            textAlign: "center",
+            color: "var(--color-ink-muted)",
+          }}
+        >
+          Have a staff invitation?{" "}
+          <Link
+            to="/accept-invitation"
+            style={{
+              color: "var(--color-primary)",
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
+          >
+            Accept it here
+          </Link>
+        </p>
       </form>
 
       <style>

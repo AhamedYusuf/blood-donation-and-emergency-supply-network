@@ -1,7 +1,6 @@
 import type { CreateRequestDto } from "./requestTypes";
 
 export interface RequestValidationErrors {
-  requesterId?: string;
   organizationId?: string;
   bloodType?: string;
   unitsRequested?: string;
@@ -17,9 +16,6 @@ export const validateCreateRequest = (
 ): RequestValidationErrors => {
   const errors: RequestValidationErrors = {};
 
-  if (!values.requesterId.trim()) {
-    errors.requesterId = "Requester is required.";
-  }
 
   if (!values.organizationId.trim()) {
     errors.organizationId = "Organization is required.";

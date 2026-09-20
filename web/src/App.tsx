@@ -27,8 +27,11 @@ import { InventoryEmergencyPage } from "./features/inventory/InventoryEmergencyP
 import RequestsPage from "./features/requests/RequestsPage";
 import CreateRequestPage from "./features/requests/CreateRequestPage";
 import RequestDetailsPage from "./features/requests/RequestDetailsPage";
+import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage";
 import { StaffInvitationsPage } from "./features/staff-invitations/StaffInvitationsPage";
 import { AcceptInvitationPage } from "./features/staff-invitations/AcceptInvitationPage";
+
+import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage";
 
 // =====================================================
 // AUTH GUARDS
@@ -336,11 +339,11 @@ export function App() {
           path="/requests/create"
           element={
             <RequireAuth>
-              <RequireDonorProfile>
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <CreateRequestPage />
                 </AppShell>
-              </RequireDonorProfile>
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -354,6 +357,37 @@ export function App() {
                   <RequestDetailsPage />
                 </AppShell>
               </RequireDonorProfile>
+            </RequireAuth>
+          }
+        />
+
+
+        <Route
+          path="/workflows/:id"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["staff", "admin"]}>
+                <AppShell>
+                  <WorkflowMonitorPage />
+                </AppShell>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
+        {/* =================================================
+            AGENT WORKFLOW MONITOR
+           ================================================= */}
+
+        <Route
+          path="/workflows/:id"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["staff", "admin"]}>
+                <AppShell>
+                  <WorkflowMonitorPage />
+                </AppShell>
+              </RequireRole>
             </RequireAuth>
           }
         />

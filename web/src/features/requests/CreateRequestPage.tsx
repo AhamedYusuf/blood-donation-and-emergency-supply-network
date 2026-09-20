@@ -74,7 +74,6 @@ export default function CreateRequestPage() {
   ] = useCreateRequestMutation();
 
   const [form, setForm] = useState<CreateRequestDto>({
-    requesterId: userId ?? "",
     organizationId: userOrganizationId ?? "",
     bloodType: BloodType.APositive,
     unitsRequested: 1,
@@ -94,7 +93,6 @@ export default function CreateRequestPage() {
   useEffect(() => {
     setForm((current) => ({
       ...current,
-      requesterId: userId ?? current.requesterId,
       organizationId:
         userOrganizationId ?? current.organizationId,
     }));
@@ -131,7 +129,6 @@ export default function CreateRequestPage() {
 
     const payload: CreateRequestDto = {
       ...form,
-      requesterId: userId,
       hospitalName: form.hospitalName.trim(),
       notes: form.notes.trim(),
     };
@@ -285,7 +282,7 @@ export default function CreateRequestPage() {
                 onChange={(event) =>
                   updateField(
                     "bloodType",
-                    Number(event.target.value) as BloodType
+                    event.target.value as BloodType
                   )
                 }
               >
@@ -337,9 +334,7 @@ export default function CreateRequestPage() {
                 onChange={(event) =>
                   updateField(
                     "urgency",
-                    Number(
-                      event.target.value
-                    ) as RequestUrgency
+                    event.target.value as RequestUrgency
                   )
                 }
               >
