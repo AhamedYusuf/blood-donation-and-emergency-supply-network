@@ -361,6 +361,23 @@ export function App() {
         />
 
         {/* =================================================
+            AGENT WORKFLOW MONITOR
+           ================================================= */}
+
+        <Route
+          path="/workflows/:id"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["staff", "admin"]}>
+                <AppShell>
+                  <WorkflowMonitorPage />
+                </AppShell>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
+        {/* =================================================
             CATCH ALL
            ================================================= */}
 
