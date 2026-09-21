@@ -6,62 +6,67 @@ namespace BloodDonationNetwork.Infrastructure.Persistence;
 
 public class AppDbContext : DbContext, IApplicationDbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options)
+    public AppDbContext(
+        DbContextOptions<AppDbContext> options)
         : base(options)
     {
     }
 
-    public DbSet<DonorProfile> DonorProfiles => Set<DonorProfile>();
+    public DbSet<DonorProfile> DonorProfiles =>
+        Set<DonorProfile>();
 
-    public DbSet<Organization> Organizations => Set<Organization>();
+    public DbSet<Organization> Organizations =>
+        Set<Organization>();
 
-    public DbSet<User> Users => Set<User>();
+    public DbSet<User> Users =>
+        Set<User>();
 
-    public DbSet<DonationAppointment> DonationAppointments => Set<DonationAppointment>();
+    public DbSet<DonationAppointment> DonationAppointments =>
+        Set<DonationAppointment>();
 
-    public DbSet<BloodRequest> BloodRequests => Set<BloodRequest>();
+    public DbSet<BloodRequest> BloodRequests =>
+        Set<BloodRequest>();
 
     // Student 2 - Agent workflow tracking
-    public DbSet<AgentWorkflow> AgentWorkflows => Set<AgentWorkflow>();
+    public DbSet<AgentWorkflow> AgentWorkflows =>
+        Set<AgentWorkflow>();
 
-    public DbSet<AgentStep> AgentSteps => Set<AgentStep>();
+    public DbSet<AgentStep> AgentSteps =>
+        Set<AgentStep>();
 
-    public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
+    public DbSet<ApprovalDecision> ApprovalDecisions =>
+        Set<ApprovalDecision>();
 
-    public DbSet<BloodBankInventory> BloodBankInventories => Set<BloodBankInventory>();
+    public DbSet<BloodBankInventory> BloodBankInventories =>
+        Set<BloodBankInventory>();
 
-    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<InventoryTransaction> InventoryTransactions =>
+        Set<InventoryTransaction>();
 
-    public DbSet<DonorDevice> DonorDevices => Set<DonorDevice>();
+    public DbSet<DonorDevice> DonorDevices =>
+        Set<DonorDevice>();
 
-    public DbSet<StaffInvitation> StaffInvitations => Set<StaffInvitation>();
+    public DbSet<StaffInvitation> StaffInvitations =>
+        Set<StaffInvitation>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(AppDbContext).Assembly);
 
         base.OnModelCreating(modelBuilder);
 
-        // DonationAppointments.DonorId and DonorDevices.DonorUserId store a
-        // User.Id (not a DonorProfile.Id — easy to misread given the
-        // "Donor" naming; see the comments on those entities). Both were
-        // plain, unconstrained Guid columns because DonorProfiles didn't
-        // exist yet when DonationAppointments was first migrated. It does
-        // now — add the real FK constraints (shadow FK: no CLR navigation
-        // property, so nothing that constructs these entities needs to
-        // change).
+        // DonationAppointments.DonorId and
+        // DonorDevices.DonorUserId store User.Id.
         modelBuilder.Entity<DonationAppointment>()
             .HasOne<User>()
             .WithMany()
             .HasForeignKey(a => a.DonorId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // RelatedWorkflowId was the other plain, unconstrained Guid column
-        // on DonationAppointment — nullable because a donor can book
-        // directly, not just via a dispatched workflow, and because
-        // AgentWorkflow didn't exist yet at the time. It does now. SetNull
-        // (not Cascade) because deleting the workflow's audit record
-        // shouldn't delete a donor's real, already-booked appointment.
+        // RelatedWorkflowId is nullable because an appointment
+        // can exist without being created by an agent workflow.
         modelBuilder.Entity<DonationAppointment>()
             .HasOne<AgentWorkflow>()
             .WithMany()
@@ -74,7 +79,10 @@ public class AppDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(d => d.DonorUserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Student 2 - AgentWorkflow configuration
+        // =====================================================
+        // STUDENT 2 - AGENT WORKFLOW
+        // =====================================================
+
         modelBuilder.Entity<AgentWorkflow>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -88,11 +96,20 @@ public class AppDbContext : DbContext, IApplicationDbContext
                 .IsRequired()
                 .HasMaxLength(50);
 
+            entity.Property(x => x.Objective)
+                .IsRequired();
+
+            entity.Property(x => x.CurrentAgent)
+                .HasMaxLength(100);
+
             entity.Property(x => x.FailureReason)
                 .HasMaxLength(1000);
         });
 
-        // Student 2 - AgentStep configuration
+        // =====================================================
+        // STUDENT 2 - AGENT STEP
+        // =====================================================
+
         modelBuilder.Entity<AgentStep>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -114,11 +131,39 @@ public class AppDbContext : DbContext, IApplicationDbContext
                 .IsRequired()
                 .HasMaxLength(50);
 
+            /*
+             * Keep the existing C# property names:
+             *
+             * InputJson
+             * OutputJson
+             * RetryCount
+             *
+             * Other parts of the project already depend on these
+             * property names.
+             *
+             * Only map their DATABASE column names to the names
+             * required by the technical specification.
+             */
+
+            entity.Property(x => x.InputJson)
+                .HasColumnName("input_data");
+
+            entity.Property(x => x.OutputJson)
+                .HasColumnName("output_data");
+
+            entity.Property(x => x.RetryCount)
+                .HasColumnName("retry_count")
+                .IsRequired()
+                .HasDefaultValue(0);
+
             entity.Property(x => x.ErrorMessage)
                 .HasMaxLength(1000);
         });
 
-        // Student 2 - ApprovalDecision configuration
+        // =====================================================
+        // STUDENT 2 - APPROVAL DECISION
+        // =====================================================
+
         modelBuilder.Entity<ApprovalDecision>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -135,6 +180,10 @@ public class AppDbContext : DbContext, IApplicationDbContext
             entity.Property(x => x.Comments)
                 .HasMaxLength(1000);
         });
+
+        // =====================================================
+        // INVENTORY
+        // =====================================================
 
         modelBuilder.Entity<BloodBankInventory>(entity =>
         {
@@ -165,6 +214,10 @@ public class AppDbContext : DbContext, IApplicationDbContext
             })
             .IsUnique();
         });
+
+        // =====================================================
+        // INVENTORY TRANSACTIONS
+        // =====================================================
 
         modelBuilder.Entity<InventoryTransaction>(entity =>
         {
