@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Routes,
@@ -29,6 +30,8 @@ import CreateRequestPage from "./features/requests/CreateRequestPage";
 import RequestDetailsPage from "./features/requests/RequestDetailsPage";
 import { StaffInvitationsPage } from "./features/staff-invitations/StaffInvitationsPage";
 import { AcceptInvitationPage } from "./features/staff-invitations/AcceptInvitationPage";
+
+import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage";
 
 // =====================================================
 // AUTH GUARDS
