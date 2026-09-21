@@ -27,7 +27,6 @@ import { InventoryEmergencyPage } from "./features/inventory/InventoryEmergencyP
 import RequestsPage from "./features/requests/RequestsPage";
 import CreateRequestPage from "./features/requests/CreateRequestPage";
 import RequestDetailsPage from "./features/requests/RequestDetailsPage";
-import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage";
 import { StaffInvitationsPage } from "./features/staff-invitations/StaffInvitationsPage";
 import { AcceptInvitationPage } from "./features/staff-invitations/AcceptInvitationPage";
 
@@ -359,19 +358,6 @@ export function App() {
           }
         />
 
-
-        <Route
-          path="/workflows/:id"
-          element={
-            <RequireAuth>
-              <RequireRole roles={["staff", "admin"]}>
-                <AppShell>
-                  <WorkflowMonitorPage />
-                </AppShell>
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
 
         {/* =================================================
             AGENT WORKFLOW MONITOR
