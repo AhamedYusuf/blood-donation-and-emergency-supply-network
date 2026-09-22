@@ -278,6 +278,24 @@ public class InventoryService : IInventoryService
             currentUserId,
             cancellationToken);
 
+        return await AnalyzeStockRiskCoreAsync(
+            organizationId,
+            cancellationToken);
+    }
+
+    public async Task<StockRiskResponse> AnalyzeStockRiskForAgentAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        return await AnalyzeStockRiskCoreAsync(
+            organizationId,
+            cancellationToken);
+    }
+
+    private async Task<StockRiskResponse> AnalyzeStockRiskCoreAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
         var inventory = await _db.BloodBankInventories
             .AsNoTracking()
             .Where(x => x.OrganizationId == organizationId)

@@ -11,6 +11,10 @@ public interface IOrganizationService
         Guid id,
         CancellationToken ct);
 
+    Task<(double Latitude, double Longitude)> GeocodeAddressAsync(
+        string address,
+        CancellationToken ct);
+
     Task<OrganizationResponse> CreateAsync(
         CreateOrganizationRequest request,
         CancellationToken ct);

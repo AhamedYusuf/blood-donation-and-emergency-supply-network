@@ -45,8 +45,13 @@ const URGENCY_TO_NUMBER: Record<
 
 export const inventoryApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    // =====================================================
+    // INVENTORY
+    // =====================================================
+
     getInventory: builder.query<InventoryResponse[], string>({
-      query: (organizationId) => `/inventory/${organizationId}`,
+      query: (organizationId) =>
+        `/inventory/${organizationId}`,
       providesTags: ["Inventory"],
     }),
 
@@ -56,6 +61,10 @@ export const inventoryApi = baseApi.injectEndpoints({
       providesTags: ["Inventory"],
     }),
 
+    // =====================================================
+    // TRANSACTIONS
+    // =====================================================
+
     getTransactions: builder.query<
       PagedResult<InventoryTransactionResponse>,
       {
@@ -64,7 +73,11 @@ export const inventoryApi = baseApi.injectEndpoints({
         pageSize?: number;
       }
     >({
-      query: ({ organizationId, page = 1, pageSize = 20 }) =>
+      query: ({
+        organizationId,
+        page = 1,
+        pageSize = 20,
+      }) =>
         `/inventory/transactions/${organizationId}?page=${page}&pageSize=${pageSize}`,
       providesTags: ["Inventory"],
     }),
@@ -76,13 +89,18 @@ export const inventoryApi = baseApi.injectEndpoints({
         request: AdjustInventoryRequest;
       }
     >({
-      query: ({ inventoryId, request }) => ({
+      query: ({
+        inventoryId,
+        request,
+      }) => ({
         url: `/inventory/${inventoryId}/adjust`,
         method: "PUT",
         body: {
           ...request,
           transactionType:
-            TRANSACTION_TYPE_TO_NUMBER[request.transactionType],
+            TRANSACTION_TYPE_TO_NUMBER[
+              request.transactionType
+            ],
         },
       }),
       invalidatesTags: ["Inventory"],
@@ -111,32 +129,71 @@ export const inventoryApi = baseApi.injectEndpoints({
         method: "POST",
         body: {
           organizationId,
-          bloodType: BLOOD_TYPE_TO_NUMBER[bloodType],
+          bloodType:
+            BLOOD_TYPE_TO_NUMBER[bloodType],
           units,
-          transactionType: TRANSACTION_TYPE_TO_NUMBER[transactionType],
-          relatedAppointmentId: relatedAppointmentId ?? null,
-          relatedTransferOrgId: relatedTransferOrgId ?? null,
+          transactionType:
+            TRANSACTION_TYPE_TO_NUMBER[
+              transactionType
+            ],
+          relatedAppointmentId:
+            relatedAppointmentId ?? null,
+          relatedTransferOrgId:
+            relatedTransferOrgId ?? null,
         },
       }),
       invalidatesTags: ["Inventory"],
     }),
 
-    checkStock: builder.mutation<StockCheckResponse, StockCheckRequest>({
+    // =====================================================
+    // AGENT 01 - STOCK CHECK
+    //
+    // Browser-facing authenticated endpoint.
+    //
+    // IMPORTANT:
+    // Do NOT use /internal/agent/check-stock here.
+    // The internal endpoint requires X-Internal-Secret.
+    // =====================================================
+
+    checkStock: builder.mutation<
+      StockCheckResponse,
+      StockCheckRequest
+    >({
       query: (request) => ({
         url: "/inventory/stock-check",
         method: "POST",
         body: {
           organizationId: request.organizationId,
-          bloodType: BLOOD_TYPE_TO_NUMBER[request.bloodType],
+          bloodType:
+            BLOOD_TYPE_TO_NUMBER[request.bloodType],
           requiredUnits: request.requiredUnits,
         },
       }),
     }),
 
-    getStockRisk: builder.query<StockRiskResponse, string>({
-      query: (organizationId) => `/inventory/stock-risk/${organizationId}`,
+    // =====================================================
+    // AGENT 02 - STOCK RISK
+    // =====================================================
+
+    getStockRisk: builder.query<
+      StockRiskResponse,
+      string
+    >({
+      query: (organizationId) =>
+        `/inventory/stock-risk/${organizationId}`,
       providesTags: ["Inventory"],
     }),
+
+    // =====================================================
+    // AGENT 03 - EMERGENCY RECOMMENDATION
+    //
+    // Browser-facing authenticated endpoint.
+    //
+    // IMPORTANT:
+    // Do NOT use /internal/agent/inventory-recommendation
+    // from the browser because that endpoint requires
+    // the internal server-to-server secret.
+    // =====================================================
 
     getEmergencyRecommendation: builder.mutation<
       EmergencyInventoryRecommendation,
@@ -146,9 +203,11 @@ export const inventoryApi = baseApi.injectEndpoints({
         url: "/inventory/emergency-recommendation",
         method: "POST",
         body: {
-          bloodType: BLOOD_TYPE_TO_NUMBER[request.bloodType],
+          bloodType:
+            BLOOD_TYPE_TO_NUMBER[request.bloodType],
           requiredUnits: request.requiredUnits,
-          urgency: URGENCY_TO_NUMBER[request.urgency],
+          urgency:
+            URGENCY_TO_NUMBER[request.urgency],
         },
       }),
     }),

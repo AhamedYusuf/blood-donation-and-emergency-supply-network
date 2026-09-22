@@ -14,11 +14,13 @@ export type InventoryTransactionType =
   | "TransferIn"
   | "TransferOut";
 
-export type RequestUrgency = "Normal" | "Urgent" | "Critical";
+export type RequestUrgency =
+  | "Normal"
+  | "Urgent"
+  | "Critical";
 
 /*
- * The backend uses C# enums.
- * Depending on JSON serialization, the API can return either:
+ * Backend enums can be returned either as:
  *
  *   "OPositive"
  *
@@ -26,7 +28,7 @@ export type RequestUrgency = "Normal" | "Urgent" | "Critical";
  *
  *   6
  *
- * Therefore the frontend accepts both formats.
+ * The frontend therefore accepts both representations.
  */
 export type ApiEnumValue<T extends string> = T | number;
 
@@ -66,6 +68,12 @@ export interface PagedResult<T> {
   totalPages: number;
 }
 
+/*
+ * Authenticated frontend Stock Check request.
+ *
+ * This is used by:
+ * POST /api/inventory/stock-check
+ */
 export interface StockCheckRequest {
   organizationId: string;
   bloodType: BloodType;
@@ -82,6 +90,9 @@ export interface StockCheckResponse {
   lowStock: boolean;
 }
 
+/*
+ * Stock Risk Agent response.
+ */
 export interface StockRiskResponse {
   organizationId: string;
   riskLevel: string;
@@ -91,18 +102,28 @@ export interface StockRiskResponse {
   recommendation: string;
 }
 
+/*
+ * Emergency Recommendation request.
+ */
 export interface EmergencyInventoryRequest {
   bloodType: BloodType;
   requiredUnits: number;
   urgency: RequestUrgency;
 }
 
+/*
+ * Emergency Recommendation Agent response.
+ *
+ * New contract:
+ * - shortfallUnits instead of shortfall
+ * - urgency instead of priority
+ */
 export interface EmergencyInventoryRecommendation {
   bloodType: ApiEnumValue<BloodType>;
   requiredUnits: number;
   availableUnits: number;
-  shortfall: number;
+  shortfallUnits: number;
   recommendation: string;
   suggestedAction: string;
-  priority: RequestUrgency | number;
+  urgency: RequestUrgency | number;
 }

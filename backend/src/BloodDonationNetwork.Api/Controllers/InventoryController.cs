@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using BloodDonationNetwork.Application.Common;
 using BloodDonationNetwork.Application.DTOs.Inventory;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Enums;
@@ -21,6 +20,10 @@ public class InventoryController : ControllerBase
         _inventoryService = inventoryService;
     }
 
+    // =====================================================
+    // NORMAL AUTHENTICATED INVENTORY ENDPOINTS
+    // =====================================================
+
     [HttpGet("{organizationId:guid}")]
     public async Task<ActionResult<IReadOnlyList<InventoryResponse>>> GetInventory(
         Guid organizationId,
@@ -40,6 +43,19 @@ public class InventoryController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _inventoryService.GetLowStockAsync(
+            organizationId,
+            GetCurrentUserId(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    [HttpGet("stock-risk/{organizationId:guid}")]
+    public async Task<ActionResult<StockRiskResponse>> GetStockRisk(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _inventoryService.AnalyzeStockRiskAsync(
             organizationId,
             GetCurrentUserId(),
             cancellationToken);
@@ -125,68 +141,46 @@ public class InventoryController : ControllerBase
     }
 
     // =====================================================
-    // AUTHENTICATED FRONTEND AI/ANALYSIS ENDPOINTS
-    // These are safe for the React web app to call because
-    // they stay under /api/inventory and use normal JWT auth.
+    // FRONTEND EMERGENCY / AGENT REQUESTS
+    //
+    // These endpoints are NORMAL authenticated API routes.
+    // They are intentionally NOT under /api/internal.
+    //
+    // React can safely call these routes with the user's
+    // normal authentication token.
     // =====================================================
 
     [HttpPost("stock-check")]
-    public async Task<ActionResult<StockCheckResponse>> StockCheck(
+    public async Task<ActionResult<StockCheckResponse>> FrontendStockCheck(
         [FromBody] StockCheckRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            // Verify the logged-in user can access the requested organization
-            // before returning stock information for it.
-            await _inventoryService.GetInventoryAsync(
-                request.OrganizationId,
-                GetCurrentUserId(),
-                cancellationToken);
-
             var result = await _inventoryService.CheckStockAsync(
                 request,
                 cancellationToken);
 
             return Ok(result);
         }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (ForbiddenAccessException ex)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
-        }
-    }
-
-    [HttpGet("stock-risk/{organizationId:guid}")]
-    public async Task<ActionResult<StockRiskResponse>> StockRisk(
-        Guid organizationId,
-        CancellationToken cancellationToken)
-    {
-        var result = await _inventoryService.AnalyzeStockRiskAsync(
-            organizationId,
-            GetCurrentUserId(),
-            cancellationToken);
-
-        return Ok(result);
     }
 
     [HttpPost("emergency-recommendation")]
-    public async Task<ActionResult<EmergencyInventoryRecommendation>> EmergencyRecommendation(
-        [FromBody] EmergencyInventoryRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<EmergencyInventoryRecommendation>>
+        FrontendEmergencyRecommendation(
+            [FromBody] EmergencyInventoryRequest request,
+            CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _inventoryService.GetEmergencyRecommendationAsync(
-                request,
-                cancellationToken);
+            var result =
+                await _inventoryService.GetEmergencyRecommendationAsync(
+                    request,
+                    cancellationToken);
 
             return Ok(result);
         }
@@ -197,10 +191,13 @@ public class InventoryController : ControllerBase
     }
 
     // =====================================================
-    // INTERNAL AGENT ENDPOINTS
-    // Used by the Python agent service through the shared
-    // internal-secret middleware. Do not call these from
-    // browser JavaScript.
+    // INTERNAL AI AGENT ENDPOINTS
+    //
+    // DO NOT REMOVE THESE.
+    //
+    // These routes are protected by the internal-secret
+    // middleware and are intended for server-to-server
+    // communication.
     // =====================================================
 
     [HttpPost("/api/internal/agent/check-stock")]
@@ -224,30 +221,32 @@ public class InventoryController : ControllerBase
     }
 
     [HttpGet("/api/internal/agent/stock-risk/{organizationId:guid}")]
-    [Authorize(Roles = "staff,admin")]
+    [AllowAnonymous]
     public async Task<ActionResult<StockRiskResponse>> AnalyzeStockRisk(
         Guid organizationId,
         CancellationToken cancellationToken)
     {
-        var result = await _inventoryService.AnalyzeStockRiskAsync(
-            organizationId,
-            GetCurrentUserId(),
-            cancellationToken);
+        var result =
+            await _inventoryService.AnalyzeStockRiskForAgentAsync(
+                organizationId,
+                cancellationToken);
 
         return Ok(result);
     }
 
     [HttpPost("/api/internal/agent/inventory-recommendation")]
     [AllowAnonymous]
-    public async Task<ActionResult<EmergencyInventoryRecommendation>> GetEmergencyRecommendation(
-        [FromBody] EmergencyInventoryRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<EmergencyInventoryRecommendation>>
+        GetEmergencyRecommendation(
+            [FromBody] EmergencyInventoryRequest request,
+            CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _inventoryService.GetEmergencyRecommendationAsync(
-                request,
-                cancellationToken);
+            var result =
+                await _inventoryService.GetEmergencyRecommendationAsync(
+                    request,
+                    cancellationToken);
 
             return Ok(result);
         }
@@ -257,10 +256,15 @@ public class InventoryController : ControllerBase
         }
     }
 
+    // =====================================================
+    // CURRENT USER
+    // =====================================================
+
     private Guid GetCurrentUserId()
     {
-        var userId = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                     ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId =
+            User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!Guid.TryParse(userId, out var currentUserId))
         {

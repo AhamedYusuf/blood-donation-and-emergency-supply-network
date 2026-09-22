@@ -44,6 +44,10 @@ public interface IInventoryService
         Guid currentUserId,
         CancellationToken cancellationToken = default);
 
+    Task<StockRiskResponse> AnalyzeStockRiskForAgentAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default);
+
     Task<EmergencyInventoryRecommendation> GetEmergencyRecommendationAsync(
         EmergencyInventoryRequest request,
         CancellationToken cancellationToken = default);

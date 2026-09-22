@@ -144,10 +144,39 @@ function getStatus(item: InventoryResponse) {
 }
 
 export function InventoryManagePage() {
-  // Was reading a build-time env var nothing in this repo sets — see
-  // InventoryPage.tsx for the full explanation. Read from the signed-in
-  // user's own organization instead.
-  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+  const linkedOrganizationId = useSelector(
+    (s: RootState) => s.auth.organizationId,
+  );
+
+  /*
+   * Admin users may not have an organizationId on their account.
+   * In that case, load the available organizations and let the admin
+   * choose which organization's inventory should be managed.
+   *
+   * Staff users keep using their linked organization automatically.
+   */
+  const {
+    data: organizations = [],
+    isLoading: organizationsLoading,
+    isError: organizationsError,
+  } = useGetOrganizationsQuery();
+
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState(() => {
+      try {
+        return localStorage.getItem("inventory:selectedOrganizationId") ?? "";
+      } catch {
+        return "";
+      }
+    });
+
+  const organizationId =
+    linkedOrganizationId ||
+    selectedOrganizationId ||
+    organizations[0]?.id ||
+    "";
+
+ 
   const skip = !organizationId;
 
   const {
@@ -164,11 +193,6 @@ export function InventoryManagePage() {
     { organizationId: organizationId ?? "", page: 1, pageSize: 20 },
     { skip }
   );
-
-  const {
-    data: organizations = [],
-    isLoading: organizationsLoading,
-  } = useGetOrganizationsQuery();
 
   const [createTransaction, createState] =
     useCreateTransactionMutation();
@@ -468,11 +492,53 @@ export function InventoryManagePage() {
     }
   }
 
+  if (organizationsLoading) {
+    return (
+      <div className="manage-loading">
+        <div className="manage-loading-icon">
+          ♥
+        </div>
+
+        <h2>Loading organizations</h2>
+
+        <p>
+          Loading organizations available for inventory management...
+        </p>
+      </div>
+    );
+  }
+
+  if (organizationsError) {
+    return (
+      <div className="manage-error">
+        <div className="manage-error-icon">
+          !
+        </div>
+
+        <h2>Unable to load organizations</h2>
+
+        <p>
+          We couldn't retrieve the organizations. Please make sure the backend API is running.
+        </p>
+
+        <button
+          type="button"
+          className="manage-primary-button"
+          onClick={() => window.location.reload()}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (!organizationId) {
     return (
       <div className="manage-loading">
-        <h2>No organization linked</h2>
-        <p>Your account isn't linked to an organization, so there's no inventory to manage here.</p>
+        <h2>No organization available</h2>
+        <p>
+          There are currently no organizations available to manage.
+        </p>
       </div>
     );
   }
@@ -553,6 +619,66 @@ export function InventoryManagePage() {
             <h1>Manage Inventory</h1>
           </div>
         </div>
+
+        {!linkedOrganizationId && organizations.length > 0 && (
+          <label
+            htmlFor="manageOrganization"
+            style={{
+              display: "block",
+              minWidth: "260px",
+              marginLeft: "auto",
+            }}
+          >
+            <span
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Managing organization
+            </span>
+
+            <select
+              id="manageOrganization"
+              value={organizationId}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedOrganizationId(value);
+
+                try {
+                  localStorage.setItem(
+                    "inventory:selectedOrganizationId",
+                    value,
+                  );
+                } catch {
+                  // Ignore localStorage failures. The selected value still works for this page.
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                border: "1px solid rgba(0,0,0,0.12)",
+                background: "white",
+                font: "inherit",
+              }}
+            >
+              {organizations.map((organization) => (
+                <option
+                  key={organization.id}
+                  value={organization.id}
+                >
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <a
           href="/inventory"
