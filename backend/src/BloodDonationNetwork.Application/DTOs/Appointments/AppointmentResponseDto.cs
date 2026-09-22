@@ -13,6 +13,11 @@ public class AppointmentResponseDto
     // Null when the donor has no profile row yet.
     public string? DonorBloodType { get; set; }
 
+    // Populated only when RelatedWorkflowId is set and the Matching &
+    // Dispatch Agent's own search_donors step data for that workflow is
+    // available. See AgentMatchDto.
+    public AgentMatchDto? AgentMatch { get; set; }
+
     public int? UnitsDonated { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

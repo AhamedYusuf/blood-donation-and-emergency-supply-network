@@ -205,7 +205,7 @@ builder.Services.AddAuthentication(
                     new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(
                             builder.Configuration[
-                                "Jwt:Key"]!))
+                                "Jwt:Key"]!)),
             };
     });
 

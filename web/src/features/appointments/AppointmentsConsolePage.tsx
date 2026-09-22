@@ -630,11 +630,49 @@ export function AppointmentsConsolePage() {
               <p className="text-subheading" style={{ color: "var(--color-agent)", margin: 0 }}>
                 Agent reasoning
               </p>
-              <p className="text-body-sm" style={{ color: "var(--color-ink-muted)", marginTop: 4, marginBottom: 0 }}>
-                Created by the Matching &amp; Dispatch Agent. Rank/distance/score
-                display pending — requires reading the agent_steps log for this
-                workflow, not yet built.
-              </p>
+              {selected.agentMatch ? (
+                <div
+                  className="tabular-nums"
+                  style={{
+                    display: "flex",
+                    gap: "var(--space-md)",
+                    marginTop: 6,
+                    color: "var(--color-ink)",
+                  }}
+                >
+                  <div>
+                    <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                      RANK
+                    </p>
+                    <p className="text-body-sm" style={{ margin: "2px 0 0", fontWeight: 500 }}>
+                      #{selected.agentMatch.rank}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                      DISTANCE
+                    </p>
+                    <p className="text-body-sm" style={{ margin: "2px 0 0", fontWeight: 500 }}>
+                      {selected.agentMatch.distanceKm.toFixed(2)} km
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                      RELIABILITY
+                    </p>
+                    <p className="text-body-sm" style={{ margin: "2px 0 0", fontWeight: 500 }}>
+                      {Math.round(selected.agentMatch.reliabilityScore * 100)}%
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-body-sm" style={{ color: "var(--color-ink-muted)", marginTop: 4, marginBottom: 0 }}>
+                  Created by the Matching &amp; Dispatch Agent. Rank/distance/score
+                  aren't available for this appointment — the agent's search log
+                  for its workflow doesn't include this donor (e.g. booked
+                  outside the search step, or the log has since aged out).
+                </p>
+              )}
             </div>
           )}
 
