@@ -1,10 +1,13 @@
-using BloodDonationNetwork.Domain.Entities;
+using BloodDonationNetwork.Application.Common;
 using BloodDonationNetwork.Application.Interfaces;
+using BloodDonationNetwork.Domain.Entities;
 
 namespace BloodDonationNetwork.Application.Services;
 
 public class EligibilityRuleEngine : IEligibilityRuleEngine
 {
+    /// <param name="requiredBloodType">The RECIPIENT's (patient's) blood type — the one
+    /// the request is for. See BloodCompatibility for the donor→recipient direction.</param>
     public (bool IsEligible, string? Reason) Evaluate(DonorProfile donor, string requiredBloodType)
     {
         if (!donor.VerifiedByAdmin) return (false, "verified_by_admin = false");
@@ -22,7 +25,20 @@ public class EligibilityRuleEngine : IEligibilityRuleEngine
         if (donor.MedicalFlags.TryGetValue("recent_illness", out var illness) && illness)
             return (false, "medical_flags.recent_illness = true");
 
-        if (donor.BloodType != requiredBloodType) return (false, "blood type mismatch");
+        IReadOnlyList<string> compatibleDonorTypes;
+        try
+        {
+            compatibleDonorTypes = BloodCompatibility.GetCompatibleDonorTypes(requiredBloodType);
+        }
+        catch (ArgumentException)
+        {
+            // Fail closed at THIS boundary rather than let one bad record crash the batch —
+            // the shared utility is allowed to throw; the safety gate isn't.
+            return (false, $"unrecognized recipient blood type '{requiredBloodType}'");
+        }
+
+        if (!compatibleDonorTypes.Contains(donor.BloodType))
+            return (false, $"blood type {donor.BloodType} not compatible with recipient {requiredBloodType}");
 
         return (true, null);
     }

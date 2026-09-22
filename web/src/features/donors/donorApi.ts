@@ -108,7 +108,10 @@ export const donorApi = baseApi.injectEndpoints({
         method: "PUT",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: "Donor", id }],
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Donor", id },
+        { type: "Donor", id: "LIST" },
+      ],
     }),
 
     /**
