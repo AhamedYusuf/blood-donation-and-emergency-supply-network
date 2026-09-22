@@ -11,7 +11,8 @@ public class WorkflowInternalController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
 
-    public WorkflowInternalController(IApplicationDbContext context)
+    public WorkflowInternalController(
+        IApplicationDbContext context)
     {
         _context = context;
     }
@@ -21,8 +22,9 @@ public class WorkflowInternalController : ControllerBase
     public async Task<IActionResult> CreateWorkflow(
         [FromBody] CreateWorkflowInternalRequest request)
     {
-        var bloodRequest = await _context.BloodRequests.FindAsync(
-            request.BloodRequestId);
+        var bloodRequest =
+            await _context.BloodRequests.FindAsync(
+                request.BloodRequestId);
 
         if (bloodRequest == null)
         {
@@ -34,11 +36,20 @@ public class WorkflowInternalController : ControllerBase
 
         var now = DateTime.UtcNow;
 
+        var bloodType =
+            MapBloodType(bloodRequest.BloodType);
+
+        var objective =
+            $"Fulfill {bloodRequest.UnitsRequested} unit(s) of " +
+            $"{bloodType} blood for {bloodRequest.HospitalName}.";
+
         var workflow = new AgentWorkflow
         {
             Id = Guid.NewGuid(),
             BloodRequestId = request.BloodRequestId,
             Status = WorkflowStatuses.Planning,
+            Objective = objective,
+            CurrentAgent = AgentNames.Coordinator,
             RevisionCount = 0,
             StartedAt = now,
             UpdatedAt = now
@@ -55,6 +66,8 @@ public class WorkflowInternalController : ControllerBase
                 workflow.Id,
                 workflow.BloodRequestId,
                 workflow.Status,
+                workflow.Objective,
+                workflow.CurrentAgent,
                 workflow.RevisionCount,
                 workflow.StartedAt
             });
@@ -65,8 +78,9 @@ public class WorkflowInternalController : ControllerBase
     public async Task<IActionResult> GetBloodRequestForAgent(
         Guid bloodRequestId)
     {
-        var bloodRequest = await _context.BloodRequests.FindAsync(
-            bloodRequestId);
+        var bloodRequest =
+            await _context.BloodRequests.FindAsync(
+                bloodRequestId);
 
         if (bloodRequest == null)
         {
@@ -76,15 +90,19 @@ public class WorkflowInternalController : ControllerBase
             });
         }
 
-        var bloodType = MapBloodType(bloodRequest.BloodType);
-        var urgency = MapUrgency(bloodRequest.Urgency);
+        var bloodType =
+            MapBloodType(bloodRequest.BloodType);
+
+        var urgency =
+            MapUrgency(bloodRequest.Urgency);
 
         return Ok(new
         {
             bloodRequestId = bloodRequest.Id,
             organizationId = bloodRequest.OrganizationId,
             bloodType,
-            unitsRequested = bloodRequest.UnitsRequested,
+            unitsRequested =
+                bloodRequest.UnitsRequested,
             urgency,
             latitude = bloodRequest.Latitude,
             longitude = bloodRequest.Longitude
@@ -95,9 +113,11 @@ public class WorkflowInternalController : ControllerBase
     [HttpPost("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(
         Guid id,
-        [FromBody] UpdateWorkflowStatusInternalRequest request)
+        [FromBody]
+        UpdateWorkflowStatusInternalRequest request)
     {
-        var workflow = await _context.AgentWorkflows.FindAsync(id);
+        var workflow =
+            await _context.AgentWorkflows.FindAsync(id);
 
         if (workflow == null)
         {
@@ -115,11 +135,16 @@ public class WorkflowInternalController : ControllerBase
             request.Status == WorkflowStatuses.Rejected)
         {
             workflow.CompletedAt = DateTime.UtcNow;
+
+            // Terminal state: no active agent.
+            workflow.CurrentAgent = null;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.FailureReason))
+        if (!string.IsNullOrWhiteSpace(
+                request.FailureReason))
         {
-            workflow.FailureReason = request.FailureReason;
+            workflow.FailureReason =
+                request.FailureReason;
         }
 
         await _context.SaveChangesAsync();
@@ -128,6 +153,8 @@ public class WorkflowInternalController : ControllerBase
         {
             workflow.Id,
             workflow.Status,
+            workflow.Objective,
+            workflow.CurrentAgent,
             workflow.UpdatedAt,
             workflow.CompletedAt,
             workflow.FailureReason
@@ -138,9 +165,11 @@ public class WorkflowInternalController : ControllerBase
     [HttpPost("{id:guid}/steps")]
     public async Task<IActionResult> AddStep(
         Guid id,
-        [FromBody] CreateAgentStepInternalRequest request)
+        [FromBody]
+        CreateAgentStepInternalRequest request)
     {
-        var workflow = await _context.AgentWorkflows.FindAsync(id);
+        var workflow =
+            await _context.AgentWorkflows.FindAsync(id);
 
         if (workflow == null)
         {
@@ -160,14 +189,20 @@ public class WorkflowInternalController : ControllerBase
             InputJson = request.InputJson,
             OutputJson = request.OutputJson,
             Narrative = request.Narrative,
-            StartedAt = request.StartedAt ?? DateTime.UtcNow,
+            RetryCount = request.RetryCount,
+            StartedAt =
+                request.StartedAt ?? DateTime.UtcNow,
             CompletedAt = request.CompletedAt,
             ErrorMessage = request.ErrorMessage
         };
 
         _context.AgentSteps.Add(step);
 
-        workflow.UpdatedAt = DateTime.UtcNow;
+        workflow.CurrentAgent =
+            request.AgentName;
+
+        workflow.UpdatedAt =
+            DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
@@ -178,23 +213,41 @@ public class WorkflowInternalController : ControllerBase
             step.AgentName,
             step.StepName,
             step.Status,
+            step.RetryCount,
             step.StartedAt,
-            step.CompletedAt
+            step.CompletedAt,
+            workflow.CurrentAgent
         });
     }
 
-    private static string MapBloodType(BloodType bloodType)
+    private static string MapBloodType(
+        BloodType bloodType)
     {
         return bloodType switch
         {
-            BloodType.APositive => BloodTypes.APositive,
-            BloodType.ANegative => BloodTypes.ANegative,
-            BloodType.BPositive => BloodTypes.BPositive,
-            BloodType.BNegative => BloodTypes.BNegative,
-            BloodType.ABPositive => BloodTypes.ABPositive,
-            BloodType.ABNegative => BloodTypes.ABNegative,
-            BloodType.OPositive => BloodTypes.OPositive,
-            BloodType.ONegative => BloodTypes.ONegative,
+            BloodType.APositive =>
+                BloodTypes.APositive,
+
+            BloodType.ANegative =>
+                BloodTypes.ANegative,
+
+            BloodType.BPositive =>
+                BloodTypes.BPositive,
+
+            BloodType.BNegative =>
+                BloodTypes.BNegative,
+
+            BloodType.ABPositive =>
+                BloodTypes.ABPositive,
+
+            BloodType.ABNegative =>
+                BloodTypes.ABNegative,
+
+            BloodType.OPositive =>
+                BloodTypes.OPositive,
+
+            BloodType.ONegative =>
+                BloodTypes.ONegative,
 
             _ => throw new ArgumentOutOfRangeException(
                 nameof(bloodType),
@@ -203,13 +256,19 @@ public class WorkflowInternalController : ControllerBase
         };
     }
 
-    private static string MapUrgency(RequestUrgency urgency)
+    private static string MapUrgency(
+        RequestUrgency urgency)
     {
         return urgency switch
         {
-            RequestUrgency.Normal => "routine",
-            RequestUrgency.Urgent => "urgent",
-            RequestUrgency.Critical => "critical",
+            RequestUrgency.Normal =>
+                "routine",
+
+            RequestUrgency.Urgent =>
+                "urgent",
+
+            RequestUrgency.Critical =>
+                "critical",
 
             _ => throw new ArgumentOutOfRangeException(
                 nameof(urgency),
@@ -219,34 +278,37 @@ public class WorkflowInternalController : ControllerBase
     }
 }
 
-
 public class CreateWorkflowInternalRequest
 {
     public Guid BloodRequestId { get; set; }
 }
 
-
 public class UpdateWorkflowStatusInternalRequest
 {
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } =
+        string.Empty;
 
     public string? FailureReason { get; set; }
 }
 
-
 public class CreateAgentStepInternalRequest
 {
-    public string AgentName { get; set; } = string.Empty;
+    public string AgentName { get; set; } =
+        string.Empty;
 
-    public string StepName { get; set; } = string.Empty;
+    public string StepName { get; set; } =
+        string.Empty;
 
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } =
+        string.Empty;
 
     public string? InputJson { get; set; }
 
     public string? OutputJson { get; set; }
 
     public string? Narrative { get; set; }
+
+    public int RetryCount { get; set; } = 0;
 
     public DateTime? StartedAt { get; set; }
 

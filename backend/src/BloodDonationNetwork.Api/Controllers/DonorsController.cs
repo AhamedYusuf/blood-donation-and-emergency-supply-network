@@ -60,7 +60,7 @@ public class DonorsController : ControllerBase
     [HttpGet("search")]
     [Authorize(Roles = "staff,admin")]
     public async Task<ActionResult<PagedResult<DonorProfileResponse>>> Search(
-        [FromQuery] string bloodType,
+        [FromQuery] string? bloodType,
         [FromQuery] double? lat,
         [FromQuery] double? lng,
         [FromQuery] double? radiusKm,
@@ -73,7 +73,7 @@ public class DonorsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/verify")]
-    [Authorize(Roles = "staff,admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Verify(Guid id, CancellationToken ct)
     {
         await _donorService.VerifyAsync(id, ct);

@@ -20,7 +20,8 @@ export interface DonorRegisterRequest {
   bloodType: string;
   /** ISO date string: "YYYY-MM-DD" — serialised from DateOnly on backend */
   dateOfBirth: string;
-  address?: string;
+  address: string;
+  lastDonationDate?: string;
   /**
    * Keys MUST be snake_case matching EligibilityRuleEngine.cs TryGetValue calls:
    * recent_illness | recent_surgery | chronic_condition | hiv_positive | hepatitis
@@ -38,6 +39,7 @@ export interface DonorUpdateRequest {
 export interface DonorProfileResponse {
   id: string;
   userId: string;
+  fullName: string;
   bloodType: string;
   /** 'eligible' | 'not_eligible' | 'pending_review' */
   eligibilityStatus: string;
@@ -106,7 +108,10 @@ export const donorApi = baseApi.injectEndpoints({
         method: "PUT",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: "Donor", id }],
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Donor", id },
+        { type: "Donor", id: "LIST" },
+      ],
     }),
 
     /**

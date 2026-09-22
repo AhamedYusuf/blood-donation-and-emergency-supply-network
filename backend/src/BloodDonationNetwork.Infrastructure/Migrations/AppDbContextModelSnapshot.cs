@@ -42,13 +42,21 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<string>("InputJson")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("input_data");
 
                     b.Property<string>("Narrative")
                         .HasColumnType("text");
 
                     b.Property<string>("OutputJson")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("output_data");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("retry_count");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone");
@@ -85,9 +93,17 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CurrentAgent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("RevisionCount")
                         .HasColumnType("integer");
@@ -209,8 +225,9 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("UnitsRequested")
                         .HasColumnType("integer");

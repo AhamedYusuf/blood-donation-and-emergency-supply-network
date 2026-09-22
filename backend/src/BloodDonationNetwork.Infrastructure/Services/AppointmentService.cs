@@ -1,4 +1,6 @@
+using System.Text.Json;
 using BloodDonationNetwork.Application.Common;
+using BloodDonationNetwork.Application.DTOs.Agents;
 using BloodDonationNetwork.Application.DTOs.Appointments;
 using BloodDonationNetwork.Application.DTOs.Inventory;
 using BloodDonationNetwork.Application.Interfaces;
@@ -110,22 +112,117 @@ public class AppointmentService : IAppointmentService
             .Take(pageSize)
             .ToListAsync();
 
-        // Batch-load blood types for the donors on this page to avoid an
-        // N+1 lookup per row.
+        // Batch-load donor profiles (blood type + profile id) for the
+        // donors on this page to avoid an N+1 lookup per row. Profile id
+        // (not the User id DonationAppointment.DonorId actually stores)
+        // is what the agent's own candidate list keys donors by.
         var donorIds = appointments.Select(a => a.DonorId).Distinct().ToList();
-        var bloodTypes = await _context.DonorProfiles
+        var donorProfiles = await _context.DonorProfiles
             .Where(d => donorIds.Contains(d.UserId))
-            .ToDictionaryAsync(d => d.UserId, d => d.BloodType);
+            .ToDictionaryAsync(d => d.UserId, d => new DonorProfileLookup(d.Id, d.BloodType));
+
+        var agentMatches = await GetAgentMatchesAsync(appointments, donorProfiles);
 
         return new PagedResultDto<AppointmentResponseDto>
         {
             Items = appointments
-                .Select(a => MapToDto(a, bloodTypes.GetValueOrDefault(a.DonorId)))
+                .Select(a => MapToDto(
+                    a,
+                    donorProfiles.TryGetValue(a.DonorId, out var dp) ? dp.BloodType : null,
+                    agentMatches.GetValueOrDefault(a.Id)))
                 .ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount
         };
+    }
+
+    // Reads back the Matching & Dispatch Agent's own "search_donors"
+    // agent_steps row for each appointment's workflow, so the console's
+    // "Agent reasoning" panel can show the actual rank/distance/
+    // reliability the agent used, not a re-derived guess. Best-effort:
+    // any appointment without a related workflow, without a matching
+    // step, without a DonorProfile, or whose step JSON doesn't parse
+    // simply gets no AgentMatchDto — this is a display enrichment, never
+    // a reason to fail the appointment query itself.
+    private async Task<Dictionary<Guid, AgentMatchDto>> GetAgentMatchesAsync(
+        List<DonationAppointment> appointments,
+        Dictionary<Guid, DonorProfileLookup> donorProfilesByUserId)
+    {
+        var result = new Dictionary<Guid, AgentMatchDto>();
+
+        var workflowIds = appointments
+            .Where(a => a.RelatedWorkflowId.HasValue)
+            .Select(a => a.RelatedWorkflowId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (workflowIds.Count == 0)
+        {
+            return result;
+        }
+
+        // A workflow could in theory be searched more than once across
+        // revisions — take the latest search_donors step per workflow.
+        var steps = await _context.AgentSteps
+            .Where(s => workflowIds.Contains(s.WorkflowId)
+                     && s.StepName == "search_donors"
+                     && s.OutputJson != null)
+            .OrderByDescending(s => s.StartedAt)
+            .Select(s => new { s.WorkflowId, s.OutputJson })
+            .ToListAsync();
+
+        var latestOutputByWorkflow = new Dictionary<Guid, string>();
+        foreach (var step in steps)
+        {
+            latestOutputByWorkflow.TryAdd(step.WorkflowId, step.OutputJson!);
+        }
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        foreach (var appointment in appointments)
+        {
+            if (appointment.RelatedWorkflowId is not { } workflowId)
+            {
+                continue;
+            }
+
+            if (!latestOutputByWorkflow.TryGetValue(workflowId, out var outputJson))
+            {
+                continue;
+            }
+
+            if (!donorProfilesByUserId.TryGetValue(appointment.DonorId, out var donorProfile))
+            {
+                continue;
+            }
+
+            SearchDonorsResponseDto? response;
+            try
+            {
+                response = JsonSerializer.Deserialize<SearchDonorsResponseDto>(outputJson, jsonOptions);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            var candidate = response?.Candidates.FirstOrDefault(c => c.DonorId == donorProfile.Id);
+
+            if (candidate is null)
+            {
+                continue;
+            }
+
+            result[appointment.Id] = new AgentMatchDto
+            {
+                Rank = candidate.Rank,
+                DistanceKm = candidate.DistanceKm,
+                ReliabilityScore = candidate.ReliabilityScore,
+            };
+        }
+
+        return result;
     }
 
     public async Task<AppointmentResponseDto> CompleteAsync(
@@ -206,7 +303,7 @@ public class AppointmentService : IAppointmentService
 
     // Private helper — converts the entity to the DTO shape.
     private static AppointmentResponseDto MapToDto(
-        DonationAppointment appointment, string? donorBloodType = null)
+        DonationAppointment appointment, string? donorBloodType = null, AgentMatchDto? agentMatch = null)
     {
         return new AppointmentResponseDto
         {
@@ -217,11 +314,18 @@ public class AppointmentService : IAppointmentService
             ScheduledTime = appointment.ScheduledTime,
             Status = AppointmentStatusMap.ToApiString(appointment.Status),
             DonorBloodType = donorBloodType,
+            AgentMatch = agentMatch,
             UnitsDonated = appointment.UnitsDonated,
             CreatedAt = appointment.CreatedAt,
             UpdatedAt = appointment.UpdatedAt
         };
     }
+
+    // Used only by GetAgentMatchesAsync's batch lookup — pairs the two
+    // DonorProfile fields that lookup needs (its own Id, for matching
+    // against the agent's candidate list, and BloodType, already needed
+    // for the DTO's DonorBloodType).
+    private sealed record DonorProfileLookup(Guid Id, string BloodType);
 
     // Status <-> API-string conversion lives in AppointmentStatusMap
     // (Application/Common) so it can be unit-tested without a DbContext.

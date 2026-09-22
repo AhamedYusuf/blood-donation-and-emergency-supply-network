@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { BloodDrops } from "../../components/blood-effects/BloodDrops";
@@ -8,6 +8,7 @@ import {
   useUpdateAppointmentStatusMutation,
   type Appointment,
 } from "./appointmentsApi";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 import { StatusBadge, STATUS_CONFIG } from "./StatusBadge";
 import { AgentTag } from "./AgentTag";
 import "./appointments.css";
@@ -98,10 +99,32 @@ export function AppointmentsConsolePage() {
   const [unitsDonated, setUnitsDonated] = useState("1");
 
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+  const role = useSelector((s: RootState) => s.auth.role);
+  // role isn't consistently cased across the API (e.g. login returns
+  // "Admin", other places return lowercase "admin") — compare
+  // case-insensitively rather than assuming one, matching the pattern
+  // App.tsx's RequireRole already uses for the same reason.
+  const isAdmin = (role ?? "").toLowerCase() === "admin";
+
+  // Staff belong to one org and always see that queue. Admins don't
+  // belong to any single org (the backend already allows them to query
+  // any org's queue — AppointmentService.GetUpcomingByOrganizationAsync
+  // only enforces the same-org check for non-admins), so they pick which
+  // one to view instead of hitting a dead end.
+  const { data: organizations } = useGetOrganizationsQuery(undefined, { skip: !isAdmin });
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+
+  useEffect(() => {
+    if (isAdmin && !selectedOrgId && organizations && organizations.length > 0) {
+      setSelectedOrgId(organizations[0].id);
+    }
+  }, [isAdmin, organizations, selectedOrgId]);
+
+  const effectiveOrgId = organizationId ?? (isAdmin ? selectedOrgId : "");
 
   const { data, isLoading, error, isFetching, refetch } = useGetUpcomingByOrganizationQuery(
-    { orgId: organizationId ?? "", page: 1, pageSize: 50 },
-    { skip: !organizationId }
+    { orgId: effectiveOrgId, page: 1, pageSize: 50 },
+    { skip: !effectiveOrgId }
   );
 
   const [completeAppointment, { isLoading: isCompleting }] = useCompleteAppointmentMutation();
@@ -136,15 +159,24 @@ export function AppointmentsConsolePage() {
     setSelected(null);
   };
 
-  if (!organizationId) {
+  if (!effectiveOrgId) {
+    // Admins aren't tied to one org (organizationId is only ever set for
+    // staff), but the backend already lets them query any org's queue —
+    // this only shows for donors, or for an admin whose org list hasn't
+    // loaded yet / has no organizations registered.
+    const message = isAdmin
+      ? organizations && organizations.length === 0
+        ? "No organizations are registered yet — create one to see an appointment queue."
+        : "Loading organizations…"
+      : "This console shows a blood bank's appointment queue. Your account isn't linked to an organization, so there is nothing to display here.";
+
     return (
       <div style={{ padding: "var(--space-xl)", fontFamily: "var(--font-sans)", background: "var(--color-canvas)", height: "100%" }}>
         <h1 className="text-display" style={{ margin: "0 0 var(--space-sm)", color: "var(--color-ink)" }}>
           Upcoming Appointments
         </h1>
         <p className="text-body" style={{ color: "var(--color-ink-secondary)", margin: 0, maxWidth: 440 }}>
-          This console shows a blood bank's appointment queue. Your account isn't
-          linked to an organization, so there is nothing to display here.
+          {message}
         </p>
       </div>
     );
@@ -189,6 +221,20 @@ export function AppointmentsConsolePage() {
                 reaches someone who needs it.
               </p>
               <div className="appointments-hero__actions">
+                {isAdmin && organizations && organizations.length > 0 && (
+                  <select
+                    value={selectedOrgId}
+                    onChange={(e) => setSelectedOrgId(e.target.value)}
+                    className="appointments-org-picker"
+                    aria-label="Organization"
+                  >
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button type="button" onClick={() => refetch()} disabled={isFetching}>
                   {isFetching ? "Refreshing…" : "↻ Refresh queue"}
                 </button>
@@ -584,11 +630,49 @@ export function AppointmentsConsolePage() {
               <p className="text-subheading" style={{ color: "var(--color-agent)", margin: 0 }}>
                 Agent reasoning
               </p>
-              <p className="text-body-sm" style={{ color: "var(--color-ink-muted)", marginTop: 4, marginBottom: 0 }}>
-                Created by the Matching &amp; Dispatch Agent. Rank/distance/score
-                display pending — requires reading the agent_steps log for this
-                workflow, not yet built.
-              </p>
+              {selected.agentMatch ? (
+                <div
+                  className="tabular-nums"
+                  style={{
+                    display: "flex",
+                    gap: "var(--space-md)",
+                    marginTop: 6,
+                    color: "var(--color-ink)",
+                  }}
+                >
+                  <div>
+                    <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                      RANK
+                    </p>
+                    <p className="text-body-sm" style={{ margin: "2px 0 0", fontWeight: 500 }}>
+                      #{selected.agentMatch.rank}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                      DISTANCE
+                    </p>
+                    <p className="text-body-sm" style={{ margin: "2px 0 0", fontWeight: 500 }}>
+                      {selected.agentMatch.distanceKm.toFixed(2)} km
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-label" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
+                      RELIABILITY
+                    </p>
+                    <p className="text-body-sm" style={{ margin: "2px 0 0", fontWeight: 500 }}>
+                      {Math.round(selected.agentMatch.reliabilityScore * 100)}%
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-body-sm" style={{ color: "var(--color-ink-muted)", marginTop: 4, marginBottom: 0 }}>
+                  Created by the Matching &amp; Dispatch Agent. Rank/distance/score
+                  aren't available for this appointment — the agent's search log
+                  for its workflow doesn't include this donor (e.g. booked
+                  outside the search step, or the log has since aged out).
+                </p>
+              )}
             </div>
           )}
 

@@ -14,67 +14,90 @@ public class AgentWorkflowService : IAgentWorkflowService
         _context = context;
     }
 
-    public async Task<AgentWorkflow?> GetByIdAsync(Guid workflowId)
+    public async Task<AgentWorkflow?> GetByIdAsync(
+        Guid workflowId)
     {
         return await _context.AgentWorkflows
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.Id == workflowId);
     }
 
-    public async Task<AgentWorkflow?> GetLatestByBloodRequestIdAsync(
-        Guid bloodRequestId)
+    public async Task<AgentWorkflow?>
+        GetLatestByBloodRequestIdAsync(
+            Guid bloodRequestId)
     {
         return await _context.AgentWorkflows
             .AsNoTracking()
-            .Where(w => w.BloodRequestId == bloodRequestId)
+            .Where(w =>
+                w.BloodRequestId == bloodRequestId)
             .OrderByDescending(w => w.StartedAt)
             .FirstOrDefaultAsync();
     }
 
-    public async Task<List<AgentStep>> GetStepsAsync(Guid workflowId)
+    public async Task<List<AgentStep>> GetStepsAsync(
+        Guid workflowId)
     {
         return await _context.AgentSteps
             .AsNoTracking()
-            .Where(s => s.WorkflowId == workflowId)
+            .Where(s =>
+                s.WorkflowId == workflowId)
             .OrderBy(s => s.StartedAt)
             .ToListAsync();
     }
 
-    public async Task<object?> GetSummaryAsync(Guid workflowId)
+    public async Task<object?> GetSummaryAsync(
+        Guid workflowId)
     {
-        var workflow = await _context.AgentWorkflows
-            .AsNoTracking()
-            .FirstOrDefaultAsync(w => w.Id == workflowId);
+        var workflow =
+            await _context.AgentWorkflows
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    w => w.Id == workflowId);
 
         if (workflow == null)
         {
             return null;
         }
 
-        var steps = await _context.AgentSteps
-            .AsNoTracking()
-            .Where(s => s.WorkflowId == workflowId)
-            .ToListAsync();
+        var steps =
+            await _context.AgentSteps
+                .AsNoTracking()
+                .Where(s =>
+                    s.WorkflowId == workflowId)
+                .ToListAsync();
 
-        var decisions = await _context.ApprovalDecisions
-            .AsNoTracking()
-            .Where(d => d.WorkflowId == workflowId)
-            .OrderByDescending(d => d.CreatedAt)
-            .ToListAsync();
+        var decisions =
+            await _context.ApprovalDecisions
+                .AsNoTracking()
+                .Where(d =>
+                    d.WorkflowId == workflowId)
+                .OrderByDescending(
+                    d => d.CreatedAt)
+                .ToListAsync();
 
-        var completedSteps = steps.Count(s =>
-            s.CompletedAt != null &&
-            string.IsNullOrWhiteSpace(s.ErrorMessage));
+        var completedSteps =
+            steps.Count(s =>
+                s.CompletedAt != null &&
+                string.IsNullOrWhiteSpace(
+                    s.ErrorMessage));
 
-        var failedSteps = steps.Count(s =>
-            !string.IsNullOrWhiteSpace(s.ErrorMessage));
+        var failedSteps =
+            steps.Count(s =>
+                !string.IsNullOrWhiteSpace(
+                    s.ErrorMessage));
 
-        var latestDecision = decisions.FirstOrDefault();
+        var latestDecision =
+            decisions.FirstOrDefault();
 
         return new
         {
             workflow.Id,
             workflow.BloodRequestId,
+
+            // Workflow purpose and active agent
+            workflow.Objective,
+            workflow.CurrentAgent,
+
             workflow.Status,
             workflow.RevisionCount,
             workflow.StartedAt,
@@ -86,15 +109,17 @@ public class AgentWorkflowService : IAgentWorkflowService
             CompletedSteps = completedSteps,
             FailedSteps = failedSteps,
 
-            LatestDecision = latestDecision == null
-                ? null
-                : new
-                {
-                    latestDecision.Decision,
-                    latestDecision.Comments,
-                    latestDecision.DecidedByUserId,
-                    latestDecision.CreatedAt
-                }
+            LatestDecision =
+                latestDecision == null
+                    ? null
+                    : new
+                    {
+                        latestDecision.Decision,
+                        latestDecision.Comments,
+                        latestDecision
+                            .DecidedByUserId,
+                        latestDecision.CreatedAt
+                    }
         };
     }
 
@@ -103,8 +128,10 @@ public class AgentWorkflowService : IAgentWorkflowService
         Guid decidedByUserId,
         string? comments)
     {
-        var workflow = await _context.AgentWorkflows
-            .FirstOrDefaultAsync(w => w.Id == workflowId);
+        var workflow =
+            await _context.AgentWorkflows
+                .FirstOrDefaultAsync(
+                    w => w.Id == workflowId);
 
         if (workflow == null)
         {
@@ -115,19 +142,34 @@ public class AgentWorkflowService : IAgentWorkflowService
 
         var now = DateTime.UtcNow;
 
-        workflow.Status = WorkflowStatuses.Approved;
+        workflow.Status =
+            WorkflowStatuses.Approved;
+
+        // Coordinator is responsible for resuming
+        // the workflow after human approval.
+        workflow.CurrentAgent =
+            AgentNames.Coordinator;
+
         workflow.UpdatedAt = now;
 
-        var decision = new ApprovalDecision
-        {
-            WorkflowId = workflow.Id,
-            DecidedByUserId = decidedByUserId,
-            Decision = ApprovalDecisions.Approved,
-            Comments = comments,
-            CreatedAt = now
-        };
+        var decision =
+            new ApprovalDecision
+            {
+                WorkflowId = workflow.Id,
 
-        _context.ApprovalDecisions.Add(decision);
+                DecidedByUserId =
+                    decidedByUserId,
+
+                Decision =
+                    ApprovalDecisions.Approved,
+
+                Comments = comments,
+
+                CreatedAt = now
+            };
+
+        _context.ApprovalDecisions.Add(
+            decision);
 
         await _context.SaveChangesAsync();
 
@@ -139,8 +181,10 @@ public class AgentWorkflowService : IAgentWorkflowService
         Guid decidedByUserId,
         string? comments)
     {
-        var workflow = await _context.AgentWorkflows
-            .FirstOrDefaultAsync(w => w.Id == workflowId);
+        var workflow =
+            await _context.AgentWorkflows
+                .FirstOrDefaultAsync(
+                    w => w.Id == workflowId);
 
         if (workflow == null)
         {
@@ -151,20 +195,34 @@ public class AgentWorkflowService : IAgentWorkflowService
 
         var now = DateTime.UtcNow;
 
-        workflow.Status = WorkflowStatuses.Rejected;
+        workflow.Status =
+            WorkflowStatuses.Rejected;
+
         workflow.UpdatedAt = now;
         workflow.CompletedAt = now;
 
-        var decision = new ApprovalDecision
-        {
-            WorkflowId = workflow.Id,
-            DecidedByUserId = decidedByUserId,
-            Decision = ApprovalDecisions.Rejected,
-            Comments = comments,
-            CreatedAt = now
-        };
+        // Rejected is a terminal state,
+        // so there is no active agent.
+        workflow.CurrentAgent = null;
 
-        _context.ApprovalDecisions.Add(decision);
+        var decision =
+            new ApprovalDecision
+            {
+                WorkflowId = workflow.Id,
+
+                DecidedByUserId =
+                    decidedByUserId,
+
+                Decision =
+                    ApprovalDecisions.Rejected,
+
+                Comments = comments,
+
+                CreatedAt = now
+            };
+
+        _context.ApprovalDecisions.Add(
+            decision);
 
         await _context.SaveChangesAsync();
 
@@ -176,8 +234,10 @@ public class AgentWorkflowService : IAgentWorkflowService
         Guid decidedByUserId,
         string? comments)
     {
-        var workflow = await _context.AgentWorkflows
-            .FirstOrDefaultAsync(w => w.Id == workflowId);
+        var workflow =
+            await _context.AgentWorkflows
+                .FirstOrDefaultAsync(
+                    w => w.Id == workflowId);
 
         if (workflow == null)
         {
@@ -188,24 +248,40 @@ public class AgentWorkflowService : IAgentWorkflowService
 
         var now = DateTime.UtcNow;
 
+        // Maximum 3 revisions allowed.
         if (workflow.RevisionCount >= 3)
         {
-            workflow.Status = WorkflowStatuses.Failed;
+            workflow.Status =
+                WorkflowStatuses.Failed;
+
             workflow.FailureReason =
                 "Maximum workflow revision limit exceeded.";
+
             workflow.CompletedAt = now;
             workflow.UpdatedAt = now;
 
-            var failedDecision = new ApprovalDecision
-            {
-                WorkflowId = workflow.Id,
-                DecidedByUserId = decidedByUserId,
-                Decision = ApprovalDecisions.RevisionRequested,
-                Comments = comments,
-                CreatedAt = now
-            };
+            // Failed is terminal.
+            workflow.CurrentAgent = null;
 
-            _context.ApprovalDecisions.Add(failedDecision);
+            var failedDecision =
+                new ApprovalDecision
+                {
+                    WorkflowId = workflow.Id,
+
+                    DecidedByUserId =
+                        decidedByUserId,
+
+                    Decision =
+                        ApprovalDecisions
+                            .RevisionRequested,
+
+                    Comments = comments,
+
+                    CreatedAt = now
+                };
+
+            _context.ApprovalDecisions.Add(
+                failedDecision);
 
             await _context.SaveChangesAsync();
 
@@ -213,19 +289,36 @@ public class AgentWorkflowService : IAgentWorkflowService
         }
 
         workflow.RevisionCount += 1;
-        workflow.Status = WorkflowStatuses.RevisionRequested;
+
+        workflow.Status =
+            WorkflowStatuses.RevisionRequested;
+
+        // Coordinator will resume/re-plan
+        // the workflow after revision.
+        workflow.CurrentAgent =
+            AgentNames.Coordinator;
+
         workflow.UpdatedAt = now;
 
-        var decision = new ApprovalDecision
-        {
-            WorkflowId = workflow.Id,
-            DecidedByUserId = decidedByUserId,
-            Decision = ApprovalDecisions.RevisionRequested,
-            Comments = comments,
-            CreatedAt = now
-        };
+        var decision =
+            new ApprovalDecision
+            {
+                WorkflowId = workflow.Id,
 
-        _context.ApprovalDecisions.Add(decision);
+                DecidedByUserId =
+                    decidedByUserId,
+
+                Decision =
+                    ApprovalDecisions
+                        .RevisionRequested,
+
+                Comments = comments,
+
+                CreatedAt = now
+            };
+
+        _context.ApprovalDecisions.Add(
+            decision);
 
         await _context.SaveChangesAsync();
 
@@ -236,8 +329,10 @@ public class AgentWorkflowService : IAgentWorkflowService
         AgentWorkflow workflow)
     {
         var decisionAllowed =
-            workflow.Status == WorkflowStatuses.Planning ||
-            workflow.Status == WorkflowStatuses.AwaitingApproval;
+            workflow.Status ==
+                WorkflowStatuses.Planning ||
+            workflow.Status ==
+                WorkflowStatuses.AwaitingApproval;
 
         if (!decisionAllowed)
         {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   useSearchDonorsQuery,
+  useUpdateDonorProfileMutation,
   useVerifyDonorMutation,
   type DonorProfileResponse,
 } from "./donorApi";
@@ -77,7 +78,11 @@ function SkeletonRow() {
 
 function DonorRow({ donor }: { donor: DonorProfileResponse }) {
   const [verify, { isLoading }] = useVerifyDonorMutation();
+  const [updateProfile, { isLoading: isSavingMedicalFlags }] = useUpdateDonorProfileMutation();
   const [hovered, setHovered] = useState(false);
+  const [editingMedicalFlags, setEditingMedicalFlags] = useState(false);
+  const [medicalFlags, setMedicalFlags] = useState<Record<string, boolean>>(donor.medicalFlags ?? {});
+  const [medicalError, setMedicalError] = useState<string | null>(null);
 
   const handleVerify = async () => {
     try {
@@ -87,13 +92,23 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
     }
   };
 
+  const handleSaveMedicalFlags = async () => {
+    setMedicalError(null);
+    try {
+      await updateProfile({ id: donor.id, body: { medicalFlags } }).unwrap();
+      setEditingMedicalFlags(false);
+    } catch {
+      setMedicalError("Could not save medical flags.");
+    }
+  };
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         display: "grid",
-        gridTemplateColumns: "3px 56px 1fr 1fr 130px 120px",
+        gridTemplateColumns: "3px 56px 1fr 1fr 130px 190px",
         alignItems: "center",
         gap: 16,
         padding: "12px 16px",
@@ -122,7 +137,7 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
         {donor.bloodType}
       </span>
 
-      {/* Donor ID fragment + address */}
+      {/* Donor name + secondary identifiers and address */}
       <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span
           className="text-body-sm tabular-nums"
@@ -133,13 +148,13 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
             whiteSpace: "nowrap",
           }}
         >
-          Profile ID: {donor.id}
+          {donor.fullName || "Unnamed donor"}
         </span>
         <span
           className="text-caption tabular-nums"
           style={{ color: "var(--color-ink-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
         >
-          Account ID: {donor.userId}
+          Profile ID: {donor.id} · Account ID: {donor.userId}
         </span>
         {donor.address && (
           <span
@@ -175,52 +190,43 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
       {/* Eligibility status */}
       <StatusBadge status={donor.eligibilityStatus} />
 
-      {/* Approve button */}
-      <button
-        onClick={handleVerify}
-        disabled={isLoading}
-        className="transition-fast"
-        style={{
-          background: isLoading ? "var(--color-primary-press)" : "var(--color-primary)",
-          color: "var(--color-on-primary)",
-          border: "none",
-          borderRadius: "var(--radius-sm)",
-          padding: "6px 12px",
-          fontSize: 12,
-          fontWeight: 500,
-          fontFamily: "var(--font-sans)",
-          cursor: isLoading ? "not-allowed" : "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          whiteSpace: "nowrap",
-        }}
-        onMouseEnter={(e) => {
-          if (!isLoading) e.currentTarget.style.background = "var(--color-primary-hover)";
-        }}
-        onMouseLeave={(e) => {
-          if (!isLoading) e.currentTarget.style.background = "var(--color-primary)";
-        }}
-      >
-        {isLoading ? (
-          <>
-            <span
-              style={{
-                display: "inline-block",
-                width: 10,
-                height: 10,
-                border: "2px solid rgba(255,255,255,0.4)",
-                borderTopColor: "#fff",
-                borderRadius: "50%",
-                animation: "spin 0.7s linear infinite",
-              }}
-            />
-            Verifying…
-          </>
-        ) : (
-          "✓ Approve"
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+        {!donor.verifiedByAdmin && (
+          <button
+            onClick={handleVerify}
+            disabled={isLoading}
+            style={{ background: isLoading ? "var(--color-primary-press)" : "var(--color-primary)", color: "var(--color-on-primary)", border: 0, borderRadius: "var(--radius-sm)", padding: "6px 12px", fontSize: 12, fontWeight: 500, fontFamily: "var(--font-sans)", cursor: isLoading ? "not-allowed" : "pointer" }}
+          >
+            {isLoading ? "Verifying…" : "✓ Approve donor"}
+          </button>
         )}
-      </button>
+        <button
+          type="button"
+          onClick={() => setEditingMedicalFlags((current) => !current)}
+          style={{ background: "var(--color-surface)", color: "var(--color-ink-secondary)", border: "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", padding: "6px 12px", fontSize: 12, fontWeight: 500, fontFamily: "var(--font-sans)", cursor: "pointer" }}
+        >
+          {editingMedicalFlags ? "Close medical flags" : "Flag medical illness"}
+        </button>
+        {editingMedicalFlags && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8, background: "var(--color-surface-sunken)", borderRadius: "var(--radius-sm)" }}>
+            {Object.entries(MEDICAL_FLAG_LABELS).map(([key, label]) => (
+              <label key={key} className="text-caption" style={{ display: "flex", gap: 6, alignItems: "center", color: "var(--color-ink-secondary)" }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(medicalFlags[key])}
+                  onChange={(event) => setMedicalFlags((current) => ({ ...current, [key]: event.target.checked }))}
+                  style={{ accentColor: "var(--color-primary)" }}
+                />
+                {label}
+              </label>
+            ))}
+            {medicalError && <span className="text-caption" style={{ color: "var(--color-critical)" }}>{medicalError}</span>}
+            <button type="button" onClick={handleSaveMedicalFlags} disabled={isSavingMedicalFlags} style={{ background: "var(--color-primary)", color: "var(--color-on-primary)", border: 0, borderRadius: "var(--radius-sm)", padding: "5px 8px", fontSize: 12, cursor: "pointer" }}>
+              {isSavingMedicalFlags ? "Saving…" : "Save flags"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -228,13 +234,20 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function DonorVerificationQueuePage() {
-  // Fetch all donors (large page), then filter client-side for unverified.
-  // Once the backend adds a dedicated filter param, wire it in here.
-  const { data, isLoading, isError, refetch } = useSearchDonorsQuery({
-    pageSize: 100,
+  const [view, setView] = useState<"pending" | "all">("pending");
+  const { data, isLoading, isError, error, refetch } = useSearchDonorsQuery({
+    pageSize: 1000,
   });
-
   const unverified = (data?.items ?? []).filter((d) => !d.verifiedByAdmin);
+  const visibleDonors = view === "pending" ? unverified : (data?.items ?? []);
+  const errorStatus = typeof error === "object" && error !== null && "status" in error
+    ? String(error.status)
+    : "";
+  const errorMessage = errorStatus === "401" || errorStatus === "403"
+    ? "Your admin session is not authorized to view donors. Log out and sign in again with an admin account."
+    : errorStatus === "FETCH_ERROR"
+      ? "The donor service could not be reached. Check that the backend is running."
+      : "Failed to load donors. Try refreshing.";
 
   return (
     <div
@@ -256,14 +269,13 @@ export function DonorVerificationQueuePage() {
       >
         <div>
           <h1 className="text-display" style={{ margin: 0, color: "var(--color-ink)" }}>
-            Verification Queue
+            Donor verification
           </h1>
           <p
             className="text-body-sm"
             style={{ margin: "4px 0 0", color: "var(--color-ink-muted)" }}
           >
-            Donors awaiting admin approval — review and approve to make them eligible
-            for dispatch.
+            Review registration status and maintain donor medical information.
           </p>
         </div>
         <button
@@ -289,6 +301,14 @@ export function DonorVerificationQueuePage() {
         >
           ↺ Refresh
         </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, padding: "0 var(--space-lg) var(--space-md)" }}>
+        {(["pending", "all"] as const).map((option) => (
+          <button key={option} type="button" onClick={() => setView(option)} style={{ border: "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", padding: "6px 10px", background: view === option ? "var(--color-ink)" : "var(--color-surface)", color: view === option ? "#fff" : "var(--color-ink-secondary)", font: "inherit", fontSize: 12, cursor: "pointer" }}>
+            {option === "pending" ? `Pending verification (${unverified.length})` : `All donors (${data?.items.length ?? 0})`}
+          </button>
+        ))}
       </div>
 
       {/* Counter badge */}
@@ -328,7 +348,7 @@ export function DonorVerificationQueuePage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "3px 56px 1fr 1fr 130px 120px",
+            gridTemplateColumns: "3px 56px minmax(220px, 1fr) 1fr 130px 210px",
             gap: 16,
             padding: "10px 16px",
             background: "var(--color-surface-sunken)",
@@ -336,7 +356,7 @@ export function DonorVerificationQueuePage() {
           }}
         >
           <div />
-          {["Blood", "Donor ID / Address", "Date of Birth", "Status", "Action"].map(
+          {["Blood", "Donor name / Address", "Date of birth", "Status", "Admin actions"].map(
             (h) => (
               <span
                 key={h}
@@ -378,13 +398,13 @@ export function DonorVerificationQueuePage() {
               ✕
             </div>
             <p className="text-body-sm" style={{ color: "var(--color-critical)", margin: 0 }}>
-              Failed to load donor queue. Try refreshing.
+              {errorMessage}
             </p>
           </div>
         )}
 
         {/* Empty state */}
-        {!isLoading && !isError && unverified.length === 0 && (
+        {!isLoading && !isError && visibleDonors.length === 0 && (
           <div
             className="fade-enter"
             style={{
@@ -412,13 +432,13 @@ export function DonorVerificationQueuePage() {
               className="text-subheading"
               style={{ color: "var(--color-ink)", margin: "0 0 4px" }}
             >
-              Queue is clear
+              {view === "pending" ? "Queue is clear" : "No donors registered"}
             </p>
             <p
               className="text-body-sm"
               style={{ color: "var(--color-ink-muted)", margin: 0 }}
             >
-              All registered donors have been verified.
+              {view === "pending" ? "All registered donors have been verified." : "Registered donors will appear here."}
             </p>
           </div>
         )}
@@ -426,7 +446,7 @@ export function DonorVerificationQueuePage() {
         {/* Rows */}
         {!isLoading &&
           !isError &&
-          unverified.map((donor) => <DonorRow key={donor.id} donor={donor} />)}
+          visibleDonors.map((donor) => <DonorRow key={donor.id} donor={donor} />)}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

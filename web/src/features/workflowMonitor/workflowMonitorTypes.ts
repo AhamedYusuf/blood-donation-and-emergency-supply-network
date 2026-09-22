@@ -1,6 +1,8 @@
 export interface AgentWorkflow {
   id: string;
   bloodRequestId: string;
+  objective: string;
+  currentAgent?: string | null;
   status: string;
   revisionCount: number;
   startedAt: string;
@@ -21,11 +23,14 @@ export interface AgentStep {
   startedAt: string;
   completedAt?: string | null;
   errorMessage?: string | null;
+  retryCount: number;
 }
 
 export interface WorkflowSummary {
   id: string;
   bloodRequestId: string;
+  objective: string;
+  currentAgent?: string | null;
   status: string;
   revisionCount: number;
   startedAt: string;

@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Routes,
@@ -27,9 +28,10 @@ import { InventoryEmergencyPage } from "./features/inventory/InventoryEmergencyP
 import RequestsPage from "./features/requests/RequestsPage";
 import CreateRequestPage from "./features/requests/CreateRequestPage";
 import RequestDetailsPage from "./features/requests/RequestDetailsPage";
+import { StaffInvitationsPage } from "./features/staff-invitations/StaffInvitationsPage";
+import { AcceptInvitationPage } from "./features/staff-invitations/AcceptInvitationPage";
 
 import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage";
-
 
 // =====================================================
 // AUTH GUARDS
@@ -51,7 +53,6 @@ function RequireAuth({
   return <>{children}</>;
 }
 
-
 function RedirectIfAuthed({
   children,
 }: {
@@ -68,7 +69,6 @@ function RedirectIfAuthed({
   return <>{children}</>;
 }
 
-
 function RequireRole({
   children,
   roles,
@@ -77,25 +77,19 @@ function RequireRole({
   roles: string[];
 }) {
   const role = useSelector(
-    (state: RootState) =>
-      state.auth.role ?? ""
+    (state: RootState) => state.auth.role ?? ""
   );
 
   const allowedRoles = roles.map((r) =>
     r.toLowerCase()
   );
 
-  if (
-    !allowedRoles.includes(
-      role.toLowerCase()
-    )
-  ) {
+  if (!allowedRoles.includes(role.toLowerCase())) {
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 }
-
 
 /**
  * Donors must complete their donor profile before
@@ -116,14 +110,10 @@ function RequireDonorProfile({
   );
 
   const donorId = useSelector(
-    (state: RootState) =>
-      state.auth.donorId
+    (state: RootState) => state.auth.donorId
   );
 
-  if (
-    role === "donor" &&
-    !donorId
-  ) {
+  if (role === "donor" && !donorId) {
     return (
       <Navigate
         to="/register/donor-profile"
@@ -135,7 +125,6 @@ function RequireDonorProfile({
   return <>{children}</>;
 }
 
-
 // =====================================================
 // APP
 // =====================================================
@@ -144,7 +133,6 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* =================================================
             PUBLIC AUTH
            ================================================= */}
@@ -167,6 +155,7 @@ export function App() {
           }
         />
 
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
         {/* =================================================
             DONOR PROFILE REGISTRATION
@@ -176,15 +165,12 @@ export function App() {
           path="/register/donor-profile"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["donor"]}
-              >
+              <RequireRole roles={["donor"]}>
                 <DonorProfilePage />
               </RequireRole>
             </RequireAuth>
           }
         />
-
 
         {/* =================================================
             MAIN CONSOLE
@@ -203,7 +189,6 @@ export function App() {
           }
         />
 
-
         {/* =================================================
             DONOR MODULE
            ================================================= */}
@@ -212,9 +197,7 @@ export function App() {
           path="/donors/search"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["staff", "admin"]}
-              >
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <DonorSearchPage />
                 </AppShell>
@@ -227,9 +210,7 @@ export function App() {
           path="/donors/verification-queue"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["staff", "admin"]}
-              >
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <DonorVerificationQueuePage />
                 </AppShell>
@@ -237,7 +218,6 @@ export function App() {
             </RequireAuth>
           }
         />
-
 
         {/* =================================================
             ORGANIZATION MODULE
@@ -255,9 +235,7 @@ export function App() {
           path="/organizations"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["admin"]}
-              >
+              <RequireRole roles={["admin"]}>
                 <AppShell>
                   <OrganizationsPage />
                 </AppShell>
@@ -266,6 +244,18 @@ export function App() {
           }
         />
 
+        <Route
+          path="/staff-invitations"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["admin"]}>
+                <AppShell>
+                  <StaffInvitationsPage />
+                </AppShell>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
 
         {/* =================================================
             INVENTORY MODULE
@@ -283,9 +273,7 @@ export function App() {
           path="/inventory"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["staff", "admin"]}
-              >
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <InventoryPage />
                 </AppShell>
@@ -298,9 +286,7 @@ export function App() {
           path="/inventory/manage"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["staff", "admin"]}
-              >
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <InventoryManagePage />
                 </AppShell>
@@ -313,9 +299,7 @@ export function App() {
           path="/inventory/emergency"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["staff", "admin"]}
-              >
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <InventoryEmergencyPage />
                 </AppShell>
@@ -323,7 +307,6 @@ export function App() {
             </RequireAuth>
           }
         />
-
 
         {/* =================================================
             BLOOD REQUEST MODULE
@@ -356,11 +339,11 @@ export function App() {
           path="/requests/create"
           element={
             <RequireAuth>
-              <RequireDonorProfile>
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <CreateRequestPage />
                 </AppShell>
-              </RequireDonorProfile>
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -387,9 +370,7 @@ export function App() {
           path="/workflows/:id"
           element={
             <RequireAuth>
-              <RequireRole
-                roles={["staff", "admin"]}
-              >
+              <RequireRole roles={["staff", "admin"]}>
                 <AppShell>
                   <WorkflowMonitorPage />
                 </AppShell>
@@ -398,7 +379,6 @@ export function App() {
           }
         />
 
-
         {/* =================================================
             CATCH ALL
            ================================================= */}
@@ -406,13 +386,9 @@ export function App() {
         <Route
           path="*"
           element={
-            <Navigate
-              to="/requests"
-              replace
-            />
+            <Navigate to="/requests" replace />
           }
         />
-
       </Routes>
     </BrowserRouter>
   );

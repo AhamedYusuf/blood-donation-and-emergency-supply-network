@@ -72,4 +72,33 @@ public class EligibilityRuleEngineTests
         Assert.True(isEligible);
         Assert.Null(reason);
     }
+
+    [Theory]
+    [InlineData("O-", "AB+")] [InlineData("O-", "O-")] [InlineData("O-", "B+")]
+    public void Universal_donor_is_compatible_with_everyone(string donor, string recipient)
+        => Assert.True(_engine.Evaluate(MakeDonor(bloodType: donor), recipient).IsEligible);
+
+    [Theory]
+    [InlineData("AB+", "AB+")] [InlineData("O+", "AB+")] [InlineData("B-", "AB+")]
+    public void Universal_recipient_accepts_everyone(string donor, string recipient)
+        => Assert.True(_engine.Evaluate(MakeDonor(bloodType: donor), recipient).IsEligible);
+
+    [Theory]
+    [InlineData("O+", "O-")]   // Rh mismatch — catches "O is universal" oversimplification
+    [InlineData("A+", "A-")]
+    [InlineData("AB+", "A+")]
+    public void Incompatible_pairs_are_rejected(string donor, string recipient)
+        => Assert.False(_engine.Evaluate(MakeDonor(bloodType: donor), recipient).IsEligible);
+
+    [Fact]
+    public void Unknown_recipient_type_fails_closed()
+        => Assert.False(_engine.Evaluate(MakeDonor(bloodType: "O-"), "XYZ").IsEligible);
+
+    [Fact]
+    public void Unknown_recipient_type_fails_closed_without_throwing()
+    {
+        var (ok, reason) = _engine.Evaluate(MakeDonor(bloodType: "O-"), "XYZ");
+        Assert.False(ok);
+        Assert.Contains("unrecognized", reason, StringComparison.OrdinalIgnoreCase);
+    }
 }

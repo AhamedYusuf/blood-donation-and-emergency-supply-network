@@ -44,7 +44,20 @@ public class JwtTokenService : IJwtTokenService
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new(JwtRegisteredClaimNames.Email, email),
-            new(ClaimTypes.Role, role.ToLowerInvariant()),
+            // Tech Doc §0.4 requires the claim key to be literally "role"
+            // in the raw JWT payload, not ClaimTypes.Role's full
+            // XML-namespace URI. No other change is needed: ASP.NET
+            // Core's JWT bearer handler auto-maps an inbound "role" claim
+            // back onto ClaimsPrincipal's standard role claim type by
+            // default (JwtSecurityTokenHandler.DefaultInboundClaimTypeMap),
+            // which is also RoleClaimType's default — so
+            // User.IsInRole()/[Authorize(Roles=...)] keep working exactly
+            // as before. (Explicitly setting RoleClaimType/MapInboundClaims
+            // in Program.cs was tried and reverted — it broke every
+            // ClaimTypes.NameIdentifier-based ownership check across the
+            // app, since disabling inbound mapping to fix "role" also
+            // stops "sub" from mapping to NameIdentifier.)
+            new("role", role.ToLowerInvariant()),
         };
 
         // Tech Doc §0.4: organizationId claim, present only for users that

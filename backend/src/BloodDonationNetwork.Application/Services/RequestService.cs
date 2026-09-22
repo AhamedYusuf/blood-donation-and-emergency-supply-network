@@ -10,15 +10,35 @@ public class RequestService : IRequestService
 {
     private readonly IApplicationDbContext _context;
 
+    private static readonly HashSet<string> ValidRequestStatuses =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            RequestStatuses.Open,
+            RequestStatuses.Matching,
+            RequestStatuses.AwaitingApproval,
+            RequestStatuses.DonorsNotified,
+            RequestStatuses.PartiallyFulfilled,
+            RequestStatuses.Fulfilled,
+            RequestStatuses.Expired,
+            RequestStatuses.Cancelled
+        };
+
     public RequestService(IApplicationDbContext context)
     {
         _context = context;
     }
 
     // 1. Create a new blood request
-    public async Task<RequestResponseDto> CreateAsync(Guid requesterId, Guid requestingUserId, bool isAdmin, CreateRequestDto dto)
+    public async Task<RequestResponseDto> CreateAsync(
+        Guid requesterId,
+        Guid requestingUserId,
+        bool isAdmin,
+        CreateRequestDto dto)
     {
-        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, dto.OrganizationId);
+        await EnsureCanActOnOrganizationAsync(
+            requestingUserId,
+            isAdmin,
+            dto.OrganizationId);
 
         var request = new BloodRequest
         {
@@ -28,7 +48,7 @@ public class RequestService : IRequestService
             BloodType = dto.BloodType,
             UnitsRequested = dto.UnitsRequested,
             Urgency = dto.Urgency,
-            Status = BloodRequestStatus.Pending,
+            Status = RequestStatuses.Open,
             HospitalName = dto.HospitalName,
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
@@ -61,7 +81,7 @@ public class RequestService : IRequestService
     public async Task<IEnumerable<RequestResponseDto>> GetAllAsync(
         BloodType? bloodType = null,
         RequestUrgency? urgency = null,
-        BloodRequestStatus? status = null,
+        string? status = null,
         Guid? organizationId = null,
         int page = 1,
         int pageSize = 10,
@@ -75,23 +95,29 @@ public class RequestService : IRequestService
         // Filters
         if (bloodType.HasValue)
         {
-            query = query.Where(r => r.BloodType == bloodType.Value);
+            query = query.Where(
+                r => r.BloodType == bloodType.Value);
         }
 
         if (urgency.HasValue)
         {
-            query = query.Where(r => r.Urgency == urgency.Value);
+            query = query.Where(
+                r => r.Urgency == urgency.Value);
         }
 
-        if (status.HasValue)
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(r => r.Status == status.Value);
+            var normalizedStatus =
+                NormalizeAndValidateStatus(status);
+
+            query = query.Where(
+                r => r.Status == normalizedStatus);
         }
 
         if (organizationId.HasValue)
         {
-            query = query.Where(r =>
-                r.OrganizationId == organizationId.Value);
+            query = query.Where(
+                r => r.OrganizationId == organizationId.Value);
         }
 
         // Prevent invalid pagination values
@@ -147,18 +173,25 @@ public class RequestService : IRequestService
             return null;
         }
 
-        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, request.OrganizationId);
+        await EnsureCanActOnOrganizationAsync(
+            requestingUserId,
+            isAdmin,
+            request.OrganizationId);
 
-        request.Status = dto.Status;
+        var normalizedStatus =
+            NormalizeAndValidateStatus(dto.Status);
+
+        request.Status = normalizedStatus;
 
         // Record fulfilment time
-        if (dto.Status == BloodRequestStatus.Fulfilled)
+        if (normalizedStatus == RequestStatuses.Fulfilled)
         {
             request.FulfilledAt ??= DateTime.UtcNow;
         }
 
-        // Record closed time
-        if (dto.Status == BloodRequestStatus.Closed)
+        // The old system used a "closed" state.
+        // The current specification uses "cancelled" instead.
+        if (normalizedStatus == RequestStatuses.Cancelled)
         {
             request.ClosedAt ??= DateTime.UtcNow;
         }
@@ -169,7 +202,10 @@ public class RequestService : IRequestService
     }
 
     // 5. Delete a blood request
-    public async Task<bool> DeleteAsync(Guid id, Guid requestingUserId, bool isAdmin)
+    public async Task<bool> DeleteAsync(
+        Guid id,
+        Guid requestingUserId,
+        bool isAdmin)
     {
         var request = await _context.BloodRequests
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -179,7 +215,10 @@ public class RequestService : IRequestService
             return false;
         }
 
-        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, request.OrganizationId);
+        await EnsureCanActOnOrganizationAsync(
+            requestingUserId,
+            isAdmin,
+            request.OrganizationId);
 
         _context.BloodRequests.Remove(request);
         await _context.SaveChangesAsync();
@@ -188,7 +227,10 @@ public class RequestService : IRequestService
     }
 
     // 6. Close a blood request
-    public async Task<RequestResponseDto?> CloseAsync(Guid id, Guid requestingUserId, bool isAdmin)
+    public async Task<RequestResponseDto?> CloseAsync(
+        Guid id,
+        Guid requestingUserId,
+        bool isAdmin)
     {
         var request = await _context.BloodRequests
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -198,9 +240,15 @@ public class RequestService : IRequestService
             return null;
         }
 
-        await EnsureCanActOnOrganizationAsync(requestingUserId, isAdmin, request.OrganizationId);
+        await EnsureCanActOnOrganizationAsync(
+            requestingUserId,
+            isAdmin,
+            request.OrganizationId);
 
-        request.Status = BloodRequestStatus.Closed;
+        // "Closed" is not part of the specification's request states.
+        // Existing close behavior now maps to the valid terminal
+        // "cancelled" state.
+        request.Status = RequestStatuses.Cancelled;
         request.ClosedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -208,9 +256,12 @@ public class RequestService : IRequestService
         return MapToResponse(request);
     }
 
-    // Staff may only act on their own organization's requests; admins may
-    // act on any. Mirrors AppointmentService's org-ownership check.
-    private async Task EnsureCanActOnOrganizationAsync(Guid requestingUserId, bool isAdmin, Guid organizationId)
+    // Staff may only act on their own organization's requests.
+    // Admins may act on any organization.
+    private async Task EnsureCanActOnOrganizationAsync(
+        Guid requestingUserId,
+        bool isAdmin,
+        Guid organizationId)
     {
         if (isAdmin)
         {
@@ -218,13 +269,44 @@ public class RequestService : IRequestService
         }
 
         var requestingUser = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == requestingUserId);
+            .FirstOrDefaultAsync(
+                u => u.Id == requestingUserId);
 
         if (requestingUser?.OrganizationId != organizationId)
         {
             throw new UnauthorizedAccessException(
                 "Staff may only manage blood requests for their own organization.");
         }
+    }
+
+    private static string NormalizeAndValidateStatus(
+        string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            throw new ArgumentException(
+                "Blood request status is required.");
+        }
+
+        var normalizedStatus =
+            status.Trim().ToLowerInvariant();
+
+        if (!ValidRequestStatuses.Contains(normalizedStatus))
+        {
+            throw new ArgumentException(
+                $"Invalid blood request status: '{status}'. " +
+                "Allowed values are: " +
+                $"{RequestStatuses.Open}, " +
+                $"{RequestStatuses.Matching}, " +
+                $"{RequestStatuses.AwaitingApproval}, " +
+                $"{RequestStatuses.DonorsNotified}, " +
+                $"{RequestStatuses.PartiallyFulfilled}, " +
+                $"{RequestStatuses.Fulfilled}, " +
+                $"{RequestStatuses.Expired}, " +
+                $"{RequestStatuses.Cancelled}.");
+        }
+
+        return normalizedStatus;
     }
 
     // Convert BloodRequest entity into response DTO

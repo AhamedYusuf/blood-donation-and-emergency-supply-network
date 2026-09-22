@@ -36,11 +36,19 @@ public class MatchingDispatchAgentService : IMatchingDispatchAgentService
         var lat = request.Location.Lat;
         var lng = request.Location.Lng;
 
-        // Rough pre-filter by blood type only — real distance filtering
-        // happens in-memory below, since Haversine distance can't be
-        // translated into SQL by EF Core directly.
+        // Rough pre-filter by compatible blood type only — real distance
+        // filtering happens in-memory below, since Haversine distance
+        // can't be translated into SQL by EF Core directly. Widened to
+        // every donor type that could safely give to this request's
+        // recipient type (e.g. an A+ request also considers O+/O-/A-
+        // donors), not just an exact match — see BloodCompatibility.
+        // This doesn't replace the authoritative compatibility rule Tech
+        // Doc §1.4 assigns to the Eligibility Validation Agent; it just
+        // means a compatible donor gets seen as a candidate at all.
+        var compatibleTypes = BloodCompatibility.GetCompatibleDonorTypes(request.BloodType);
+
         var candidateDonors = await _context.DonorProfiles
-            .Where(d => d.BloodType == request.BloodType
+            .Where(d => compatibleTypes.Contains(d.BloodType)
                      && d.VerifiedByAdmin
                      && d.Latitude != null
                      && d.Longitude != null)
