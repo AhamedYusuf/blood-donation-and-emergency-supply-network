@@ -82,6 +82,7 @@ public class WorkflowInternalController : ControllerBase
         return Ok(new
         {
             bloodRequestId = bloodRequest.Id,
+            organizationId = bloodRequest.OrganizationId,
             bloodType,
             unitsRequested = bloodRequest.UnitsRequested,
             urgency,

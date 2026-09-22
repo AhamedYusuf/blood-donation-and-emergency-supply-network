@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from agents.eligibility_validation_agent import run as run_eligibility
+from agents.stock_check_agent import run as run_stock_check
 from agents.matching_dispatch_agent import dispatch as run_dispatch
 from agents.matching_dispatch_agent import search as run_search
 from shared.internal_client import InternalClient, InternalClientError
@@ -20,6 +21,8 @@ class CoordinatorState(TypedDict, total=False):
     blood_request_id: str
 
     # Request information
+    organization_id: str
+    requesting_org_id: str
     blood_type: str
     units_needed: int
     urgency_level: str
@@ -74,6 +77,7 @@ def log_workflow_step(
 
     Logging failure must not crash the main workflow.
     """
+
     workflow_id = state.get("workflow_id")
 
     if not workflow_id:
@@ -119,45 +123,123 @@ def log_workflow_step(
         )
 
 
+# ============================================================
+# STOCK CHECK NODE
+# ============================================================
+
 def stock_check_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
-    Temporary Student 3 stub.
+    Run the Stock Check Agent.
 
-    Later this node will call Student 3's real stock-check agent.
+    IMPORTANT:
+    stock_check_agent.py expects:
+        organizationId
+        bloodType
+        requiredUnits
+
+    Do not send:
+        requestingOrgId
+        unitsNeeded
     """
+
     started_at = utc_now_iso()
 
-    result = {
-        "sufficient": False,
-        "message": "Temporary stock-check stub.",
-    }
-
-    log_workflow_step(
-        state,
-        agent_name="Stock Check Agent",
-        step_name="stock_check",
-        status="completed",
-        input_data={
-            "bloodType": state.get("blood_type"),
-            "unitsNeeded": state.get("units_needed"),
-            "location": state.get("location"),
-        },
-        output_data=result,
-        narrative=(
-            "Checked available blood stock. "
-            "Temporary Student 3 stub is currently in use."
-        ),
-        started_at=started_at,
-        completed_at=utc_now_iso(),
+    organization_id = (
+        state.get("organization_id")
+        or state.get("requesting_org_id")
     )
 
-    return {
-        "current_step": "stock_check",
-        "stock_result": result,
+    payload = {
+        "workflowId": state.get("workflow_id"),
+        "organizationId": organization_id,
+        "bloodType": state.get("blood_type"),
+        "requiredUnits": state.get("units_needed"),
     }
 
+    print("=" * 60)
+    print("[Coordinator] STOCK CHECK REQUEST")
+    print(f"[Coordinator] organizationId = {organization_id}")
+    print(
+        f"[Coordinator] bloodType = "
+        f"{state.get('blood_type')}"
+    )
+    print(
+        f"[Coordinator] requiredUnits = "
+        f"{state.get('units_needed')}"
+    )
+    print(f"[Coordinator] payload = {payload}")
+    print("=" * 60)
+
+    try:
+        result = run_stock_check(payload)
+
+        print("=" * 60)
+        print("[Coordinator] STOCK CHECK RESULT")
+        print(result)
+        print("=" * 60)
+
+        log_workflow_step(
+            state,
+            agent_name="Stock Check Agent",
+            step_name="stock_check",
+            status="completed",
+            input_data=payload,
+            output_data=result,
+            narrative=(
+                "Stock Check Agent evaluated the requesting "
+                "organization's current blood inventory."
+            ),
+            started_at=started_at,
+            completed_at=utc_now_iso(),
+        )
+
+        return {
+            "current_step": "stock_check",
+            "stock_result": result,
+            "error": None,
+        }
+
+    except (InternalClientError, ValueError) as exc:
+        error_message = f"stock_check failed: {exc}"
+
+        print("=" * 60)
+        print("[Coordinator] STOCK CHECK ERROR")
+        print(error_message)
+        print("=" * 60)
+
+        log_workflow_step(
+            state,
+            agent_name="Stock Check Agent",
+            step_name="stock_check",
+            status="failed",
+            input_data=payload,
+            output_data={},
+            narrative="Stock Check Agent failed.",
+            started_at=started_at,
+            completed_at=utc_now_iso(),
+            error_message=error_message,
+        )
+
+        return {
+            "current_step": "stock_check",
+            "stock_result": {
+                "sufficient": False,
+                "ownStockUnits": 0,
+                "shortfallUnits": state.get(
+                    "units_needed",
+                    0,
+                ),
+                "candidateTransferOrgs": [],
+            },
+            "error": error_message,
+        }
+
+
+# ============================================================
+# STOCK ROUTING
+# ============================================================
 
 def route_after_stock_check(
     state: CoordinatorState,
@@ -167,6 +249,7 @@ def route_after_stock_check(
 
     Otherwise continue to donor search.
     """
+
     stock_result = state.get(
         "stock_result",
         {},
@@ -178,15 +261,21 @@ def route_after_stock_check(
     return "search_donors"
 
 
+# ============================================================
+# DONOR SEARCH
+# ============================================================
+
 def search_donors_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
     Student 4 Matching & Dispatch Agent - search mode.
 
-    Student 4's search agent already writes its own AgentStep record,
-    so the Coordinator must not log this step again.
+    Student 4's search agent already writes its own
+    AgentStep record, so the Coordinator must not log
+    this step again.
     """
+
     search_input = {
         "workflowId": state.get("workflow_id"),
         "bloodType": state.get("blood_type"),
@@ -217,19 +306,25 @@ def search_donors_node(
         }
 
 
+# ============================================================
+# ELIGIBILITY VALIDATION
+# ============================================================
+
 def validate_eligibility_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
     Student 1 Eligibility Validation Agent.
 
-    Student 4's search agent returns candidate donor objects. The
-    eligibility agent expects donor IDs plus the required blood type,
-    so the Coordinator adapts the data between both agents.
+    Student 4's search agent returns candidate donor objects.
+    The eligibility agent expects donor IDs plus the required
+    blood type, so the Coordinator adapts the data between
+    both agents.
 
-    Student 1's endpoint owns its AgentStep logging, so the Coordinator
-    does not create a duplicate eligibility step.
+    Student 1's endpoint owns its AgentStep logging, so the
+    Coordinator does not create a duplicate eligibility step.
     """
+
     donor_search_result = state.get(
         "donor_search_result",
         {},
@@ -307,12 +402,17 @@ def validate_eligibility_node(
     }
 
 
+# ============================================================
+# MARK AWAITING APPROVAL
+# ============================================================
+
 def mark_awaiting_approval_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
     Persist awaiting_approval before LangGraph pauses.
     """
+
     workflow_id = state.get("workflow_id")
 
     if not workflow_id:
@@ -343,15 +443,20 @@ def mark_awaiting_approval_node(
     }
 
 
+# ============================================================
+# HUMAN APPROVAL
+# ============================================================
+
 def await_approval_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
     Human-in-the-loop approval.
 
-    The graph pauses until an authorized staff/admin user chooses:
-    approve, reject, or revise.
+    The graph pauses until an authorized staff/admin user
+    chooses approve, reject, or revise.
     """
+
     started_at = utc_now_iso()
 
     decision = interrupt(
@@ -421,6 +526,10 @@ def await_approval_node(
     }
 
 
+# ============================================================
+# REVISION / REPLAN
+# ============================================================
+
 def revision_replan_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
@@ -430,6 +539,7 @@ def revision_replan_node(
     The backend already increments RevisionCount and enforces
     the maximum revision limit.
     """
+
     started_at = utc_now_iso()
 
     comments = state.get(
@@ -481,6 +591,10 @@ def revision_replan_node(
     }
 
 
+# ============================================================
+# APPROVAL ROUTING
+# ============================================================
+
 def route_after_approval(
     state: CoordinatorState,
 ) -> str:
@@ -491,6 +605,7 @@ def route_after_approval(
     revise  -> re-plan and run workflow again
     reject  -> end
     """
+
     decision = state.get(
         "approval_decision",
         "",
@@ -505,15 +620,20 @@ def route_after_approval(
     return "end"
 
 
+# ============================================================
+# DISPATCH
+# ============================================================
+
 def dispatch_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
     Student 4 Matching & Dispatch Agent - dispatch mode.
 
-    Student 4's dispatch agent owns its own logging, so the Coordinator
-    must not create a duplicate dispatch AgentStep.
+    Student 4's dispatch agent owns its own logging, so the
+    Coordinator must not create a duplicate dispatch AgentStep.
     """
+
     eligibility_result = state.get(
         "eligibility_result",
         {},
@@ -558,6 +678,10 @@ def dispatch_node(
         }
 
 
+# ============================================================
+# FINALIZE WORKFLOW
+# ============================================================
+
 def finalize_workflow_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
@@ -567,6 +691,7 @@ def finalize_workflow_node(
     Successful dispatch -> completed
     Failed dispatch     -> failed
     """
+
     workflow_id = state.get(
         "workflow_id"
     )
@@ -643,6 +768,10 @@ def finalize_workflow_node(
     }
 
 
+# ============================================================
+# BUILD COORDINATOR GRAPH
+# ============================================================
+
 def build_coordinator_graph() -> StateGraph:
     builder = StateGraph(
         CoordinatorState
@@ -688,13 +817,19 @@ def build_coordinator_graph() -> StateGraph:
         finalize_workflow_node,
     )
 
+    # --------------------------------------------------------
     # Start workflow
+    # --------------------------------------------------------
+
     builder.add_edge(
         START,
         "stock_check",
     )
 
+    # --------------------------------------------------------
     # Stock routing
+    # --------------------------------------------------------
+
     builder.add_conditional_edges(
         "stock_check",
         route_after_stock_check,
@@ -704,25 +839,37 @@ def build_coordinator_graph() -> StateGraph:
         },
     )
 
+    # --------------------------------------------------------
     # Donor search -> eligibility
+    # --------------------------------------------------------
+
     builder.add_edge(
         "search_donors",
         "validate_eligibility",
     )
 
-    # Eligibility -> persist awaiting approval
+    # --------------------------------------------------------
+    # Eligibility -> awaiting approval
+    # --------------------------------------------------------
+
     builder.add_edge(
         "validate_eligibility",
         "mark_awaiting_approval",
     )
 
-    # Persist status -> human approval interrupt
+    # --------------------------------------------------------
+    # Persist status -> human approval
+    # --------------------------------------------------------
+
     builder.add_edge(
         "mark_awaiting_approval",
         "await_approval",
     )
 
+    # --------------------------------------------------------
     # Human decision routing
+    # --------------------------------------------------------
+
     builder.add_conditional_edges(
         "await_approval",
         route_after_approval,
@@ -733,19 +880,28 @@ def build_coordinator_graph() -> StateGraph:
         },
     )
 
+    # --------------------------------------------------------
     # Revise -> re-run workflow
+    # --------------------------------------------------------
+
     builder.add_edge(
         "revision_replan",
         "stock_check",
     )
 
+    # --------------------------------------------------------
     # Dispatch -> final DB status
+    # --------------------------------------------------------
+
     builder.add_edge(
         "dispatch",
         "finalize_workflow",
     )
 
+    # --------------------------------------------------------
     # Final status -> end
+    # --------------------------------------------------------
+
     builder.add_edge(
         "finalize_workflow",
         END,
@@ -754,7 +910,10 @@ def build_coordinator_graph() -> StateGraph:
     return builder
 
 
-# In-memory LangGraph checkpoint storage.
+# ============================================================
+# LANGGRAPH CHECKPOINT
+# ============================================================
+
 memory = MemorySaver()
 
 coordinator_graph = (

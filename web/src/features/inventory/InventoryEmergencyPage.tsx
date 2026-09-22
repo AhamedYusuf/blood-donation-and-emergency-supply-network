@@ -1,13 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 import type { RootState } from "../../app/store";
 import {
-  useCheckStockMutation,
-  useGetEmergencyRecommendationMutation,
   useGetInventoryQuery,
   useGetLowStockQuery,
-  useGetStockRiskQuery,
 } from "./inventoryApi";
+import {
+  runEmergencyRecommendationAgent,
+  runStockCheckAgent,
+  runStockRiskAgent,
+} from "./agentApi";
 import type {
   BloodType,
   EmergencyInventoryRecommendation,
@@ -98,10 +101,63 @@ function getRiskLevel(
 }
 
 export function InventoryEmergencyPage() {
-  // Was reading a build-time env var nothing in this repo sets — see
-  // InventoryPage.tsx for the full explanation. Read from the signed-in
-  // user's own organization instead.
-  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+  const linkedOrganizationId = useSelector(
+    (s: RootState) => s.auth.organizationId,
+  );
+
+  const INVENTORY_ORGANIZATION_STORAGE_KEY = "inventory.selectedOrganizationId";
+
+  const {
+    data: organizations = [],
+    isLoading: isOrganizationsLoading,
+  } = useGetOrganizationsQuery(undefined, {
+    skip: Boolean(linkedOrganizationId),
+  });
+
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState(() => {
+      if (typeof window === "undefined") {
+        return "";
+      }
+
+      return localStorage.getItem(
+        INVENTORY_ORGANIZATION_STORAGE_KEY
+      ) ?? "";
+    });
+
+  const availableSelectedOrganizationId = organizations.some(
+    (organization) => organization.id === selectedOrganizationId
+  )
+    ? selectedOrganizationId
+    : organizations[0]?.id ?? "";
+
+  const organizationId =
+    linkedOrganizationId || availableSelectedOrganizationId;
+
+  useEffect(() => {
+    if (linkedOrganizationId || !availableSelectedOrganizationId) {
+      return;
+    }
+
+    if (selectedOrganizationId !== availableSelectedOrganizationId) {
+      setSelectedOrganizationId(availableSelectedOrganizationId);
+    }
+
+    localStorage.setItem(
+      INVENTORY_ORGANIZATION_STORAGE_KEY,
+      availableSelectedOrganizationId
+    );
+  }, [
+    linkedOrganizationId,
+    availableSelectedOrganizationId,
+    selectedOrganizationId,
+  ]);
+
+  const selectedOrganization =
+    organizations.find(
+      (organization) => organization.id === organizationId,
+    ) ?? null;
+
   const skip = !organizationId;
 
   const {
@@ -114,18 +170,50 @@ export function InventoryEmergencyPage() {
   const { data: lowStock = [] } =
     useGetLowStockQuery(organizationId ?? "", { skip });
 
-  const {
-    data: stockRisk,
-    isFetching: isRiskFetching,
-    isError: isRiskError,
-    refetch: refetchRisk,
-  } = useGetStockRiskQuery(organizationId ?? "", { skip });
+  const [stockRisk, setStockRisk] =
+    useState<import("./inventoryTypes").StockRiskResponse | null>(null);
 
-  const [checkStock, checkStockState] =
-    useCheckStockMutation();
+  const [isRiskFetching, setIsRiskFetching] =
+    useState(false);
 
-  const [getEmergencyRecommendation, recommendationState] =
-    useGetEmergencyRecommendationMutation();
+  const [isRiskError, setIsRiskError] =
+    useState(false);
+
+  const [checkStockState, setCheckStockState] =
+    useState({ isLoading: false });
+
+  const [recommendationState, setRecommendationState] =
+    useState({ isLoading: false });
+
+  const refetchRisk = async () => {
+    if (!organizationId) {
+      return;
+    }
+
+    setIsRiskFetching(true);
+    setIsRiskError(false);
+
+    try {
+      const result =
+        await runStockRiskAgent(organizationId);
+
+      setStockRisk(result);
+    } catch (riskError) {
+      console.error("Stock Risk Agent failed:", riskError);
+      setIsRiskError(true);
+    } finally {
+      setIsRiskFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!organizationId) {
+      setStockRisk(null);
+      return;
+    }
+
+    void refetchRisk();
+  }, [organizationId]);
 
   const [bloodType, setBloodType] =
     useState<BloodType>("OPositive");
@@ -245,12 +333,22 @@ export function InventoryEmergencyPage() {
       return;
     }
 
+    if (!organizationId) {
+      setError("Please select an organization.");
+      return;
+    }
+
+    setCheckStockState({ isLoading: true });
+    setRecommendationState({ isLoading: false });
+
     try {
-      const stockResult = await checkStock({
-        organizationId: organizationId ?? "",
-        bloodType,
-        requiredUnits: units,
-      }).unwrap();
+      // Agent 01: React -> Python Agent Service -> .NET internal API
+      const stockResult =
+        await runStockCheckAgent({
+          organizationId,
+          bloodType,
+          requiredUnits: units,
+        });
 
       setStockCheckResult({
         requiredUnits: stockResult.requiredUnits,
@@ -260,28 +358,56 @@ export function InventoryEmergencyPage() {
         lowStock: stockResult.lowStock,
       });
 
+      // Agent 03: React -> Python Agent Service -> .NET internal API
+      setRecommendationState({ isLoading: true });
+
       const recommendationResult =
-        await getEmergencyRecommendation({
+        await runEmergencyRecommendationAgent({
           bloodType,
           requiredUnits: units,
           urgency,
-        }).unwrap();
+        });
 
-      setRecommendation(recommendationResult);
+      setRecommendation(
+        recommendationResult,
+      );
+
       setChecked(true);
     } catch (requestError) {
-      console.error(requestError);
-      setError(
-        "We could not complete the emergency stock analysis. Please check your connection and try again."
+      console.error(
+        "Emergency agents failed:",
+        requestError,
       );
+
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "We could not complete the emergency stock analysis. Please check your connection and try again.",
+      );
+    } finally {
+      setCheckStockState({ isLoading: false });
+      setRecommendationState({ isLoading: false });
     }
   }
 
   if (!organizationId) {
+    if (isOrganizationsLoading) {
+      return (
+        <div className="emergency-loading">
+          <div className="emergency-loading-icon">!</div>
+          <h2>Loading organizations</h2>
+          <p>Preparing the emergency inventory context...</p>
+        </div>
+      );
+    }
+
     return (
       <div className="emergency-loading">
-        <h2>No organization linked</h2>
-        <p>Your account isn't linked to an organization, so there's no emergency dashboard to show here.</p>
+        <h2>No organization available</h2>
+        <p>
+          This account is not linked to an organization and no
+          organizations are available to inspect.
+        </p>
       </div>
     );
   }
@@ -375,6 +501,56 @@ export function InventoryEmergencyPage() {
       </header>
 
       <main className="emergency-content">
+        {!linkedOrganizationId && selectedOrganization && (
+          <section className="emergency-card">
+            <div className="emergency-card-heading">
+              <div>
+                <span className="emergency-eyebrow">
+                  ORGANIZATION CONTEXT
+                </span>
+                <h2>Choose inventory organization</h2>
+              </div>
+            </div>
+
+            <div className="emergency-form">
+              <div className="emergency-field">
+                <label htmlFor="emergencyOrganization">
+                  Organization <span>*</span>
+                </label>
+
+                <select
+                  id="emergencyOrganization"
+                  value={
+                    selectedOrganizationId ||
+                    selectedOrganization.id
+                  }
+                  onChange={(event) => {
+                    const nextOrganizationId = event.target.value;
+                    setSelectedOrganizationId(nextOrganizationId);
+                    localStorage.setItem(
+                      INVENTORY_ORGANIZATION_STORAGE_KEY,
+                      nextOrganizationId
+                    );
+                    setChecked(false);
+                    setStockCheckResult(null);
+                    setRecommendation(null);
+                    setError("");
+                  }}
+                >
+                  {organizations.map((organization) => (
+                    <option
+                      key={organization.id}
+                      value={organization.id}
+                    >
+                      {organization.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="emergency-intro">
           <div>
             <span className="emergency-eyebrow">
@@ -595,7 +771,8 @@ export function InventoryEmergencyPage() {
                   <strong>
                     {sufficient
                       ? resultRemainingUnits
-                      : resultShortfall}
+                      : recommendation?.shortfallUnits ??
+                        resultShortfall}
                   </strong>
                 </div>
               </div>
@@ -625,7 +802,7 @@ export function InventoryEmergencyPage() {
               <div
                 className={`urgency-badge urgency-${urgency.toLowerCase()}`}
               >
-                {recommendation?.priority ?? urgency}
+                {recommendation?.urgency ?? urgency}
               </div>
             </section>
           </>

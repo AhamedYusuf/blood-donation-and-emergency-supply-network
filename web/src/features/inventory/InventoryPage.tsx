@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 import type { RootState } from "../../app/store";
 import {
   useGetInventoryQuery,
@@ -285,12 +286,58 @@ function TransactionRow({
 }
 
 export function InventoryPage() {
-  // Was reading a build-time env var (VITE_INVENTORY_ORGANIZATION_ID)
-  // that nothing in this repo ever sets — every user, regardless of
-  // which organization they actually belong to, was querying inventory
-  // for an undefined org id. Read it from the signed-in user instead,
-  // the same way AppointmentsConsolePage does.
-  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+  const linkedOrganizationId = useSelector(
+    (s: RootState) => s.auth.organizationId,
+  );
+
+  const {
+    data: organizations = [],
+    isLoading: isOrganizationsLoading,
+  } = useGetOrganizationsQuery(undefined, {
+    skip: Boolean(linkedOrganizationId),
+  });
+
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState(() => {
+      try {
+        return (
+          localStorage.getItem(
+            "inventory:selectedOrganizationId",
+          ) ?? ""
+        );
+      } catch {
+        return "";
+      }
+    });
+
+  /*
+   * Admin users may not have an organizationId on their auth record.
+   * In that case, use the same organization saved by Manage Inventory
+   * so every inventory page works with the same organization.
+   *
+   * If the saved organization no longer exists, safely fall back to
+   * the first organization returned by the API.
+   */
+  const savedOrganizationIsValid = organizations.some(
+    (organization) =>
+      organization.id === selectedOrganizationId,
+  );
+
+  const effectiveSelectedOrganizationId =
+    savedOrganizationIsValid
+      ? selectedOrganizationId
+      : organizations[0]?.id ?? "";
+
+  const organizationId =
+    linkedOrganizationId ||
+    effectiveSelectedOrganizationId ||
+    "";
+
+  const selectedOrganization =
+    organizations.find(
+      (organization) => organization.id === organizationId,
+    ) ?? null;
+
   const skip = !organizationId;
 
   const {
@@ -351,12 +398,21 @@ export function InventoryPage() {
     transactionData?.items ?? [];
 
   if (!organizationId) {
+    if (isOrganizationsLoading) {
+      return <LoadingState />;
+    }
+
     return (
       <div className="inventory-shell">
-        <p style={{ padding: "var(--space-xl)" }}>
-          Your account isn't linked to an organization, so there's no
-          inventory to show here.
-        </p>
+        <div style={{ padding: "var(--space-xl)" }}>
+          <h2 style={{ marginBottom: "var(--space-sm)" }}>
+            No organization available
+          </h2>
+          <p>
+            This account is not linked to an organization and no
+            organizations are available to inspect.
+          </p>
+        </div>
       </div>
     );
   }
@@ -438,6 +494,58 @@ export function InventoryPage() {
               Monitor blood availability and identify
               low-stock supplies across your organization.
             </p>
+
+            {!linkedOrganizationId && selectedOrganization && (
+              <label
+                htmlFor="inventoryOrganization"
+                style={{
+                  display: "block",
+                  marginTop: "16px",
+                  maxWidth: "360px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                Viewing organization
+                <select
+                  id="inventoryOrganization"
+                  value={organizationId}
+                  onChange={(event) => {
+                    const value = event.target.value;
+
+                    setSelectedOrganizationId(value);
+
+                    try {
+                      localStorage.setItem(
+                        "inventory:selectedOrganizationId",
+                        value,
+                      );
+                    } catch {
+                      // Ignore localStorage errors.
+                    }
+                  }}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    marginTop: "8px",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    background: "white",
+                    font: "inherit",
+                  }}
+                >
+                  {organizations.map((organization) => (
+                    <option
+                      key={organization.id}
+                      value={organization.id}
+                    >
+                      {organization.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="welcome-actions">

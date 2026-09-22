@@ -10,19 +10,37 @@ public class InternalSecretMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, IConfiguration configuration)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IConfiguration configuration)
     {
         if (context.Request.Path.StartsWithSegments("/api/internal"))
         {
-            var expectedSecret = configuration["InternalAgentSecret"]
-                ?? throw new InvalidOperationException("InternalAgentSecret is not configured.");
+            // Support both:
+            // 1. InternalAgentSecret
+            // 2. INTERNAL_AGENT_SECRET
+            var expectedSecret =
+                configuration["InternalAgentSecret"]
+                ?? configuration["INTERNAL_AGENT_SECRET"];
 
-            var providedSecret = context.Request.Headers[HeaderName].FirstOrDefault();
-
-            if (string.IsNullOrEmpty(providedSecret) || providedSecret != expectedSecret)
+            if (string.IsNullOrWhiteSpace(expectedSecret))
             {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsync("Missing or invalid internal secret.");
+                throw new InvalidOperationException(
+                    "InternalAgentSecret is not configured.");
+            }
+
+            var providedSecret =
+                context.Request.Headers[HeaderName].FirstOrDefault();
+
+            if (string.IsNullOrEmpty(providedSecret) ||
+                providedSecret != expectedSecret)
+            {
+                context.Response.StatusCode =
+                    StatusCodes.Status401Unauthorized;
+
+                await context.Response.WriteAsync(
+                    "Missing or invalid internal secret.");
+
                 return;
             }
         }
