@@ -1,5 +1,11 @@
 import { baseApi } from "../../api/baseApi";
 
+export interface AgentMatch {
+  rank: number;
+  distanceKm: number;
+  reliabilityScore: number;
+}
+
 export interface Appointment {
   id: string;
   donorId: string;
@@ -8,6 +14,10 @@ export interface Appointment {
   scheduledTime: string;
   status: string;
   donorBloodType: string | null;
+  // Populated only when relatedWorkflowId is set and the Matching &
+  // Dispatch Agent's own search_donors step data is available — see
+  // AppointmentService.GetAgentMatchesAsync on the backend.
+  agentMatch: AgentMatch | null;
   unitsDonated: number | null;
   createdAt: string;
   updatedAt: string;
