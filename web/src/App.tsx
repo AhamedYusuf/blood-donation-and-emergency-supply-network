@@ -37,7 +37,7 @@ import WorkflowMonitorPage from "./features/workflowMonitor/WorkflowMonitorPage"
 // AUTH GUARDS
 // =====================================================
 
-function RequireAuth({
+export function RequireAuth({
   children,
 }: {
   children: React.ReactNode;
@@ -69,7 +69,7 @@ function RedirectIfAuthed({
   return <>{children}</>;
 }
 
-function RequireRole({
+export function RequireRole({
   children,
   roles,
 }: {
@@ -99,7 +99,7 @@ function RequireRole({
  * registration and later return with a valid token still
  * stored in localStorage.
  */
-function RequireDonorProfile({
+export function RequireDonorProfile({
   children,
 }: {
   children: React.ReactNode;
