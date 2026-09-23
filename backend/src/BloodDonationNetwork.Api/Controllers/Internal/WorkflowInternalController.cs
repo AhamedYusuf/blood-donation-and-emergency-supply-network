@@ -130,6 +130,14 @@ public class WorkflowInternalController : ControllerBase
         workflow.Status = request.Status;
         workflow.UpdatedAt = DateTime.UtcNow;
 
+        // When the workflow pauses for human approval, the Coordinator
+        // owns the active workflow state. Do not leave CurrentAgent
+        // pointing at the last worker agent that logged a step.
+        if (request.Status == WorkflowStatuses.AwaitingApproval)
+        {
+            workflow.CurrentAgent = AgentNames.Coordinator;
+        }
+
         if (request.Status == WorkflowStatuses.Completed ||
             request.Status == WorkflowStatuses.Failed ||
             request.Status == WorkflowStatuses.Rejected)

@@ -2,7 +2,6 @@ import os
 import traceback
 import requests
 
-from uuid import uuid4
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -48,9 +47,10 @@ app.add_middleware(
 # =========================================================
 
 class StockCheckAgentRequest(BaseModel):
-    organizationId: str
+    workflowId: str
+    requestingOrgId: str
     bloodType: str
-    requiredUnits: int
+    unitsNeeded: int
 
 
 class StockRiskAgentRequest(BaseModel):
@@ -87,13 +87,11 @@ def agent_stock_check(
 
     try:
 
-        # Send the exact field names expected by
-        # stock_check_agent.py
         agent_request = {
-            "workflowId": str(uuid4()),
-            "organizationId": request.organizationId,
+            "workflowId": request.workflowId,
+            "requestingOrgId": request.requestingOrgId,
             "bloodType": request.bloodType,
-            "requiredUnits": request.requiredUnits,
+            "unitsNeeded": request.unitsNeeded,
         }
 
         print("\n[MAIN] SENDING TO STOCK CHECK AGENT")
@@ -334,6 +332,7 @@ def run_workflow(
         # -------------------------------------------------
 
         required_fields = [
+            "organizationId",
             "bloodType",
             "unitsRequested",
             "urgency",
@@ -370,6 +369,12 @@ def run_workflow(
 
             "blood_request_id":
                 request.bloodRequestId,
+
+            "organization_id":
+                blood_request["organizationId"],
+
+            "requesting_org_id":
+                blood_request["organizationId"],
 
             "blood_type":
                 blood_request["bloodType"],
