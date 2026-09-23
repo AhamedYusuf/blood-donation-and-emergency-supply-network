@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import type { AgentStep, AgentWorkflow } from "./workflowMonitorTypes";
+
 import {
   useApproveWorkflowMutation,
   useGetWorkflowQuery,
@@ -28,6 +30,65 @@ function formatStepName(value: string) {
     .replace(/\b\w/g, (letter) =>
       letter.toUpperCase()
     );
+}
+
+const workflowStages = [
+  { label: "Stock Check", aliases: ["stock", "inventory"] },
+  { label: "Donor Search", aliases: ["search", "matching", "donor"] },
+  { label: "Eligibility Validation", aliases: ["eligibility"] },
+  { label: "Human Approval", aliases: ["approval", "human"] },
+  { label: "Dispatch", aliases: ["dispatch"] },
+  { label: "Complete", aliases: ["complete"] },
+];
+
+function normalize(value: string) {
+  return value.toLowerCase().replaceAll("_", " ");
+}
+
+function findStageStep(stage: (typeof workflowStages)[number], steps: AgentStep[]) {
+  return steps.find((step) => {
+    const stepName = normalize(step.stepName);
+    return stage.aliases.some((alias) => stepName.includes(alias));
+  });
+}
+
+function getStepState(
+  stageIndex: number,
+  stage: (typeof workflowStages)[number],
+  steps: AgentStep[],
+  workflowStatus: string,
+) {
+  const step = findStageStep(stage, steps);
+  const status = normalize(step?.status ?? "");
+  const normalizedWorkflowStatus = normalize(workflowStatus);
+
+  if (status.includes("fail")) return "failed";
+  if (status.includes("complete") || status.includes("success")) return "completed";
+  if (status.includes("progress") || status.includes("running") || status.includes("active")) return "current";
+  if (stageIndex === 3 && (normalizedWorkflowStatus === "planning" || normalizedWorkflowStatus === "awaiting approval")) return "current";
+  if (stageIndex === 5 && normalizedWorkflowStatus === "completed") return "completed";
+
+  const stockStep = findStageStep(workflowStages[0], steps);
+  const hasMatchingSteps = steps.some((item) => {
+    const name = normalize(item.stepName);
+    return name.includes("search") || name.includes("matching") || name.includes("eligibility");
+  });
+
+  if (!step && stageIndex > 0 && stageIndex < 3 && stockStep && normalize(stockStep.status).includes("complete") && !hasMatchingSteps) return "skipped";
+  return step ? "pending" : "upcoming";
+}
+
+function getPhaseDescription(workflow: AgentWorkflow) {
+  const agent = normalize(workflow.currentAgent ?? "");
+  const status = normalize(workflow.status);
+
+  if (status === "completed") return "Coordinator workflow has completed.";
+  if (status === "awaiting approval" || agent.includes("approval")) return "AI workflow is paused for an authorized staff decision.";
+  if (agent.includes("stock") || agent.includes("inventory")) return "Checking available inventory and nearby transfer options.";
+  if (agent.includes("matching") || agent.includes("donor")) return "Searching and ranking compatible donor candidates.";
+  if (agent.includes("eligibility")) return "Validating donor eligibility before human review.";
+  if (status === "dispatching" || agent.includes("dispatch")) return "Approved workflow is dispatching donor notifications.";
+  return "Coordinator workflow is preparing the next verified action.";
 }
 
 
@@ -360,6 +421,40 @@ export default function WorkflowMonitorPage() {
       </section>
 
 
+      <section className="workflow-card workflow-progress-card">
+        <div className="workflow-card-heading">
+          <div>
+            <span className="workflow-eyebrow">LIVE COORDINATION</span>
+            <h2>AI workflow progress</h2>
+          </div>
+          <span className="workflow-phase-card">
+            {getPhaseDescription(workflow)}
+          </span>
+        </div>
+
+        <div className="workflow-stepper" aria-label="Workflow progress">
+          {workflowStages.map((stage, index) => {
+            const state = getStepState(index, stage, steps, workflow.status);
+
+            return (
+              <div
+                className={`workflow-stage workflow-stage--${state}`}
+                key={stage.label}
+              >
+                <span className="workflow-stage-marker">
+                  {state === "completed" ? "✓" : index + 1}
+                </span>
+                <span className="workflow-stage-label">{stage.label}</span>
+                <span className="workflow-stage-state">
+                  {state === "skipped" ? "Not required" : state}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+
       <section className="workflow-card">
         <h2>Workflow Summary</h2>
 
@@ -501,11 +596,24 @@ export default function WorkflowMonitorPage() {
                     </span>
                   </div>
 
-                  {step.errorMessage && (
-                    <div className="workflow-step-error">
-                      {step.errorMessage}
+                  <details className="workflow-step-details">
+                    <summary>View input and output details</summary>
+                    <div className="workflow-json-grid">
+                      <div>
+                        <span>Input</span>
+                        <pre>{step.inputJson || "No input recorded."}</pre>
+                      </div>
+                      <div>
+                        <span>Output</span>
+                        <pre>{step.outputJson || "No output recorded."}</pre>
+                      </div>
                     </div>
-                  )}
+                    {step.errorMessage && (
+                      <div className="workflow-step-error">
+                        {step.errorMessage}
+                      </div>
+                    )}
+                  </details>
                 </div>
               </div>
             ))}
