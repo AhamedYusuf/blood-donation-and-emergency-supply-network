@@ -39,6 +39,10 @@ public interface IInventoryService
         StockCheckRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<StockCheckAgentResponse> CheckStockForAgentAsync(
+        StockCheckAgentRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<StockRiskResponse> AnalyzeStockRiskAsync(
         Guid organizationId,
         Guid currentUserId,
