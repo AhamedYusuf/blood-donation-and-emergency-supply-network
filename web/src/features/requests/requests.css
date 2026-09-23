@@ -1,7 +1,7 @@
 .requests-page {
   min-height: 100vh;
-  background: #f8f9fb;
-  color: #141b2d;
+  background: var(--color-canvas);
+  color: var(--color-ink);
   padding: 32px 24px 64px;
 }
 
@@ -191,15 +191,87 @@
   margin-top: 24px;
 }
 
+.requests-coordinator-section {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 8px 30px rgba(23, 32, 51, 0.045);
+}
+
+.requests-section-heading--coordinator {
+  margin-bottom: 20px;
+}
+
+.requests-ai-badge {
+  padding: 7px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-full);
+  background: var(--color-agent-subtle);
+  color: var(--color-agent);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.requests-coordinator-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.requests-coordinator-card {
+  display: flex;
+  gap: 12px;
+  min-height: 116px;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+  transition: transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.requests-coordinator-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(23, 32, 51, 0.08);
+}
+
+.requests-coordinator-card__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-agent-subtle);
+  color: var(--color-agent);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.requests-coordinator-card h3 {
+  margin: 1px 0 6px;
+  color: var(--color-ink);
+  font-size: 14px;
+}
+
+.requests-coordinator-card p {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .request-summary-card {
   position: relative;
   overflow: hidden;
   min-height: 145px;
   padding: 22px;
   border: 1px solid #e7eaf0;
-  border-radius: 22px;
+  border-radius: var(--radius-md);
   background: #ffffff;
-  box-shadow: 0 12px 35px rgba(25, 30, 50, 0.07);
+  box-shadow: 0 8px 30px rgba(23, 32, 51, 0.045);
   transition:
     transform 280ms ease,
     box-shadow 280ms ease,
@@ -350,44 +422,45 @@
   white-space: nowrap;
 }
 
-.request-pill--urgency-0 {
+.request-pill--urgency-normal {
   background: #eef4ff;
   color: #2563eb;
 }
 
-.request-pill--urgency-1 {
+.request-pill--urgency-urgent {
   background: #fff6df;
   color: #a56a00;
 }
 
-.request-pill--urgency-2 {
+.request-pill--urgency-critical {
   background: #feeceb;
   color: #b42318;
 }
 
-.request-pill--status-0,
-.request-pill--status-1 {
+.request-pill--status-open,
+.request-pill--status-matching {
   background: #fff6df;
   color: #a56a00;
 }
 
-.request-pill--status-2,
-.request-pill--status-4 {
+.request-pill--status-awaiting_approval,
+.request-pill--status-partially_fulfilled {
   background: #eaf8f3;
   color: #138a68;
 }
 
-.request-pill--status-3 {
+.request-pill--status-donors_notified {
   background: #eef4ff;
   color: #2563eb;
 }
 
-.request-pill--status-5 {
+.request-pill--status-fulfilled,
+.request-pill--status-cancelled {
   background: #f2f4f7;
   color: #667085;
 }
 
-.request-pill--status-6 {
+.request-pill--status-expired {
   background: #feeceb;
   color: #b42318;
 }
@@ -747,6 +820,10 @@
   .requests-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .requests-coordinator-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -798,6 +875,14 @@
   }
 
   .requests-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .requests-coordinator-section {
+    padding: 20px;
+  }
+
+  .requests-coordinator-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1112,5 +1197,186 @@
 
   .request-details-actions {
     flex-direction: column;
+  }
+}
+
+/* Final Student 2 polish: keep request surfaces aligned with Inventory. */
+.requests-hero {
+  min-height: 286px;
+  padding: 42px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 86% 18%, rgba(255, 255, 255, 0.14), transparent 27%),
+    linear-gradient(135deg, var(--color-primary-deepest), var(--color-primary) 62%, #b51e4c);
+  box-shadow: 0 14px 35px rgba(23, 32, 51, 0.12);
+}
+
+.requests-hero h1 {
+  font-size: clamp(32px, 4vw, 44px);
+  letter-spacing: -0.4px;
+}
+
+.requests-primary-button,
+.requests-secondary-button {
+  border-radius: var(--radius-sm);
+  transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+.requests-primary-button {
+  background: var(--color-primary);
+  box-shadow: 0 8px 18px rgba(159, 23, 56, 0.2);
+}
+
+.requests-primary-button:hover {
+  background: var(--color-primary-hover);
+  box-shadow: 0 13px 25px rgba(159, 23, 56, 0.28);
+}
+
+.requests-secondary-button {
+  border-color: var(--color-hairline-strong);
+  color: var(--color-ink-secondary);
+}
+
+.requests-secondary-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 8px 18px rgba(23, 32, 51, 0.08);
+}
+
+.request-summary-card,
+.requests-content-card {
+  border-color: var(--color-hairline);
+  background: var(--color-surface);
+}
+
+.request-summary-card::before {
+  width: 4px;
+  background: var(--color-primary);
+}
+
+.request-summary-card__label,
+.requests-table th {
+  color: var(--color-ink-muted);
+}
+
+.request-summary-card strong,
+.requests-section-heading h2,
+.requests-table td strong {
+  color: var(--color-ink);
+}
+
+.requests-content-card {
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 30px rgba(23, 32, 51, 0.045);
+}
+
+.requests-table-wrapper {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+}
+
+.requests-table th,
+.requests-table td {
+  padding: 13px 14px;
+  border-bottom-color: var(--color-hairline);
+}
+
+.requests-table th {
+  background: #fafafa;
+}
+
+.requests-table tbody tr:hover {
+  background: var(--color-primary-subtle);
+}
+
+.request-pill {
+  min-height: 26px;
+  padding: 5px 9px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.request-pill--urgency-normal {
+  background: var(--color-agent-subtle);
+  color: var(--color-agent);
+}
+
+.request-pill--urgency-urgent {
+  background: var(--color-urgent-subtle);
+  color: var(--color-urgent);
+}
+
+.request-pill--urgency-critical,
+.request-pill--status-expired {
+  background: var(--color-critical-subtle);
+  color: var(--color-critical);
+}
+
+.request-pill--status-open,
+.request-pill--status-matching {
+  background: var(--color-urgent-subtle);
+  color: var(--color-urgent);
+}
+
+.request-pill--status-awaiting_approval,
+.request-pill--status-partially_fulfilled {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.request-pill--status-donors_notified {
+  background: var(--color-agent-subtle);
+  color: var(--color-agent);
+}
+
+.request-pill--status-fulfilled,
+.request-pill--status-cancelled {
+  background: var(--color-neutral-status-subtle);
+  color: var(--color-neutral-status);
+}
+
+.requests-empty-state__icon {
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.requests-loading-card {
+  height: 58px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-surface-sunken) 25%, #f8fafc 37%, var(--color-surface-sunken) 63%);
+}
+
+.requests-error-state {
+  min-height: 240px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background: var(--color-critical-subtle);
+}
+
+.requests-error-state h3 {
+  color: var(--color-critical);
+}
+
+.requests-primary-button:focus-visible,
+.requests-secondary-button:focus-visible,
+.request-view-link:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .requests-hero {
+    padding: 30px 24px;
+    border-radius: var(--radius-md);
+  }
+
+  .requests-content-card,
+  .requests-coordinator-section {
+    padding: 20px;
+    border-radius: var(--radius-md);
   }
 }
