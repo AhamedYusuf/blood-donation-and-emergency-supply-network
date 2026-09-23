@@ -1,10 +1,13 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
 using BloodDonationNetwork.Application.DTOs.Inventory;
 using BloodDonationNetwork.Application.Interfaces;
+using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BloodDonationNetwork.Api.Controllers;
 
@@ -14,10 +17,14 @@ namespace BloodDonationNetwork.Api.Controllers;
 public class InventoryController : ControllerBase
 {
     private readonly IInventoryService _inventoryService;
+    private readonly IApplicationDbContext _db;
 
-    public InventoryController(IInventoryService inventoryService)
+    public InventoryController(
+        IInventoryService inventoryService,
+        IApplicationDbContext db)
     {
         _inventoryService = inventoryService;
+        _db = db;
     }
 
     // =====================================================
@@ -202,22 +209,102 @@ public class InventoryController : ControllerBase
 
     [HttpPost("/api/internal/agent/check-stock")]
     [AllowAnonymous]
-    public async Task<ActionResult<StockCheckResponse>> CheckStock(
-        [FromBody] StockCheckRequest request,
+    public async Task<ActionResult<StockCheckAgentResponse>> CheckStock(
+        [FromBody] StockCheckAgentRequest request,
         CancellationToken cancellationToken)
     {
+        var startedAt = DateTime.UtcNow;
+
         try
         {
-            var result = await _inventoryService.CheckStockAsync(
+            var result = await _inventoryService.CheckStockForAgentAsync(
                 request,
+                cancellationToken);
+
+            await LogStockCheckStepAsync(
+                request.WorkflowId,
+                request,
+                result,
+                "completed",
+                startedAt,
+                null,
                 cancellationToken);
 
             return Ok(result);
         }
         catch (ArgumentException ex)
         {
+            await LogStockCheckStepAsync(
+                request.WorkflowId,
+                request,
+                null,
+                "failed",
+                startedAt,
+                ex.Message,
+                CancellationToken.None);
+
             return BadRequest(new { message = ex.Message });
         }
+        catch (KeyNotFoundException ex)
+        {
+            await LogStockCheckStepAsync(
+                request.WorkflowId,
+                request,
+                null,
+                "failed",
+                startedAt,
+                ex.Message,
+                CancellationToken.None);
+
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    private async Task LogStockCheckStepAsync(
+        Guid workflowId,
+        StockCheckAgentRequest request,
+        StockCheckAgentResponse? response,
+        string status,
+        DateTime startedAt,
+        string? errorMessage,
+        CancellationToken cancellationToken)
+    {
+        var workflow = await _db.AgentWorkflows
+            .FirstOrDefaultAsync(
+                x => x.Id == workflowId,
+                cancellationToken);
+
+        if (workflow is null)
+        {
+            return;
+        }
+
+        workflow.CurrentAgent = AgentNames.StockCheck;
+        workflow.UpdatedAt = DateTime.UtcNow;
+
+        _db.AgentSteps.Add(new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflowId,
+            AgentName = AgentNames.StockCheck,
+            StepName = "stock_check",
+            Status = status,
+            InputJson = JsonSerializer.Serialize(request),
+            OutputJson = response is null
+                ? null
+                : JsonSerializer.Serialize(response),
+            Narrative = response is null
+                ? "Stock check failed."
+                : response.Sufficient
+                    ? "The requesting organization has sufficient stock."
+                    : $"Stock is short by {response.ShortfallUnits} unit(s); transfer candidates were evaluated.",
+            RetryCount = 0,
+            StartedAt = startedAt,
+            CompletedAt = DateTime.UtcNow,
+            ErrorMessage = errorMessage,
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     [HttpGet("/api/internal/agent/stock-risk/{organizationId:guid}")]
