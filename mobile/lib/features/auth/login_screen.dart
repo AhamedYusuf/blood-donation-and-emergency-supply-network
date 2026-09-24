@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../theme/app_theme.dart';
@@ -128,6 +129,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               height: 20, width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary))
                           : const Text('Sign in'),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: const Text('Create a donor account'),
                     ),
                   ],
                 ),
