@@ -27,7 +27,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
+          # vitest@5 and jsdom@30 both require Node 22.12+/24+/26+ — Node 20
+          # isn't in either package's supported range at all, which is why
+          # this job failed on 20.x even though everything passed locally
+          # (this machine runs Node 26).
+          node-version: "26.x"
           cache: "npm"
           cache-dependency-path: web/package-lock.json
 
