@@ -1,139 +1,134 @@
+"""Student 3 Stock-Check Agent.
+
+This module is intentionally thin: the deterministic stock/transfer logic lives
+in ASP.NET Core. The Python agent validates the inter-service contract, calls the
+internal endpoint, validates the response, and returns it to the Coordinator.
+"""
+
+from __future__ import annotations
+
 from typing import Any
 
-from shared.internal_client import InternalClient
+from shared.internal_client import InternalClient, InternalClientError
 
 
-BLOOD_TYPE_TO_NUMBER = {
-    "A+": 0,
-    "A-": 1,
-    "B+": 2,
-    "B-": 3,
-    "AB+": 4,
-    "AB-": 5,
-    "O+": 6,
-    "O-": 7,
+CHECK_STOCK_PATH = "/api/internal/agent/check-stock"
+VALID_BLOOD_TYPES = {
+    "A+",
+    "A-",
+    "B+",
+    "B-",
+    "AB+",
+    "AB-",
+    "O+",
+    "O-",
 }
 
 
-def run(request: dict[str, Any]) -> dict[str, Any]:
+class StockCheckAgentError(ValueError):
+    """Raised when the Coordinator sends an invalid stock-check request."""
 
-    print("\n" + "=" * 70)
-    print("[STOCK CHECK AGENT] REQUEST RECEIVED")
-    print(request)
-    print("=" * 70)
 
-    # --------------------------------------------------
-    # Get values
-    # --------------------------------------------------
+def _require_non_empty_string(
+    request: dict[str, Any],
+    field: str,
+) -> str:
+    value = request.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise StockCheckAgentError(f"{field} is required")
+    return value.strip()
 
-    blood_type = request.get("bloodType")
 
-    required_units = request.get("requiredUnits")
-
-    organization_id = (
-        request.get("organizationId")
-        or request.get("requestingOrgId")
-    )
-
-    workflow_id = (
-        request.get("workflowId")
-        or ""
-    )
-
-    # --------------------------------------------------
-    # Validate blood type
-    # --------------------------------------------------
-
-    if not blood_type:
-        raise ValueError(
-            "bloodType is required"
-        )
-
-    if blood_type not in BLOOD_TYPE_TO_NUMBER:
-        raise ValueError(
-            f"Unsupported blood type: {blood_type}. "
-            f"Expected one of: "
-            f"{', '.join(BLOOD_TYPE_TO_NUMBER.keys())}"
-        )
-
-    # --------------------------------------------------
-    # Validate required units
-    # --------------------------------------------------
-
-    if required_units is None:
-        raise ValueError(
-            "requiredUnits is required"
-        )
-
-    try:
-        required_units = int(required_units)
-    except (TypeError, ValueError):
-        raise ValueError(
-            "requiredUnits must be a valid integer"
-        )
-
-    if required_units <= 0:
-        raise ValueError(
-            "requiredUnits must be greater than 0"
-        )
-
-    # --------------------------------------------------
-    # Validate organization
-    # --------------------------------------------------
-
-    if not organization_id:
-        raise ValueError(
-            "organizationId is required"
-        )
-
-    # --------------------------------------------------
-    # Convert blood type
-    # --------------------------------------------------
-
-    blood_type_number = (
-        BLOOD_TYPE_TO_NUMBER[blood_type]
-    )
-
-    # --------------------------------------------------
-    # Backend payload
-    # --------------------------------------------------
-
-    payload = {
-        "organizationId": organization_id,
-        "bloodType": blood_type_number,
-        "requiredUnits": required_units,
+def _validate_response(result: dict[str, Any]) -> None:
+    required_fields = {
+        "sufficient",
+        "ownStockUnits",
+        "shortfallUnits",
+        "candidateTransferOrgs",
     }
 
-    print("\n[STOCK CHECK AGENT] BACKEND PAYLOAD")
-    print(payload)
-
-    # --------------------------------------------------
-    # Call backend
-    # --------------------------------------------------
-
-    client = InternalClient()
-
-    try:
-
-        result = client.post(
-            "/api/internal/agent/check-stock",
-            payload,
+    if not isinstance(result, dict):
+        raise InternalClientError(
+            "check-stock returned an unexpected response type"
         )
 
-    except Exception as exc:
+    missing = required_fields.difference(result)
+    if missing:
+        raise InternalClientError(
+            "check-stock response is missing fields: "
+            + ", ".join(sorted(missing))
+        )
 
-        print("\n" + "=" * 70)
-        print("[STOCK CHECK AGENT] BACKEND ERROR")
-        print(str(exc))
-        print("=" * 70)
+    if not isinstance(result["sufficient"], bool):
+        raise InternalClientError(
+            "check-stock response field 'sufficient' must be boolean"
+        )
 
-        raise
+    for field in ("ownStockUnits", "shortfallUnits"):
+        value = result[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise InternalClientError(
+                f"check-stock response field '{field}' must be a non-negative integer"
+            )
 
-    # --------------------------------------------------
-    # Result
-    # --------------------------------------------------
+    candidates = result["candidateTransferOrgs"]
+    if not isinstance(candidates, list):
+        raise InternalClientError(
+            "check-stock response field 'candidateTransferOrgs' must be a list"
+        )
 
-    print("\n[STOCK CHECK AGENT] BACKEND RESULT")
-    print(result)
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise InternalClientError(
+                "candidateTransferOrgs entries must be objects"
+            )
 
-    return result
+        for field in ("organizationId", "distanceKm", "unitsAvailable"):
+            if field not in candidate:
+                raise InternalClientError(
+                    f"candidateTransferOrgs entry is missing '{field}'"
+                )
+
+
+def run(
+    request: dict[str, Any],
+    *,
+    client: InternalClient | None = None,
+) -> dict[str, Any]:
+    """Run the Stock-Check Agent using the final inter-agent contract."""
+
+    workflow_id = _require_non_empty_string(request, "workflowId")
+    requesting_org_id = _require_non_empty_string(request, "requestingOrgId")
+
+    blood_type = request.get("bloodType")
+    if not isinstance(blood_type, str) or blood_type not in VALID_BLOOD_TYPES:
+        raise StockCheckAgentError(
+            "bloodType must be one of: "
+            + ", ".join(sorted(VALID_BLOOD_TYPES))
+        )
+
+    units_needed = request.get("unitsNeeded")
+    if (
+        isinstance(units_needed, bool)
+        or not isinstance(units_needed, int)
+        or units_needed <= 0
+    ):
+        raise StockCheckAgentError(
+            "unitsNeeded must be a positive integer"
+        )
+
+    payload = {
+        "workflowId": workflow_id,
+        "requestingOrgId": requesting_org_id,
+        "bloodType": blood_type,
+        "unitsNeeded": units_needed,
+    }
+
+    active_client = client or InternalClient()
+    result = active_client.post(CHECK_STOCK_PATH, payload)
+    _validate_response(result)
+
+    return {
+        **result,
+        "current_agent": "stock_check_agent",
+    }

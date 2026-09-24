@@ -64,6 +64,29 @@ const getUrgencyLabel = (
   }
 };
 
+const coordinationStages = [
+  {
+    icon: "◈",
+    title: "Stock Analysis",
+    description: "Checks local inventory and nearby transfer options.",
+  },
+  {
+    icon: "◎",
+    title: "Donor Matching",
+    description: "Finds compatible donor candidates when stock is limited.",
+  },
+  {
+    icon: "✓",
+    title: "Eligibility Validation",
+    description: "Validates donor eligibility before a decision is requested.",
+  },
+  {
+    icon: "▣",
+    title: "Human Approval",
+    description: "Keeps authorized staff in control of the final decision.",
+  },
+];
+
 
 export default function RequestsPage() {
   const role = useSelector(
@@ -88,49 +111,23 @@ export default function RequestsPage() {
   /*
    * Requests that still need coordination.
    */
-  const pendingCount = requests.filter(
-    (request) =>
-      request.status ===
-        BloodRequestStatus.Open ||
-      request.status ===
-        BloodRequestStatus.Matching ||
-      request.status ===
-        BloodRequestStatus.AwaitingApproval
+  const openCount = requests.filter(
+    (request) => request.status === BloodRequestStatus.Open
   ).length;
 
-
-  /*
-   * Priority requests.
-   */
-  const urgentCount = requests.filter(
-    (request) =>
-      request.urgency ===
-        RequestUrgency.Urgent ||
-      request.urgency ===
-        RequestUrgency.Critical
+  const awaitingApprovalCount = requests.filter(
+    (request) => request.status === BloodRequestStatus.AwaitingApproval
   ).length;
 
-
-  /*
-   * Requests where coordination has progressed
-   * beyond initial matching/approval.
-   */
-  const coordinatingCount = requests.filter(
-    (request) =>
-      request.status ===
-        BloodRequestStatus.DonorsNotified ||
-      request.status ===
-        BloodRequestStatus.PartiallyFulfilled
+  const fulfilledCount = requests.filter(
+    (request) => request.status === BloodRequestStatus.Fulfilled
   ).length;
 
-
-  /*
-   * Successfully completed requests.
-   */
-  const completedCount = requests.filter(
+  const activeCount = requests.filter(
     (request) =>
-      request.status ===
-        BloodRequestStatus.Fulfilled
+      request.status === BloodRequestStatus.Matching ||
+      request.status === BloodRequestStatus.DonorsNotified ||
+      request.status === BloodRequestStatus.PartiallyFulfilled
   ).length;
 
 
@@ -142,17 +139,15 @@ export default function RequestsPage() {
         <div className="requests-hero__content">
 
           <span className="requests-eyebrow">
-            BLOOD REQUEST MANAGEMENT
+            COORDINATOR AI · REQUEST OPERATIONS
           </span>
 
           <h1>
-            Blood Requests
+            Blood Request Coordination
           </h1>
 
           <p>
-            Create, monitor and coordinate blood
-            requests through one streamlined
-            healthcare workflow.
+            Create, prioritize and coordinate emergency blood requests with AI-assisted workflow management.
           </p>
 
           {canManageRequests && (
@@ -160,7 +155,7 @@ export default function RequestsPage() {
               to="/requests/create"
               className="requests-primary-button"
             >
-              + Create Blood Request
+              + Create Request
             </Link>
           )}
 
@@ -190,15 +185,15 @@ export default function RequestsPage() {
         <article className="request-summary-card">
 
           <span className="request-summary-card__label">
-            Pending
+            Open Requests
           </span>
 
           <strong>
-            {pendingCount}
+            {openCount}
           </strong>
 
           <p>
-            Requests awaiting action
+            Newly submitted requests
           </p>
 
         </article>
@@ -207,15 +202,15 @@ export default function RequestsPage() {
         <article className="request-summary-card">
 
           <span className="request-summary-card__label">
-            Urgent / Critical
+            Awaiting Approval
           </span>
 
           <strong>
-            {urgentCount}
+            {awaitingApprovalCount}
           </strong>
 
           <p>
-            Requests requiring priority attention
+            Requests paused for staff review
           </p>
 
         </article>
@@ -224,15 +219,15 @@ export default function RequestsPage() {
         <article className="request-summary-card">
 
           <span className="request-summary-card__label">
-            In Coordination
+            Fulfilled Requests
           </span>
 
           <strong>
-            {coordinatingCount}
+            {fulfilledCount}
           </strong>
 
           <p>
-            Donor coordination currently in progress
+            Requests completed successfully
           </p>
 
         </article>
@@ -241,19 +236,43 @@ export default function RequestsPage() {
         <article className="request-summary-card">
 
           <span className="request-summary-card__label">
-            Completed
+            Active / In Progress
           </span>
 
           <strong>
-            {completedCount}
+            {activeCount}
           </strong>
 
           <p>
-            Successfully fulfilled requests
+            Matching, notifying or partially fulfilled
           </p>
 
         </article>
 
+      </section>
+
+      <section className="requests-coordinator-section">
+        <div className="requests-section-heading requests-section-heading--coordinator">
+          <div>
+            <span className="requests-eyebrow">COORDINATOR AI</span>
+            <h2>One workflow, clear human oversight</h2>
+          </div>
+          <span className="requests-ai-badge">AI-assisted · Human-led</span>
+        </div>
+
+        <div className="requests-coordinator-grid">
+          {coordinationStages.map((stage) => (
+            <article className="requests-coordinator-card" key={stage.title}>
+              <span className="requests-coordinator-card__icon" aria-hidden="true">
+                {stage.icon}
+              </span>
+              <div>
+                <h3>{stage.title}</h3>
+                <p>{stage.description}</p>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
 

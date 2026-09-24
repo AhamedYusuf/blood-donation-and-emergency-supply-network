@@ -136,88 +136,22 @@ def log_workflow_step(
 def stock_check_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
-    """
-    Run the Stock Check Agent.
-
-    IMPORTANT:
-    stock_check_agent.py expects:
-        organizationId
-        bloodType
-        requiredUnits
-
-    Do not send:
-        requestingOrgId
-        unitsNeeded
-    """
-
-    started_at = utc_now_iso()
+    """Call Student 3's real Stock-Check Agent."""
 
     organization_id = (
-        state.get("organization_id")
-        or state.get("requesting_org_id")
+        state.get("requesting_org_id")
+        or state.get("organization_id")
     )
 
     payload = {
         "workflowId": state.get("workflow_id"),
-        "organizationId": organization_id,
+        "requestingOrgId": organization_id,
         "bloodType": state.get("blood_type"),
-        "requiredUnits": state.get("units_needed"),
+        "unitsNeeded": state.get("units_needed"),
     }
-
-    print("=" * 60)
-    print("[Coordinator] STOCK CHECK REQUEST")
-    print(f"[Coordinator] organizationId = {organization_id}")
-    print(
-        f"[Coordinator] bloodType = "
-        f"{state.get('blood_type')}"
-    )
-    print(
-        f"[Coordinator] requiredUnits = "
-        f"{state.get('units_needed')}"
-    log_workflow_step(
-        state,
-        agent_name="Stock Check Agent",
-        step_name="stock_check",
-        status="completed",
-        input_data={
-            "bloodType": state.get("blood_type"),
-            "unitsNeeded": state.get("units_needed"),
-            "location": state.get("location"),
-        },
-        output_data=result,
-        narrative=(
-            "Checked available blood stock. "
-            "Temporary Student 3 stub is currently in use."
-        ),
-        retry_count=0,
-        started_at=started_at,
-        completed_at=utc_now_iso(),
-    )
-    print(f"[Coordinator] payload = {payload}")
-    print("=" * 60)
 
     try:
         result = run_stock_check(payload)
-
-        print("=" * 60)
-        print("[Coordinator] STOCK CHECK RESULT")
-        print(result)
-        print("=" * 60)
-
-        log_workflow_step(
-            state,
-            agent_name="Stock Check Agent",
-            step_name="stock_check",
-            status="completed",
-            input_data=payload,
-            output_data=result,
-            narrative=(
-                "Stock Check Agent evaluated the requesting "
-                "organization's current blood inventory."
-            ),
-            started_at=started_at,
-            completed_at=utc_now_iso(),
-        )
 
         return {
             "current_step": "stock_check",
@@ -228,20 +162,19 @@ def stock_check_node(
     except (InternalClientError, ValueError) as exc:
         error_message = f"stock_check failed: {exc}"
 
-        print("=" * 60)
-        print("[Coordinator] STOCK CHECK ERROR")
-        print(error_message)
-        print("=" * 60)
-
+        # The real stock endpoint logs its own successful/failed agent step.
+        # This fallback log covers failures that happen locally before the
+        # backend endpoint is reached (for example, missing Coordinator state).
         log_workflow_step(
             state,
             agent_name="Stock Check Agent",
             step_name="stock_check",
             status="failed",
             input_data=payload,
-            output_data={},
-            narrative="Stock Check Agent failed.",
-            started_at=started_at,
+            output_data={"error": error_message},
+            narrative="Stock Check Agent failed before a usable result was returned.",
+            retry_count=0,
+            started_at=utc_now_iso(),
             completed_at=utc_now_iso(),
             error_message=error_message,
         )
@@ -251,10 +184,7 @@ def stock_check_node(
             "stock_result": {
                 "sufficient": False,
                 "ownStockUnits": 0,
-                "shortfallUnits": state.get(
-                    "units_needed",
-                    0,
-                ),
+                "shortfallUnits": state.get("units_needed", 0),
                 "candidateTransferOrgs": [],
             },
             "error": error_message,
@@ -342,12 +272,18 @@ def validate_eligibility_node(
 
     Student 4's search agent returns candidate donor objects.
     The eligibility agent expects donor IDs plus the required
-    blood type, so the Coordinator adapts the data between
-    both agents.
+    blood type.
 
-    Student 1's endpoint owns its AgentStep logging, so the
-    Coordinator does not create a duplicate eligibility step.
+    Student 1's endpoint owns its own AgentStep logging when
+    real donor candidates exist.
+
+    If there are no donor candidates, Student 1 intentionally
+    returns without calling the backend endpoint. In that
+    special case, the Coordinator logs an empty eligibility
+    step so the workflow monitor still shows the complete path.
     """
+
+    started_at = utc_now_iso()
 
     donor_search_result = state.get(
         "donor_search_result",
@@ -372,6 +308,42 @@ def validate_eligibility_node(
         "required_blood_type": state.get("blood_type"),
     }
 
+    # Student 1's agent intentionally skips the backend endpoint
+    # when there are no candidate donors. Log this empty stage
+    # here so the workflow monitor still shows Eligibility Validation.
+    if not candidate_donor_ids:
+        eligibility_result = {
+            "eligible": [],
+            "excluded": [],
+        }
+
+        log_workflow_step(
+            state,
+            agent_name="Eligibility Validation Agent",
+            step_name="validate_eligibility",
+            status="completed",
+            input_data={
+                "candidateDonorIds": [],
+                "requiredBloodType": state.get("blood_type"),
+            },
+            output_data=eligibility_result,
+            narrative=(
+                "Eligibility validation completed with "
+                "no candidate donors to evaluate."
+            ),
+            retry_count=0,
+            started_at=started_at,
+            completed_at=utc_now_iso(),
+        )
+
+        return {
+            "current_step": "validate_eligibility",
+            "eligibility_result": eligibility_result,
+            "error": None,
+        }
+
+    # Real candidates exist, so call Student 1's real agent.
+    # Student 1's backend endpoint owns the AgentStep logging.
     result = run_eligibility(
         eligibility_input
     )
@@ -424,6 +396,7 @@ def validate_eligibility_node(
     return {
         "current_step": "validate_eligibility",
         "eligibility_result": eligibility_result,
+        "error": None,
     }
 
 
