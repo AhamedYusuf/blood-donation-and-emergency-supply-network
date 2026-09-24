@@ -1,0 +1,52 @@
+name: Agent Service CI
+
+on:
+  push:
+    branches:
+      - development
+      - production
+      - "dev/**"
+      - "chore/**"
+  pull_request:
+    branches:
+      - development
+      - production
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: agent-service
+
+    env:
+      # Tests monkeypatch the HTTP layer and never call a real backend, but
+      # importing the app (main.py -> coordinator_agent.py -> ...) must not
+      # crash for lack of this at import time — matches local dev's .env.
+      INTERNAL_AGENT_SECRET: ci-test-only-secret
+      BACKEND_BASE_URL: http://localhost:5067
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: agent-service/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Import the FastAPI app
+        # Import errors (syntax errors, broken imports anywhere in the
+        # coordinator graph) crash the whole service silently otherwise —
+        # this step fails loudly and separately from the test step below,
+        # so a broken import is never mistaken for "no tests failed".
+        run: python3 -c "import main"
+
+      - name: Test
+        run: pytest -v
