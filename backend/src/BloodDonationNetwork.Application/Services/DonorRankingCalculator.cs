@@ -35,7 +35,17 @@ public class DonorRankingCalculator
         {
             "critical" => 1.0,
             "urgent" => 0.6,
-            "routine" => 0.2,
+
+            // The value that actually reaches this method in the live
+            // Coordinator pipeline is "routine" — WorkflowInternalController's
+            // own MapUrgency helper maps RequestUrgency.Normal to "routine",
+            // which differs from RequestUrgencyJsonConverter's public-API
+            // convention of "normal" for the exact same enum value. Accepting
+            // both here means this doesn't silently break if that internal
+            // mapping is ever aligned with the public one, or if something
+            // calls search-donors directly using the public convention.
+            "routine" or "normal" => 0.2,
+
             _ => throw new ArgumentException($"Invalid urgency level: '{urgencyLevel}'")
         };
     }

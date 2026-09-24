@@ -80,6 +80,11 @@ public class DonorRankingCalculatorTests
     [InlineData("critical", 0.2)]   // 0.2 weight * 1.0 boost
     [InlineData("urgent", 0.12)]    // 0.2 weight * 0.6 boost
     [InlineData("routine", 0.04)]   // 0.2 weight * 0.2 boost
+    // "normal" is the public API's RequestUrgencyJsonConverter convention
+    // for RequestUrgency.Normal; "routine" is what WorkflowInternalController's
+    // own MapUrgency actually sends through the live Coordinator pipeline.
+    // Both must produce the same boost, since they represent the same value.
+    [InlineData("normal", 0.04)]
     public void CalculateScore_UrgencyBoostContribution_IsIsolatedAndCorrect(
         string urgency, double expectedBoostContribution)
     {
@@ -104,7 +109,6 @@ public class DonorRankingCalculatorTests
     [Theory]
     [InlineData("Critical")]   // wrong casing
     [InlineData("URGENT")]
-    [InlineData("normal")]     // the C# RequestUrgency enum name, NOT the §0.5 spec value
     [InlineData("")]
     [InlineData("emergency")]
     public void CalculateScore_UnrecognisedUrgency_Throws(string urgency)
