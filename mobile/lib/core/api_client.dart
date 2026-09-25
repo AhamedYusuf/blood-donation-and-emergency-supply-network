@@ -78,8 +78,13 @@ class ApiClient {
     );
   }
 
-  /// Pulls a human-readable message out of an ASP.NET Core ProblemDetails
-  /// body, falling back to the raw body.
+  /// Pulls a human-readable message out of an error response body.
+  /// Most endpoints go through ASP.NET Core's ProblemDetails shape
+  /// (`errors`/`title`/`detail`), but a few controllers — e.g.
+  /// DonorsController.Register — catch their own exceptions and return a
+  /// plain `{"message": "..."}` body instead. Checking `message` too
+  /// means those endpoints' actual, actionable error text reaches the
+  /// user instead of falling back to a generic "Request failed".
   String? _extractMessage(String rawBody) {
     if (rawBody.isEmpty) return null;
     try {
@@ -90,7 +95,8 @@ class ApiClient {
           final first = errors.values.first;
           if (first is List && first.isNotEmpty) return first.first.toString();
         }
-        return (decoded['title'] ?? decoded['detail'])?.toString();
+        return (decoded['message'] ?? decoded['title'] ?? decoded['detail'])
+            ?.toString();
       }
     } catch (_) {
       // not JSON
