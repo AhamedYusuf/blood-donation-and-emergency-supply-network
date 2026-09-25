@@ -64,9 +64,11 @@ class _DonorRegistrationScreenState extends ConsumerState<DonorRegistrationScree
       await ref.read(authControllerProvider.notifier).setDonorProfileId(profile.id);
       if (mounted) context.go('/donor-profile');
     } on ApiException catch (error) {
-      setState(() => _error = error.statusCode == 409
-          ? 'You already have a donor profile.'
-          : error.message);
+      // The backend (DonorsController.Register) returns 400 with a clear,
+      // actionable message for both "already registered" and "address
+      // couldn't be geocoded" — ApiClient now surfaces it correctly, so
+      // there's no need to override it with different wording here.
+      setState(() => _error = error.message);
     } catch (_) {
       setState(() => _error = 'Could not connect. Check your connection and try again.');
     } finally {

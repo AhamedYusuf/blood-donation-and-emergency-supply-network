@@ -37,13 +37,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         case AuthStatus.unauthenticated:
           return loggingIn || registering ? null : '/login';
         case AuthStatus.authenticated:
+          final auth = ref.read(authControllerProvider);
+          // Only donors are required to complete a donor profile before
+          // using the rest of the app — staff/admin accounts have no
+          // donorProfileId at all, so gating on it for every role traps
+          // them on a registration screen whose submit always 403s
+          // server-side (donor-only endpoint). Mirrors web's
+          // RequireDonorProfile guard in App.tsx.
+          final needsDonorRegistration =
+              auth.role == 'donor' && auth.donorProfileId == null;
+
           if (loggingIn || registering || state.matchedLocation == '/splash') {
-            return ref.read(authControllerProvider).donorProfileId == null
-                ? '/donor-registration'
-                : '/';
+            return needsDonorRegistration ? '/donor-registration' : '/';
           }
-          if (ref.read(authControllerProvider).donorProfileId == null &&
-              !donorRegistration) {
+          if (needsDonorRegistration && !donorRegistration) {
             return '/donor-registration';
           }
           return null;

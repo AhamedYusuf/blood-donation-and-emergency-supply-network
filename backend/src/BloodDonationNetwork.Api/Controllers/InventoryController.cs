@@ -166,6 +166,7 @@ public class InventoryController : ControllerBase
         {
             var result = await _inventoryService.CheckStockAsync(
                 request,
+                GetCurrentUserId(),
                 cancellationToken);
 
             return Ok(result);
