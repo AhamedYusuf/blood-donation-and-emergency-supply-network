@@ -240,8 +240,19 @@ public class InventoryService : IInventoryService
 
     public async Task<StockCheckResponse> CheckStockAsync(
         StockCheckRequest request,
+        Guid currentUserId,
         CancellationToken cancellationToken = default)
     {
+        // Unlike GetEmergencyRecommendationAsync (a deliberate system-wide
+        // aggregate with no OrganizationId in its request at all), this
+        // takes a caller-supplied OrganizationId and returns that specific
+        // org's exact unit count — without this check, any staff member
+        // could pass a different org's GUID and read their private stock.
+        await EnsureOrganizationAccessAsync(
+            request.OrganizationId,
+            currentUserId,
+            cancellationToken);
+
         ValidateUnits(request.RequiredUnits);
 
         var inventory = await _db.BloodBankInventories
