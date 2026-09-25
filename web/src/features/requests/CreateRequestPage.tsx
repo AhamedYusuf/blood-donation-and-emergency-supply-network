@@ -48,6 +48,36 @@ const urgencyOptions = [
   },
 ];
 
+function getApiErrorMessage(
+  error: unknown,
+  fallback: string
+) {
+  const data = (
+    error as {
+      data?: {
+        message?: unknown;
+        detail?: unknown;
+      } | string;
+    }
+  )?.data;
+
+  if (typeof data === "string" && data.trim()) {
+    return data;
+  }
+
+  if (data && typeof data === "object") {
+    if (typeof data.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+
+    if (typeof data.detail === "string" && data.detail.trim()) {
+      return data.detail;
+    }
+  }
+
+  return fallback;
+}
+
 export default function CreateRequestPage() {
   const navigate = useNavigate();
 
@@ -149,9 +179,12 @@ export default function CreateRequestPage() {
         await createRequest(payload).unwrap();
 
       navigate(`/requests/${createdRequest.id}`);
-    } catch {
+    } catch (error: unknown) {
       setSubmitError(
-        "Unable to create the blood request. Please check the information and try again."
+        getApiErrorMessage(
+          error,
+          "Unable to create the blood request. Please check the information and try again."
+        )
       );
     }
   };

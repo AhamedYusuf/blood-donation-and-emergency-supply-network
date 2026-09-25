@@ -27,6 +27,37 @@ import {
 import "./requests.css";
 
 
+function getApiErrorMessage(
+  error: unknown,
+  fallback: string
+) {
+  const data = (
+    error as {
+      data?: {
+        message?: unknown;
+        detail?: unknown;
+      } | string;
+    }
+  )?.data;
+
+  if (typeof data === "string" && data.trim()) {
+    return data;
+  }
+
+  if (data && typeof data === "object") {
+    if (typeof data.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+
+    if (typeof data.detail === "string" && data.detail.trim()) {
+      return data.detail;
+    }
+  }
+
+  return fallback;
+}
+
+
 const getBloodTypeLabel = (
   bloodType: BloodType
 ) => {
@@ -214,9 +245,12 @@ export default function RequestDetailsPage() {
         setSelectedStatus(null);
 
         refetch();
-      } catch {
+      } catch (error: unknown) {
         setActionError(
-          "Unable to update request status."
+          getApiErrorMessage(
+            error,
+            "Unable to update request status."
+          )
         );
       }
     };
@@ -250,9 +284,12 @@ export default function RequestDetailsPage() {
         );
 
         refetch();
-      } catch {
+      } catch (error: unknown) {
         setActionError(
-          "Unable to close this request."
+          getApiErrorMessage(
+            error,
+            "Unable to close this request."
+          )
         );
       }
     };
@@ -281,9 +318,12 @@ export default function RequestDetailsPage() {
         ).unwrap();
 
         navigate("/requests");
-      } catch {
+      } catch (error: unknown) {
         setActionError(
-          "Unable to delete this request."
+          getApiErrorMessage(
+            error,
+            "Unable to delete this request."
+          )
         );
       }
     };

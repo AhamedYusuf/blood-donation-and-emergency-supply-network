@@ -1,10 +1,11 @@
+import hmac
 import os
 import traceback
 import requests
 
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langgraph.types import Command
@@ -244,6 +245,30 @@ def get_backend_config():
     return backend_base_url, headers
 
 
+def require_internal_secret(
+    provided_secret: Optional[str] = Header(
+        default=None,
+        alias="X-Internal-Secret",
+    ),
+) -> None:
+    expected_secret = os.getenv("INTERNAL_AGENT_SECRET")
+
+    if not expected_secret:
+        raise HTTPException(
+            status_code=500,
+            detail="INTERNAL_AGENT_SECRET is not configured.",
+        )
+
+    if not provided_secret or not hmac.compare_digest(
+        provided_secret,
+        expected_secret,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Missing or invalid internal secret.",
+        )
+
+
 # =========================================================
 # HEALTH CHECK
 # =========================================================
@@ -262,6 +287,7 @@ def health():
 @app.post("/run-workflow")
 def run_workflow(
     request: RunWorkflowRequest,
+    _: None = Depends(require_internal_secret),
 ):
 
     backend_base_url, headers = (
@@ -396,6 +422,9 @@ def run_workflow(
             "current_step":
                 "planning",
 
+            "revision_count":
+                0,
+
             "plan": [
                 "stock_check",
                 "search_donors",
@@ -478,6 +507,7 @@ def run_workflow(
 def resume_workflow(
     workflow_id: str,
     request: ResumeWorkflowRequest,
+    _: None = Depends(require_internal_secret),
 ):
 
     decision = (
