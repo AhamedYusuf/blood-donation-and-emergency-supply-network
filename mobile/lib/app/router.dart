@@ -12,6 +12,10 @@ import '../features/profile/profile_screen.dart';
 import '../features/donor_profile/screens/donor_registration_screen.dart';
 import '../features/donor_profile/screens/donor_profile_screen.dart';
 import '../features/donor_profile/screens/eligibility_screen.dart';
+import '../features/blood_requests/blood_request_details_screen.dart';
+import '../features/blood_requests/blood_requests_screen.dart';
+import '../features/blood_requests/coordinator_workflow_screen.dart';
+import '../features/blood_requests/create_blood_request_screen.dart';
 import 'mobile_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -61,15 +65,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => MobileShell(navigationShell: shell),
         branches: [
-          StatefulShellBranch(routes: [
-            GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(path: '/appointments', builder: (_, _) => const MyAppointmentsScreen()),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
-          ]),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/appointments',
+                builder: (_, _) => const MyAppointmentsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (_, _) => const ProfileScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/blood-requests',
+                builder: (_, _) => const BloodRequestsScreen(),
+              ),
+            ],
+          ),
         ],
       ),
       GoRoute(
@@ -77,16 +99,41 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (_, _) => const BookAppointmentScreen(),
       ),
+      GoRoute(
+        path: '/blood-requests/new',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, _) => const CreateBloodRequestScreen(),
+      ),
+      GoRoute(
+        path: '/blood-requests/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, state) =>
+            BloodRequestDetailsScreen(requestId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/blood-requests/:id/workflow',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, state) =>
+            CoordinatorWorkflowScreen(requestId: state.pathParameters['id']!),
+      ),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
-      GoRoute(path: '/donor-registration', builder: (_, _) => const DonorRegistrationScreen()),
-      GoRoute(path: '/donor-profile', builder: (_, _) => const DonorProfileScreen()),
-      GoRoute(path: '/eligibility', builder: (_, _) => const EligibilityScreen()),
+      GoRoute(
+        path: '/donor-registration',
+        builder: (_, _) => const DonorRegistrationScreen(),
+      ),
+      GoRoute(
+        path: '/donor-profile',
+        builder: (_, _) => const DonorProfileScreen(),
+      ),
+      GoRoute(
+        path: '/eligibility',
+        builder: (_, _) => const EligibilityScreen(),
+      ),
       GoRoute(
         path: '/splash',
-        builder: (_, _) => const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        builder: (_, _) =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
     ],
   );

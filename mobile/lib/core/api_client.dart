@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
@@ -13,7 +14,7 @@ import 'package:http/http.dart' as http;
 /// on a real device use your machine's LAN IP.
 const String kApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:5067',
+  defaultValue: kIsWeb ? 'http://localhost:5067' : 'http://10.0.2.2:5067',
 );
 
 /// Thrown for any non-success response or transport failure.
@@ -31,7 +32,7 @@ class ApiException implements Exception {
 /// passes a bearer token for protected endpoints.
 class ApiClient {
   ApiClient({http.Client? httpClient, this.baseUrl = kApiBaseUrl})
-      : _http = httpClient ?? http.Client();
+    : _http = httpClient ?? http.Client();
 
   final http.Client _http;
   final String baseUrl;
