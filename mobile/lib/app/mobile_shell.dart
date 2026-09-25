@@ -16,6 +16,7 @@ class MobileShell extends StatelessWidget {
     NavTab(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
     NavTab(icon: Icons.event_available_outlined, activeIcon: Icons.event_available_rounded, label: 'Donations'),
     NavTab(icon: Icons.person_outline, activeIcon: Icons.person_rounded, label: 'Profile'),
+    NavTab(icon: Icons.bloodtype_outlined, activeIcon: Icons.bloodtype_rounded, label: 'Requests'),
   ];
 
   @override
