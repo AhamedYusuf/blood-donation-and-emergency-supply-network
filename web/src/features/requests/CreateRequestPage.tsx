@@ -121,12 +121,32 @@ export default function CreateRequestPage() {
     useState<string | null>(null);
 
   useEffect(() => {
+    if (!userOrganizationId) {
+      return;
+    }
+
+    const selectedOrganization = organizations.find(
+      (organization) =>
+        organization.id === userOrganizationId
+    );
+
+    const coordinatesAvailable = (
+      selectedOrganization !== undefined &&
+      Number.isFinite(selectedOrganization.latitude) &&
+      Number.isFinite(selectedOrganization.longitude)
+    );
+
     setForm((current) => ({
       ...current,
-      organizationId:
-        userOrganizationId ?? current.organizationId,
+      organizationId: userOrganizationId,
+      latitude: coordinatesAvailable
+        ? selectedOrganization.latitude
+        : Number.NaN,
+      longitude: coordinatesAvailable
+        ? selectedOrganization.longitude
+        : Number.NaN,
     }));
-  }, [userId, userOrganizationId]);
+  }, [organizations, userOrganizationId]);
 
   const updateField = <K extends keyof CreateRequestDto>(
     field: K,
@@ -140,6 +160,46 @@ export default function CreateRequestPage() {
     setErrors((current) => ({
       ...current,
       [field]: undefined,
+    }));
+
+    setSubmitError(null);
+  };
+
+  const handleOrganizationChange = (
+    organizationId: string
+  ) => {
+    const selectedOrganization = organizations.find(
+      (organization) => organization.id === organizationId
+    );
+
+    const coordinatesAvailable = (
+      selectedOrganization !== undefined &&
+      Number.isFinite(selectedOrganization.latitude) &&
+      Number.isFinite(selectedOrganization.longitude)
+    );
+
+    setForm((current) => ({
+      ...current,
+      organizationId,
+      latitude: coordinatesAvailable
+        ? selectedOrganization.latitude
+        : Number.NaN,
+      longitude: coordinatesAvailable
+        ? selectedOrganization.longitude
+        : Number.NaN,
+    }));
+
+    setErrors((current) => ({
+      ...current,
+      organizationId: undefined,
+      latitude:
+        organizationId && !coordinatesAvailable
+          ? "The selected organization does not have valid coordinates."
+          : undefined,
+      longitude:
+        organizationId && !coordinatesAvailable
+          ? "The selected organization does not have valid coordinates."
+          : undefined,
     }));
 
     setSubmitError(null);
@@ -243,8 +303,7 @@ export default function CreateRequestPage() {
                 value={form.organizationId}
                 disabled={organizationsLoading}
                 onChange={(event) =>
-                  updateField(
-                    "organizationId",
+                  handleOrganizationChange(
                     event.target.value
                   )
                 }
@@ -406,13 +465,8 @@ export default function CreateRequestPage() {
                 step="any"
                 min={-90}
                 max={90}
-                value={form.latitude}
-                onChange={(event) =>
-                  updateField(
-                    "latitude",
-                    Number(event.target.value)
-                  )
-                }
+                value={Number.isFinite(form.latitude) ? form.latitude : ""}
+                readOnly
               />
 
               {errors.latitude && (
@@ -433,13 +487,8 @@ export default function CreateRequestPage() {
                 step="any"
                 min={-180}
                 max={180}
-                value={form.longitude}
-                onChange={(event) =>
-                  updateField(
-                    "longitude",
-                    Number(event.target.value)
-                  )
-                }
+                value={Number.isFinite(form.longitude) ? form.longitude : ""}
+                readOnly
               />
 
               {errors.longitude && (
