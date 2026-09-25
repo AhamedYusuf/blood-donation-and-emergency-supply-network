@@ -9,6 +9,9 @@ String dayNum(DateTime d) => d.day.toString();
 String monthAbbr(DateTime d) => _months[d.month - 1];
 String weekdayAbbr(DateTime d) => _weekdays[d.weekday - 1];
 
+String isoDate(DateTime d) =>
+  '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
 /// e.g. "8:30 AM"
 String clockTime(DateTime d) {
   final h24 = d.hour;

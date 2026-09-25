@@ -10,6 +10,7 @@ class AuthResult {
     required this.email,
     required this.fullName,
     required this.role,
+    this.donorProfileId,
     this.organizationId,
   });
 
@@ -18,6 +19,7 @@ class AuthResult {
   final String email;
   final String fullName;
   final String role;
+  final String? donorProfileId;
   final String? organizationId;
 
   factory AuthResult.fromJson(Map<String, dynamic> json) => AuthResult(
@@ -26,6 +28,7 @@ class AuthResult {
         email: json['email'] as String,
         fullName: json['fullName'] as String? ?? '',
         role: (json['role'] as String).toLowerCase(),
+        donorProfileId: json['donorProfileId'] as String?,
         organizationId: json['organizationId'] as String?,
       );
 }
@@ -42,6 +45,25 @@ class AuthRepository {
     final json = await _api.post(
       '/api/auth/login',
       body: {'email': email, 'password': password},
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<AuthResult> register({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+  }) async {
+    final json = await _api.post(
+      '/api/auth/register',
+      body: {
+        'email': email,
+        'password': password,
+        'fullName': fullName,
+        'phoneNumber': phoneNumber,
+        'role': 'donor',
+      },
     );
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }

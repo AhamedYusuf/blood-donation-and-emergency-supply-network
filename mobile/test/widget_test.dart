@@ -14,6 +14,7 @@ class _FakeSecureStorage implements SecureStorage {
   Future<void> saveSession({
     required String token,
     required String userId,
+    String? donorProfileId,
     required String role,
     String? organizationId,
     String? email,
@@ -33,6 +34,7 @@ class _FakeSecureStorage implements SecureStorage {
       ({
         String token,
         String userId,
+        String? donorProfileId,
         String role,
         String? organizationId,
         String? email,
@@ -43,6 +45,7 @@ class _FakeSecureStorage implements SecureStorage {
     return (
       token: token,
       userId: _store['userId']!,
+      donorProfileId: _store['donorProfileId'],
       role: _store['role']!,
       organizationId: _store['orgId'],
       email: _store['email'],
