@@ -6,8 +6,12 @@ import '../features/appointments/book_appointment_screen.dart';
 import '../features/appointments/my_appointments_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/register_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/donor_profile/screens/donor_registration_screen.dart';
+import '../features/donor_profile/screens/donor_profile_screen.dart';
+import '../features/donor_profile/screens/eligibility_screen.dart';
 import 'mobile_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -24,14 +28,25 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final status = ref.read(authControllerProvider).status;
       final loggingIn = state.matchedLocation == '/login';
+      final registering = state.matchedLocation == '/register';
+      final donorRegistration = state.matchedLocation == '/donor-registration';
 
       switch (status) {
         case AuthStatus.unknown:
           return '/splash';
         case AuthStatus.unauthenticated:
-          return loggingIn ? null : '/login';
+          return loggingIn || registering ? null : '/login';
         case AuthStatus.authenticated:
-          return (loggingIn || state.matchedLocation == '/splash') ? '/' : null;
+          if (loggingIn || registering || state.matchedLocation == '/splash') {
+            return ref.read(authControllerProvider).donorProfileId == null
+                ? '/donor-registration'
+                : '/';
+          }
+          if (ref.read(authControllerProvider).donorProfileId == null &&
+              !donorRegistration) {
+            return '/donor-registration';
+          }
+          return null;
       }
     },
     refreshListenable: _AuthRefresh(ref),
@@ -56,6 +71,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const BookAppointmentScreen(),
       ),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+      GoRoute(path: '/donor-registration', builder: (_, _) => const DonorRegistrationScreen()),
+      GoRoute(path: '/donor-profile', builder: (_, _) => const DonorProfileScreen()),
+      GoRoute(path: '/eligibility', builder: (_, _) => const EligibilityScreen()),
       GoRoute(
         path: '/splash',
         builder: (_, _) => const Scaffold(
