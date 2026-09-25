@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BloodDrops } from "../../components/blood-effects/BloodDrops";
+import { getApiErrorMessage } from "../../api/getApiErrorMessage";
 import {
   useCreateOrganizationMutation,
   useDeleteOrganizationMutation,
@@ -656,7 +657,10 @@ export function OrganizationsPage() {
     } catch (requestError) {
       console.error(requestError);
       setActionError(
-        "We could not save this organization. Please check the information and try again.",
+        getApiErrorMessage(
+          requestError,
+          "We could not save this organization. Please check the information and try again.",
+        ),
       );
     }
   };
@@ -672,7 +676,10 @@ export function OrganizationsPage() {
     } catch (requestError) {
       console.error(requestError);
       setActionError(
-        "This organization could not be deleted. It may still be connected to users or inventory.",
+        getApiErrorMessage(
+          requestError,
+          "This organization could not be deleted. It may still be connected to users or inventory.",
+        ),
       );
     }
   };

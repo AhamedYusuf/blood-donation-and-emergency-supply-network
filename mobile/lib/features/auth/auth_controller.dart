@@ -13,6 +13,7 @@ class AuthState {
     required this.status,
     this.token,
     this.userId,
+    this.donorProfileId,
     this.role,
     this.organizationId,
     this.email,
@@ -25,6 +26,7 @@ class AuthState {
   final AuthStatus status;
   final String? token;
   final String? userId;
+  final String? donorProfileId;
   final String? role;
   final String? organizationId;
   final String? email;
@@ -78,6 +80,7 @@ class AuthController extends Notifier<AuthState> {
             status: AuthStatus.authenticated,
             token: session.token,
             userId: session.userId,
+            donorProfileId: session.donorProfileId,
             role: session.role,
             organizationId: session.organizationId,
             email: session.email,
@@ -88,9 +91,29 @@ class AuthController extends Notifier<AuthState> {
   /// Throws [ApiException] on failure; the caller shows the message.
   Future<void> login({required String email, required String password}) async {
     final result = await _repo.login(email: email, password: password);
+    await _establishSession(result);
+  }
+
+  Future<void> register({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+  }) async {
+    final result = await _repo.register(
+      email: email,
+      password: password,
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+    );
+    await _establishSession(result);
+  }
+
+  Future<void> _establishSession(AuthResult result) async {
     await _storage.saveSession(
       token: result.token,
       userId: result.userId,
+      donorProfileId: result.donorProfileId,
       role: result.role,
       organizationId: result.organizationId,
       email: result.email,
@@ -100,6 +123,7 @@ class AuthController extends Notifier<AuthState> {
       status: AuthStatus.authenticated,
       token: result.token,
       userId: result.userId,
+      donorProfileId: result.donorProfileId,
       role: result.role,
       organizationId: result.organizationId,
       email: result.email,
@@ -120,6 +144,30 @@ class AuthController extends Notifier<AuthState> {
 
     await _storage.clear();
     state = const AuthState.signedOut();
+  }
+
+  Future<void> setDonorProfileId(String profileId) async {
+    final session = await _storage.readSession();
+    if (session == null) return;
+    await _storage.saveSession(
+      token: session.token,
+      userId: session.userId,
+      donorProfileId: profileId,
+      role: session.role,
+      organizationId: session.organizationId,
+      email: session.email,
+      fullName: session.fullName,
+    );
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      token: state.token,
+      userId: state.userId,
+      donorProfileId: profileId,
+      role: state.role,
+      organizationId: state.organizationId,
+      email: state.email,
+      fullName: state.fullName,
+    );
   }
 
   static Future<void> _bestEffort(Future<void> Function() action) async {
@@ -143,4 +191,8 @@ final authTokenProvider = Provider<String?>(
 /// The current user's id, or null.
 final currentUserIdProvider = Provider<String?>(
   (ref) => ref.watch(authControllerProvider).userId,
+);
+
+final currentDonorProfileIdProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider).donorProfileId,
 );

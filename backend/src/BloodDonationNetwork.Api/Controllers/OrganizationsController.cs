@@ -95,6 +95,13 @@ public class OrganizationsController : ControllerBase
         {
             return UnprocessableEntity(new { message = ex.Message });
         }
+        catch (ArgumentException ex)
+        {
+            // ParseOrganizationType throws this for an invalid Type string —
+            // same pattern already used by the Geocode action above; without
+            // it this fell through to the global handler's generic 500.
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -114,6 +121,10 @@ public class OrganizationsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return UnprocessableEntity(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 

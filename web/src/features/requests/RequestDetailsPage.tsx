@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { getApiErrorMessage } from "../../api/getApiErrorMessage";
 import {
   Link,
   useNavigate,
@@ -245,12 +246,18 @@ export default function RequestDetailsPage() {
         setSelectedStatus(null);
 
         refetch();
+<<<<<<< HEAD
       } catch (error: unknown) {
         setActionError(
           getApiErrorMessage(
             error,
             "Unable to update request status."
           )
+=======
+      } catch (error) {
+        setActionError(
+          getApiErrorMessage(error, "Unable to update request status.")
+>>>>>>> origin/development
         );
       }
     };
@@ -284,12 +291,18 @@ export default function RequestDetailsPage() {
         );
 
         refetch();
+<<<<<<< HEAD
       } catch (error: unknown) {
         setActionError(
           getApiErrorMessage(
             error,
             "Unable to close this request."
           )
+=======
+      } catch (error) {
+        setActionError(
+          getApiErrorMessage(error, "Unable to close this request.")
+>>>>>>> origin/development
         );
       }
     };
@@ -318,12 +331,18 @@ export default function RequestDetailsPage() {
         ).unwrap();
 
         navigate("/requests");
+<<<<<<< HEAD
       } catch (error: unknown) {
         setActionError(
           getApiErrorMessage(
             error,
             "Unable to delete this request."
           )
+=======
+      } catch (error) {
+        setActionError(
+          getApiErrorMessage(error, "Unable to delete this request.")
+>>>>>>> origin/development
         );
       }
     };

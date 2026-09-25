@@ -6,8 +6,12 @@ import '../features/appointments/book_appointment_screen.dart';
 import '../features/appointments/my_appointments_screen.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/register_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/donor_profile/screens/donor_registration_screen.dart';
+import '../features/donor_profile/screens/donor_profile_screen.dart';
+import '../features/donor_profile/screens/eligibility_screen.dart';
 import 'mobile_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -24,14 +28,32 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final status = ref.read(authControllerProvider).status;
       final loggingIn = state.matchedLocation == '/login';
+      final registering = state.matchedLocation == '/register';
+      final donorRegistration = state.matchedLocation == '/donor-registration';
 
       switch (status) {
         case AuthStatus.unknown:
           return '/splash';
         case AuthStatus.unauthenticated:
-          return loggingIn ? null : '/login';
+          return loggingIn || registering ? null : '/login';
         case AuthStatus.authenticated:
-          return (loggingIn || state.matchedLocation == '/splash') ? '/' : null;
+          final auth = ref.read(authControllerProvider);
+          // Only donors are required to complete a donor profile before
+          // using the rest of the app — staff/admin accounts have no
+          // donorProfileId at all, so gating on it for every role traps
+          // them on a registration screen whose submit always 403s
+          // server-side (donor-only endpoint). Mirrors web's
+          // RequireDonorProfile guard in App.tsx.
+          final needsDonorRegistration =
+              auth.role == 'donor' && auth.donorProfileId == null;
+
+          if (loggingIn || registering || state.matchedLocation == '/splash') {
+            return needsDonorRegistration ? '/donor-registration' : '/';
+          }
+          if (needsDonorRegistration && !donorRegistration) {
+            return '/donor-registration';
+          }
+          return null;
       }
     },
     refreshListenable: _AuthRefresh(ref),
@@ -56,6 +78,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const BookAppointmentScreen(),
       ),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+      GoRoute(path: '/donor-registration', builder: (_, _) => const DonorRegistrationScreen()),
+      GoRoute(path: '/donor-profile', builder: (_, _) => const DonorProfileScreen()),
+      GoRoute(path: '/eligibility', builder: (_, _) => const EligibilityScreen()),
       GoRoute(
         path: '/splash',
         builder: (_, _) => const Scaffold(

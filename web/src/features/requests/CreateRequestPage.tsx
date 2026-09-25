@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 import type { RootState } from "../../app/store";
+import { getApiErrorMessage } from "../../api/getApiErrorMessage";
 
 import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 
@@ -239,7 +240,11 @@ export default function CreateRequestPage() {
         await createRequest(payload).unwrap();
 
       navigate(`/requests/${createdRequest.id}`);
+<<<<<<< HEAD
     } catch (error: unknown) {
+=======
+    } catch (error) {
+>>>>>>> origin/development
       setSubmitError(
         getApiErrorMessage(
           error,
