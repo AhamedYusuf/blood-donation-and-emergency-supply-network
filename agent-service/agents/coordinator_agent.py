@@ -14,6 +14,8 @@ from agents.matching_dispatch_agent import dispatch as run_dispatch
 from agents.matching_dispatch_agent import search as run_search
 from shared.internal_client import InternalClient, InternalClientError
 
+MAX_REVISIONS = 3
+
 
 class CoordinatorState(TypedDict, total=False):
     # Workflow identity
@@ -31,6 +33,7 @@ class CoordinatorState(TypedDict, total=False):
     # Coordinator state
     current_step: str
     plan: list[str]
+    revision_count: int
 
     # Agent outputs
     stock_result: dict[str, Any]
@@ -156,7 +159,6 @@ def stock_check_node(
         return {
             "current_step": "stock_check",
             "stock_result": result,
-            "error": None,
         }
 
     except (InternalClientError, ValueError) as exc:
@@ -203,6 +205,9 @@ def route_after_stock_check(
 
     Otherwise continue to donor search.
     """
+
+    if state.get("error"):
+        return "fail_workflow"
 
     stock_result = state.get(
         "stock_result",
@@ -258,6 +263,15 @@ def search_donors_node(
             },
             "error": error_message,
         }
+
+
+def route_after_search(
+    state: CoordinatorState,
+) -> str:
+    if state.get("error"):
+        return "fail_workflow"
+
+    return "validate_eligibility"
 
 
 # ============================================================
@@ -339,14 +353,28 @@ def validate_eligibility_node(
         return {
             "current_step": "validate_eligibility",
             "eligibility_result": eligibility_result,
-            "error": None,
+            "error": state.get("error"),
         }
 
     # Real candidates exist, so call Student 1's real agent.
     # Student 1's backend endpoint owns the AgentStep logging.
-    result = run_eligibility(
-        eligibility_input
-    )
+    try:
+        result = run_eligibility(
+            eligibility_input
+        )
+    except (InternalClientError, ValueError) as exc:
+        error_message = (
+            f"validate_eligibility failed: {exc}"
+        )
+
+        return {
+            "current_step": "validate_eligibility",
+            "eligibility_result": {
+                "eligible": [],
+                "excluded": [],
+            },
+            "error": error_message,
+        }
 
     error = result.get("error")
 
@@ -396,8 +424,16 @@ def validate_eligibility_node(
     return {
         "current_step": "validate_eligibility",
         "eligibility_result": eligibility_result,
-        "error": None,
     }
+
+
+def route_after_eligibility(
+    state: CoordinatorState,
+) -> str:
+    if state.get("error"):
+        return "fail_workflow"
+
+    return "mark_awaiting_approval"
 
 
 # ============================================================
@@ -535,8 +571,7 @@ def revision_replan_node(
     """
     Re-plan the workflow after a human requests a revision.
 
-    The backend already increments RevisionCount and enforces
-    the maximum revision limit.
+    The backend and coordinator both enforce the maximum revision limit.
     """
 
     started_at = utc_now_iso()
@@ -544,6 +579,51 @@ def revision_replan_node(
     comments = state.get(
         "approval_comments"
     )
+
+    revision_count = state.get(
+        "revision_count",
+        0,
+    )
+
+    if revision_count >= MAX_REVISIONS:
+        failure_reason = (
+            "Maximum workflow revision limit exceeded."
+        )
+
+        InternalClient().post(
+            (
+                "/api/internal/agent/workflows/"
+                f"{state.get('workflow_id')}/status"
+            ),
+            {
+                "status": "failed",
+                "failureReason": failure_reason,
+            },
+        )
+
+        log_workflow_step(
+            state,
+            agent_name="Coordinator Agent",
+            step_name="revision_replan",
+            status="failed",
+            input_data={
+                "decision": "revise",
+                "comments": comments,
+                "revisionCount": revision_count,
+            },
+            output_data={"error": failure_reason},
+            narrative=failure_reason,
+            retry_count=0,
+            started_at=started_at,
+            completed_at=utc_now_iso(),
+            error_message=failure_reason,
+        )
+
+        return {
+            "current_step": "failed",
+            "revision_count": revision_count,
+            "error": failure_reason,
+        }
 
     revised_plan = [
         "stock_check",
@@ -578,6 +658,7 @@ def revision_replan_node(
     return {
         "current_step": "revision_replan",
         "plan": revised_plan,
+        "revision_count": revision_count + 1,
 
         # Clear previous-cycle results.
         "stock_result": {},
@@ -587,8 +668,16 @@ def revision_replan_node(
 
         # Next approval interrupt will populate these again.
         "approval_decision": "",
-        "error": None,
     }
+
+
+def route_after_revision_replan(
+    state: CoordinatorState,
+) -> str:
+    if state.get("error"):
+        return "end"
+
+    return "stock_check"
 
 
 # ============================================================
@@ -659,7 +748,6 @@ def dispatch_node(
         return {
             "current_step": "dispatch",
             "dispatch_result": result,
-            "error": None,
         }
 
     except (InternalClientError, ValueError) as exc:
@@ -759,11 +847,39 @@ def finalize_workflow_node(
 
     return {
         "current_step": "finalize_workflow",
-        "error": (
-            failure_reason
+        **(
+            {"error": failure_reason}
             if dispatch_failed
-            else None
+            else {}
         ),
+    }
+
+
+def fail_workflow_node(
+    state: CoordinatorState,
+) -> dict[str, Any]:
+    failure_reason = state.get("error") or "Workflow failed."
+    workflow_id = state.get("workflow_id")
+
+    if not workflow_id:
+        raise ValueError(
+            "workflow_id is required to persist workflow failure."
+        )
+
+    InternalClient().post(
+        (
+            "/api/internal/agent/workflows/"
+            f"{workflow_id}/status"
+        ),
+        {
+            "status": "failed",
+            "failureReason": failure_reason,
+        },
+    )
+
+    return {
+        "current_step": "failed",
+        "error": failure_reason,
     }
 
 
@@ -816,6 +932,11 @@ def build_coordinator_graph() -> StateGraph:
         finalize_workflow_node,
     )
 
+    builder.add_node(
+        "fail_workflow",
+        fail_workflow_node,
+    )
+
     # --------------------------------------------------------
     # Start workflow
     # --------------------------------------------------------
@@ -836,6 +957,7 @@ def build_coordinator_graph() -> StateGraph:
             "search_donors": "search_donors",
             "await_approval":
                 "mark_awaiting_approval",
+            "fail_workflow": "fail_workflow",
         },
     )
 
@@ -843,18 +965,26 @@ def build_coordinator_graph() -> StateGraph:
     # Donor search -> eligibility
     # --------------------------------------------------------
 
-    builder.add_edge(
+    builder.add_conditional_edges(
         "search_donors",
-        "validate_eligibility",
+        route_after_search,
+        {
+            "validate_eligibility": "validate_eligibility",
+            "fail_workflow": "fail_workflow",
+        },
     )
 
     # --------------------------------------------------------
     # Eligibility -> awaiting approval
     # --------------------------------------------------------
 
-    builder.add_edge(
+    builder.add_conditional_edges(
         "validate_eligibility",
-        "mark_awaiting_approval",
+        route_after_eligibility,
+        {
+            "mark_awaiting_approval": "mark_awaiting_approval",
+            "fail_workflow": "fail_workflow",
+        },
     )
 
     # --------------------------------------------------------
@@ -885,9 +1015,13 @@ def build_coordinator_graph() -> StateGraph:
     # Revise -> re-run workflow
     # --------------------------------------------------------
 
-    builder.add_edge(
+    builder.add_conditional_edges(
         "revision_replan",
-        "stock_check",
+        route_after_revision_replan,
+        {
+            "stock_check": "stock_check",
+            "end": END,
+        },
     )
 
     # --------------------------------------------------------
@@ -905,6 +1039,11 @@ def build_coordinator_graph() -> StateGraph:
 
     builder.add_edge(
         "finalize_workflow",
+        END,
+    )
+
+    builder.add_edge(
+        "fail_workflow",
         END,
     )
 

@@ -215,9 +215,12 @@ export default function RequestDetailsPage() {
         setSelectedStatus(null);
 
         refetch();
-      } catch (error) {
+      } catch (error: unknown) {
         setActionError(
-          getApiErrorMessage(error, "Unable to update request status.")
+          getApiErrorMessage(
+            error,
+            "Unable to update request status."
+          )
         );
       }
     };
@@ -251,9 +254,12 @@ export default function RequestDetailsPage() {
         );
 
         refetch();
-      } catch (error) {
+      } catch (error: unknown) {
         setActionError(
-          getApiErrorMessage(error, "Unable to close this request.")
+          getApiErrorMessage(
+            error,
+            "Unable to close this request."
+          )
         );
       }
     };
@@ -282,9 +288,12 @@ export default function RequestDetailsPage() {
         ).unwrap();
 
         navigate("/requests");
-      } catch (error) {
+      } catch (error: unknown) {
         setActionError(
-          getApiErrorMessage(error, "Unable to delete this request.")
+          getApiErrorMessage(
+            error,
+            "Unable to delete this request."
+          )
         );
       }
     };

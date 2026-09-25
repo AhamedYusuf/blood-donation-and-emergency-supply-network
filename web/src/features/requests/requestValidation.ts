@@ -38,17 +38,22 @@ export const validateCreateRequest = (
       "Hospital name cannot exceed 200 characters.";
   }
 
-  if (values.latitude < -90 || values.latitude > 90) {
+  if (
+    !Number.isFinite(values.latitude) ||
+    values.latitude < -90 ||
+    values.latitude > 90
+  ) {
     errors.latitude =
-      "Latitude must be between -90 and 90.";
+      "A valid organization latitude is required.";
   }
 
   if (
+    !Number.isFinite(values.longitude) ||
     values.longitude < -180 ||
     values.longitude > 180
   ) {
     errors.longitude =
-      "Longitude must be between -180 and 180.";
+      "A valid organization longitude is required.";
   }
 
   // Prevent the default 0,0 location from being submitted.

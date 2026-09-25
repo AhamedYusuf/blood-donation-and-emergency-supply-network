@@ -237,12 +237,19 @@ export default function WorkflowMonitorPage() {
 
     } catch (error: any) {
       const apiMessage =
-        error?.data?.message;
+        error?.data?.message ??
+        error?.data?.detail;
 
       setErrorMessage(
         apiMessage ??
           "The workflow action failed."
       );
+
+      try {
+        await refreshAll();
+      } catch {
+        // Keep the action error visible if a refresh also fails.
+      }
     }
   }
 

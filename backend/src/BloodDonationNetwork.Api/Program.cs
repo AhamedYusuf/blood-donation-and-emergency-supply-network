@@ -49,6 +49,17 @@ builder.Services.AddHttpClient("AgentService", client =>
         // not an arbitrary port, or approve/reject/revise resume and the
         // auto-start-on-request-creation call both silently fail.
         ?? "http://localhost:8000");
+
+    var internalAgentSecret =
+        builder.Configuration["InternalAgentSecret"]
+        ?? builder.Configuration["INTERNAL_AGENT_SECRET"];
+
+    if (!string.IsNullOrWhiteSpace(internalAgentSecret))
+    {
+        client.DefaultRequestHeaders.Add(
+            "X-Internal-Secret",
+            internalAgentSecret);
+    }
 });
 
 // =====================================================
