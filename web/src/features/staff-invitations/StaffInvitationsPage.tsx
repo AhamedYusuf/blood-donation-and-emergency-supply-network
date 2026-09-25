@@ -70,8 +70,15 @@ export function StaffInvitationsPage() {
 
   const copyToken = async () => {
     if (!createdInvitation) return;
-    await navigator.clipboard.writeText(createdInvitation.token);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(createdInvitation.token);
+      setCopied(true);
+    } catch {
+      // Clipboard access can be denied (permissions) or unavailable
+      // (non-secure context) — fail visibly instead of "Copied" just
+      // never appearing with no explanation.
+      setApiError("Couldn't copy to clipboard. Select and copy the token manually.");
+    }
   };
 
   return (

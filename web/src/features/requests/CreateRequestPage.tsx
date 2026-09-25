@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 import type { RootState } from "../../app/store";
+import { getApiErrorMessage } from "../../api/getApiErrorMessage";
 
 import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 
@@ -149,9 +150,12 @@ export default function CreateRequestPage() {
         await createRequest(payload).unwrap();
 
       navigate(`/requests/${createdRequest.id}`);
-    } catch {
+    } catch (error) {
       setSubmitError(
-        "Unable to create the blood request. Please check the information and try again."
+        getApiErrorMessage(
+          error,
+          "Unable to create the blood request. Please check the information and try again."
+        )
       );
     }
   };
