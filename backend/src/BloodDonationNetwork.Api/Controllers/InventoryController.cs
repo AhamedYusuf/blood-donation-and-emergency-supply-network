@@ -177,6 +177,35 @@ public class InventoryController : ControllerBase
         }
     }
 
+    // React's Emergency & Risk screen needs the transfer-candidate list
+    // (nearby orgs with spare stock) that FrontendStockCheck's plain
+    // StockCheckResponse doesn't carry. That richer shape previously
+    // only existed behind /api/internal/agent/check-stock, which the
+    // frontend had no business calling directly — it has no way to
+    // present the internal secret, so it was calling the agent-service's
+    // own /agents/stock-check with no credentials at all instead. This
+    // gives the browser the same data through a normal, JWT-authenticated,
+    // org-scoped route instead.
+    [HttpPost("stock-check/candidates")]
+    public async Task<ActionResult<StockCheckAgentResponse>> FrontendStockCheckWithCandidates(
+        [FromBody] StockCheckRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _inventoryService.CheckStockWithTransferCandidatesAsync(
+                request,
+                GetCurrentUserId(),
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("emergency-recommendation")]
     public async Task<ActionResult<EmergencyInventoryRecommendation>>
         FrontendEmergencyRecommendation(

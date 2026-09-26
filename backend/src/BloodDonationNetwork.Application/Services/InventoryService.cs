@@ -65,6 +65,7 @@ public class InventoryService : IInventoryService
         ValidateUnits(request.Units);
 
         var inventory = await _db.BloodBankInventories
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 x => x.Id == inventoryId,
                 cancellationToken)
@@ -80,21 +81,15 @@ public class InventoryService : IInventoryService
             request.TransactionType,
             request.Units);
 
-        var newUnits = inventory.UnitsAvailable + stockChange;
-
-        if (newUnits < 0)
-        {
-            throw new InvalidOperationException(
-                "Insufficient inventory. Stock cannot become negative.");
-        }
-
-        inventory.UnitsAvailable = newUnits;
-        inventory.LastUpdated = DateTime.UtcNow;
+        var updatedInventory = await ApplyStockChangeAsync(
+            inventoryId,
+            stockChange,
+            cancellationToken);
 
         var transaction = new InventoryTransaction
         {
             Id = Guid.NewGuid(),
-            InventoryId = inventory.Id,
+            InventoryId = inventoryId,
             TransactionType = request.TransactionType,
             Units = request.Units,
             RelatedAppointmentId = request.RelatedAppointmentId,
@@ -106,7 +101,48 @@ public class InventoryService : IInventoryService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        return ToResponse(inventory);
+        return ToResponse(updatedInventory);
+    }
+
+    // Applies a stock delta as a single atomic UPDATE instead of the
+    // read-modify-write pattern this used to follow (load the tracked
+    // entity, mutate UnitsAvailable in memory, SaveChangesAsync). Under
+    // that pattern, two concurrent adjustments to the same inventory row
+    // (e.g. two staff completing appointments for the same blood type at
+    // once) can both read the same starting UnitsAvailable and both
+    // "succeed," with the second SaveChangesAsync silently overwriting
+    // the first — a genuine lost update, not just a theoretical race.
+    // ExecuteUpdateAsync issues one UPDATE ... SET UnitsAvailable =
+    // UnitsAvailable + @delta WHERE ... statement that Postgres evaluates
+    // against the row's live value at write time, so the negative-stock
+    // guard and the increment are checked and applied as one atomic step
+    // no interleaved transaction can invalidate.
+    private async Task<BloodBankInventory> ApplyStockChangeAsync(
+        Guid inventoryId,
+        int stockChange,
+        CancellationToken cancellationToken)
+    {
+        var updatedAt = DateTime.UtcNow;
+
+        var rowsAffected = await _db.BloodBankInventories
+            .Where(x =>
+                x.Id == inventoryId &&
+                x.UnitsAvailable + stockChange >= 0)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.UnitsAvailable, x => x.UnitsAvailable + stockChange)
+                    .SetProperty(x => x.LastUpdated, updatedAt),
+                cancellationToken);
+
+        if (rowsAffected == 0)
+        {
+            throw new InvalidOperationException(
+                "Insufficient inventory. Stock cannot become negative.");
+        }
+
+        return await _db.BloodBankInventories
+            .AsNoTracking()
+            .FirstAsync(x => x.Id == inventoryId, cancellationToken);
     }
 
     public async Task<InventoryTransactionResponse> CreateTransactionAsync(
@@ -122,11 +158,18 @@ public class InventoryService : IInventoryService
             cancellationToken);
 
         var inventory = await _db.BloodBankInventories
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 x =>
                     x.OrganizationId == request.OrganizationId &&
                     x.BloodType == request.BloodType,
                 cancellationToken);
+
+        var stockChange = GetStockChange(
+            request.TransactionType,
+            request.Units);
+
+        BloodBankInventory updatedInventory;
 
         if (inventory is null)
         {
@@ -138,38 +181,45 @@ public class InventoryService : IInventoryService
                     "Inventory record not found for this blood type.");
             }
 
-            inventory = new BloodBankInventory
+            if (stockChange < 0)
+            {
+                throw new InvalidOperationException(
+                    "Insufficient inventory. Stock cannot become negative.");
+            }
+
+            // No existing row to race over yet — this first-ever
+            // transaction for this org/blood-type pair still creates it
+            // as a normal tracked insert. (A second concurrent "first"
+            // transaction for the same pair could still race here and
+            // create a duplicate row; that's a narrower, separate gap —
+            // a unique constraint on (OrganizationId, BloodType) would
+            // close it — and isn't the lost-update race this method was
+            // flagged for, which is about existing rows being
+            // incremented/decremented past each other.)
+            updatedInventory = new BloodBankInventory
             {
                 Id = Guid.NewGuid(),
                 OrganizationId = request.OrganizationId,
                 BloodType = request.BloodType,
-                UnitsAvailable = 0,
+                UnitsAvailable = stockChange,
                 LowStockThreshold = 5,
                 LastUpdated = DateTime.UtcNow
             };
 
-            _db.BloodBankInventories.Add(inventory);
+            _db.BloodBankInventories.Add(updatedInventory);
         }
-
-        var stockChange = GetStockChange(
-            request.TransactionType,
-            request.Units);
-
-        var newUnits = inventory.UnitsAvailable + stockChange;
-
-        if (newUnits < 0)
+        else
         {
-            throw new InvalidOperationException(
-                "Insufficient inventory. Stock cannot become negative.");
+            updatedInventory = await ApplyStockChangeAsync(
+                inventory.Id,
+                stockChange,
+                cancellationToken);
         }
-
-        inventory.UnitsAvailable = newUnits;
-        inventory.LastUpdated = DateTime.UtcNow;
 
         var transaction = new InventoryTransaction
         {
             Id = Guid.NewGuid(),
-            InventoryId = inventory.Id,
+            InventoryId = updatedInventory.Id,
             TransactionType = request.TransactionType,
             Units = request.Units,
             RelatedAppointmentId = request.RelatedAppointmentId,
@@ -183,7 +233,7 @@ public class InventoryService : IInventoryService
 
         return ToTransactionResponse(
             transaction,
-            inventory.BloodType);
+            updatedInventory.BloodType);
     }
 
     public async Task<PagedResult<InventoryTransactionResponse>> GetTransactionsAsync(
@@ -288,10 +338,48 @@ public class InventoryService : IInventoryService
 
         var bloodType = ParseBloodType(request.BloodType);
 
+        return await CheckStockWithTransferCandidatesCoreAsync(
+            request.RequestingOrgId,
+            bloodType,
+            request.UnitsNeeded,
+            cancellationToken);
+    }
+
+    public async Task<StockCheckAgentResponse> CheckStockWithTransferCandidatesAsync(
+        StockCheckRequest request,
+        Guid currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        // Same org-ownership check CheckStockAsync uses — this is the
+        // browser-facing counterpart of CheckStockForAgentAsync (which
+        // trusts its caller implicitly because it sits behind the
+        // internal-secret middleware, not a real user's JWT). A plain
+        // staff member has no such trust boundary, so it must be enforced
+        // here the same way every other org-scoped read in this class does.
+        await EnsureOrganizationAccessAsync(
+            request.OrganizationId,
+            currentUserId,
+            cancellationToken);
+
+        ValidateUnits(request.RequiredUnits);
+
+        return await CheckStockWithTransferCandidatesCoreAsync(
+            request.OrganizationId,
+            request.BloodType,
+            request.RequiredUnits,
+            cancellationToken);
+    }
+
+    private async Task<StockCheckAgentResponse> CheckStockWithTransferCandidatesCoreAsync(
+        Guid requestingOrgId,
+        BloodType bloodType,
+        int unitsNeeded,
+        CancellationToken cancellationToken)
+    {
         var requestingOrg = await _db.Organizations
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                x => x.Id == request.RequestingOrgId,
+                x => x.Id == requestingOrgId,
                 cancellationToken)
             ?? throw new KeyNotFoundException(
                 "Requesting organization was not found.");
@@ -300,15 +388,15 @@ public class InventoryService : IInventoryService
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 x =>
-                    x.OrganizationId == request.RequestingOrgId &&
+                    x.OrganizationId == requestingOrgId &&
                     x.BloodType == bloodType,
                 cancellationToken);
 
         var ownStockUnits = ownInventory?.UnitsAvailable ?? 0;
-        var sufficient = ownStockUnits >= request.UnitsNeeded;
+        var sufficient = ownStockUnits >= unitsNeeded;
         var shortfallUnits = Math.Max(
             0,
-            request.UnitsNeeded - ownStockUnits);
+            unitsNeeded - ownStockUnits);
 
         if (sufficient)
         {
@@ -323,7 +411,7 @@ public class InventoryService : IInventoryService
             .AsNoTracking()
             .Include(x => x.Organization)
             .Where(x =>
-                x.OrganizationId != request.RequestingOrgId &&
+                x.OrganizationId != requestingOrgId &&
                 x.BloodType == bloodType &&
                 x.UnitsAvailable > 0)
             .ToListAsync(cancellationToken);
