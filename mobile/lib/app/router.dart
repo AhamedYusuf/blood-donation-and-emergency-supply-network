@@ -40,9 +40,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final donorRegistration =
           state.matchedLocation == '/donor-registration';
 
-      final workflowRoute = state.matchedLocation
-          .startsWith('/blood-requests/') &&
-          state.matchedLocation.endsWith('/workflow');
+      final workflowRoute =
+          state.matchedLocation
+                  .startsWith('/blood-requests/') &&
+              state.matchedLocation
+                  .endsWith('/workflow');
 
       switch (status) {
         case AuthStatus.unknown:
@@ -71,8 +73,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             return '/donor-registration';
           }
 
-          // Coordinator Workflow is internal operational information.
-          // Only staff and admins may access this screen.
+          // Blood request creation is only available
+          // to staff and admin users.
+          if (state.matchedLocation ==
+                  '/blood-requests/new' &&
+              auth.role != 'staff' &&
+              auth.role != 'admin') {
+            return '/blood-requests';
+          }
+
+          // Coordinator Workflow contains internal
+          // operational information.
+          // Only staff and admins may access it.
           if (workflowRoute &&
               auth.role != 'staff' &&
               auth.role != 'admin') {
