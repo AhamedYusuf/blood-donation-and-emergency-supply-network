@@ -57,6 +57,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (needsDonorRegistration && !donorRegistration) {
             return '/donor-registration';
           }
+          // POST /api/requests is [Authorize(Roles = "staff,admin")]-only
+          // server-side — a donor who reached this screen (deep link, a
+          // future teammate linking to it, etc.) could fill out the
+          // entire form only to have submission 403 with a generic
+          // "Request failed" message (ASP.NET's Forbid() has no body to
+          // surface). Gate it client-side too so that's a redirect, not
+          // a dead end after a completed form.
+          if (state.matchedLocation == '/blood-requests/new' &&
+              auth.role != 'staff' && auth.role != 'admin') {
+            return '/blood-requests';
+          }
           return null;
       }
     },

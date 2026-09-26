@@ -365,9 +365,16 @@ class _CreateBloodRequestScreenState
         : organizations
               .where((organization) => organization.id == organizationId)
               .firstOrNull;
+    // isFinite alone treats (0, 0) as "valid" coordinates, but that's the
+    // backend's own "no location set" convention (see the coordinate
+    // field validator below, and CreateRequestDto's server-side check) —
+    // without this, an organization with unset coordinates gets silently
+    // auto-filled with "0"/"0" and shown as having no error here, only to
+    // be rejected later by the field validator. Keep both checks agreed.
     final hasCoordinates =
         selected?.latitude?.isFinite == true &&
-        selected?.longitude?.isFinite == true;
+        selected?.longitude?.isFinite == true &&
+        !(selected!.latitude == 0 && selected.longitude == 0);
 
     if (!mounted) return;
     setState(() {
@@ -377,9 +384,9 @@ class _CreateBloodRequestScreenState
           : hasCoordinates
           ? null
           : 'The selected organization does not have valid coordinates.';
-      _latitudeController.text = hasCoordinates ? '${selected!.latitude}' : '';
+      _latitudeController.text = hasCoordinates ? '${selected.latitude}' : '';
       _longitudeController.text = hasCoordinates
-          ? '${selected!.longitude}'
+          ? '${selected.longitude}'
           : '';
     });
   }
