@@ -10,6 +10,7 @@ import type {
   PagedResult,
   StockCheckRequest,
   StockCheckResponse,
+  StockCheckWithCandidatesResponse,
   StockRiskResponse,
 } from "./inventoryTypes";
 
@@ -172,6 +173,31 @@ export const inventoryApi = baseApi.injectEndpoints({
     }),
 
     // =====================================================
+    // AGENT 01 - STOCK CHECK WITH TRANSFER CANDIDATES
+    //
+    // Same auth/org-scoping as checkStock above, but also returns
+    // nearby organizations with spare stock (for the Emergency & Risk
+    // screen's transfer-candidate panel). Do NOT call the agent-service
+    // directly for this from the browser — see agentApi.ts's removal.
+    // =====================================================
+
+    checkStockWithCandidates: builder.mutation<
+      StockCheckWithCandidatesResponse,
+      StockCheckRequest
+    >({
+      query: (request) => ({
+        url: "/inventory/stock-check/candidates",
+        method: "POST",
+        body: {
+          organizationId: request.organizationId,
+          bloodType:
+            BLOOD_TYPE_TO_NUMBER[request.bloodType],
+          requiredUnits: request.requiredUnits,
+        },
+      }),
+    }),
+
+    // =====================================================
     // AGENT 02 - STOCK RISK
     // =====================================================
 
@@ -221,6 +247,7 @@ export const {
   useAdjustInventoryMutation,
   useCreateTransactionMutation,
   useCheckStockMutation,
+  useCheckStockWithCandidatesMutation,
   useGetStockRiskQuery,
   useGetEmergencyRecommendationMutation,
 } = inventoryApi;

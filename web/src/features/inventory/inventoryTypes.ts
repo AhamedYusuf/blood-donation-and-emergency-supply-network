@@ -91,6 +91,27 @@ export interface StockCheckResponse {
 }
 
 /*
+ * Richer stock-check result that also lists nearby organizations with
+ * spare stock, for the Emergency & Risk screen's transfer-candidate
+ * panel. Backed by POST /api/inventory/stock-check/candidates — a
+ * normal, JWT-authenticated, org-scoped route, NOT the agent-service's
+ * own /agents/stock-check (unauthenticated) or the .NET internal
+ * endpoint (requires the server-to-server secret the browser can't hold).
+ */
+export interface StockCheckCandidateTransferOrg {
+  organizationId: string;
+  distanceKm: number;
+  unitsAvailable: number;
+}
+
+export interface StockCheckWithCandidatesResponse {
+  sufficient: boolean;
+  ownStockUnits: number;
+  shortfallUnits: number;
+  candidateTransferOrgs: StockCheckCandidateTransferOrg[];
+}
+
+/*
  * Stock Risk Agent response.
  */
 export interface StockRiskResponse {
