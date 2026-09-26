@@ -136,6 +136,77 @@ public sealed class MatchingDispatchAgentServiceTests : IDisposable
         Assert.Equal(AppointmentStatus.Scheduled, appointment.Status);
     }
 
+    // Real bug found live (2026-09-26): a batch dispatch with one bad
+    // candidate (a DonorProfile whose UserId matches no real User — the
+    // exact shape of a stale/orphaned seed row) failed the WHOLE request
+    // with an unhandled 400, instead of isolating just that candidate.
+    // Root cause: AppointmentService.CreateAsync's failed SaveChangesAsync
+    // left the invalid DonationAppointment entity tracked as "Added" on
+    // the shared DbContext, which then poisoned every later
+    // SaveChangesAsync call on the same context in this method — the
+    // second (perfectly valid) candidate's appointment, and even the
+    // final LogStepAsync call. Fixed by detaching the failed entity in
+    // AppointmentService.CreateAsync's catch block.
+    [Fact]
+    public async Task DispatchAsync_OneBadCandidateAmongSeveral_DoesNotPoisonTheRest()
+    {
+        var workflowId = await SeedWorkflowAsync(WorkflowStatuses.Approved);
+
+        var orphanedDonorProfileId = Guid.NewGuid();
+        await using (var seedCtx = new TestAppDbContext(_options))
+        {
+            seedCtx.DonorProfiles.Add(new DonorProfile
+            {
+                Id = orphanedDonorProfileId,
+                // No matching User row — DonationAppointments.DonorId has a
+                // real FK to Users.Id, so booking an appointment for this
+                // profile fails at SaveChangesAsync, same as a stale seed row.
+                UserId = Guid.NewGuid(),
+                BloodType = "O+",
+                DateOfBirth = new DateOnly(1990, 1, 1),
+                Latitude = 6.93,
+                Longitude = 79.86,
+                VerifiedByAdmin = true,
+                ReliabilityScore = 1.0m,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            });
+            await seedCtx.SaveChangesAsync();
+        }
+
+        await using var ctx = new TestAppDbContext(_options);
+        var sut = NewService(ctx);
+
+        // The bad candidate listed first, matching the real failure's
+        // ordering (the orphaned profile was the top-ranked/closest one).
+        var result = await sut.DispatchAsync(new DispatchRequestDto
+        {
+            WorkflowId = workflowId,
+            Eligible = new List<DispatchCandidateDto>
+            {
+                new() { DonorId = orphanedDonorProfileId },
+                new() { DonorId = DonorProfileId },
+            },
+        });
+
+        Assert.Single(result.FailedNotifications);
+        Assert.Equal(orphanedDonorProfileId, result.FailedNotifications[0].DonorId);
+
+        Assert.Single(result.AppointmentsCreated);
+        Assert.Single(result.NotifiedDonorIds);
+        Assert.Contains(DonorProfileId, result.NotifiedDonorIds);
+
+        await using var verify = new TestAppDbContext(_options);
+        var appointment = await verify.DonationAppointments.SingleAsync(a => a.RelatedWorkflowId == workflowId);
+        Assert.Equal(DonorUserId, appointment.DonorId);
+
+        // The final agent_steps log write must still succeed — it's the
+        // last SaveChangesAsync in the method, and was exactly what the
+        // poisoned context broke.
+        var step = await verify.AgentSteps.SingleAsync(s => s.WorkflowId == workflowId);
+        Assert.Equal("completed", step.Status);
+    }
+
     // Tech Doc §0.7 — every agent action writes a row to the shared
     // agent_steps table.
     [Fact]
