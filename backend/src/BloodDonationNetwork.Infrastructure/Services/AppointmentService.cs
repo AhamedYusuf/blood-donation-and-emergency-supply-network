@@ -38,7 +38,27 @@ public class AppointmentService : IAppointmentService
         };
 
         _context.DonationAppointments.Add(appointment);
-        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch
+        {
+            // If this save fails (e.g. a bad DonorId reference), the
+            // appointment stays tracked as "Added" in the shared DbContext
+            // unless explicitly removed. Left alone, that poisons every
+            // later SaveChangesAsync call on the same context — real bug
+            // found live: MatchingDispatchAgentService.DispatchAsync
+            // creates several appointments in one request and catches
+            // failures per-candidate, but one bad candidate's still-tracked
+            // failed entity silently broke every appointment after it,
+            // including its own final agent_steps log write. Removing it
+            // here returns the context to a clean state for whatever runs
+            // next, regardless of who's calling this method.
+            _context.DonationAppointments.Remove(appointment);
+            throw;
+        }
 
         return MapToDto(appointment, await GetDonorBloodTypeAsync(donorId));
     }
