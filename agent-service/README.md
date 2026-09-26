@@ -35,9 +35,9 @@ cp .env.example .env                 # then edit if your backend isn't on :5067
 ## Run
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8001
 # health check:
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 ```
 
 Start order for the full stack: PostgreSQL → ASP.NET Core API → this

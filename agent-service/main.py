@@ -5,6 +5,7 @@ import requests
 
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -16,6 +17,8 @@ from agents.stock_risk_agent import run as run_stock_risk
 from agents.emergency_recommendation_agent import (
     run as run_emergency_recommendation,
 )
+
+load_dotenv()
 
 
 # =========================================================
