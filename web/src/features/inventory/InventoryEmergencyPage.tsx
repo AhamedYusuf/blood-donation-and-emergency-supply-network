@@ -16,6 +16,7 @@ import type {
   EmergencyInventoryRecommendation,
   InventoryResponse,
 } from "./inventoryTypes";
+import type { StockCheckAgentResponse } from "./agentApi";
 import "./inventoryEmergency.css";
 
 const BLOOD_TYPES: BloodType[] = [
@@ -233,13 +234,7 @@ export function InventoryEmergencyPage() {
     useState("");
 
   const [stockCheckResult, setStockCheckResult] =
-    useState<{
-      requiredUnits: number;
-      availableUnits: number;
-      remainingUnits: number;
-      sufficient: boolean;
-      lowStock: boolean;
-    } | null>(null);
+    useState<StockCheckAgentResponse | null>(null);
 
   const [recommendation, setRecommendation] =
     useState<EmergencyInventoryRecommendation | null>(null);
@@ -273,13 +268,13 @@ export function InventoryEmergencyPage() {
     Number(requiredUnits) || 0;
 
   const resultAvailableUnits =
-    stockCheckResult?.availableUnits ?? availableUnits;
+    stockCheckResult?.ownStockUnits ?? availableUnits;
 
-  const resultRequiredUnits =
-    stockCheckResult?.requiredUnits ?? requestedUnits;
+  const resultRequiredUnits = requestedUnits;
 
-  const resultRemainingUnits =
-    stockCheckResult?.remainingUnits ?? 0;
+  const resultRemainingUnits = stockCheckResult?.sufficient
+    ? Math.max(resultAvailableUnits - resultRequiredUnits, 0)
+    : 0;
 
   const resultShortfall = Math.max(
     resultRequiredUnits - resultAvailableUnits,
@@ -343,20 +338,30 @@ export function InventoryEmergencyPage() {
 
     try {
       // Agent 01: React -> Python Agent Service -> .NET internal API
-      const stockResult =
-        await runStockCheckAgent({
-          organizationId,
-          bloodType,
-          requiredUnits: units,
-        });
+     const stockResult =
+  await runStockCheckAgent({
+    workflowId: crypto.randomUUID(),
+    requestingOrgId: organizationId,
+    bloodType:
+      bloodType === "APositive"
+        ? "A+"
+        : bloodType === "ANegative"
+          ? "A-"
+          : bloodType === "BPositive"
+            ? "B+"
+            : bloodType === "BNegative"
+              ? "B-"
+              : bloodType === "ABPositive"
+                ? "AB+"
+                : bloodType === "ABNegative"
+                  ? "AB-"
+                  : bloodType === "OPositive"
+                    ? "O+"
+                    : "O-",
+    unitsNeeded: units,
+  });
 
-      setStockCheckResult({
-        requiredUnits: stockResult.requiredUnits,
-        availableUnits: stockResult.availableUnits,
-        remainingUnits: stockResult.remainingUnits,
-        sufficient: stockResult.sufficient,
-        lowStock: stockResult.lowStock,
-      });
+      setStockCheckResult(stockResult);
 
       // Agent 03: React -> Python Agent Service -> .NET internal API
       setRecommendationState({ isLoading: true });
@@ -771,7 +776,8 @@ export function InventoryEmergencyPage() {
                   <strong>
                     {sufficient
                       ? resultRemainingUnits
-                      : recommendation?.shortfallUnits ??
+                      : stockCheckResult?.shortfallUnits ??
+                        recommendation?.shortfallUnits ??
                         resultShortfall}
                   </strong>
                 </div>
@@ -805,6 +811,31 @@ export function InventoryEmergencyPage() {
                 {recommendation?.urgency ?? urgency}
               </div>
             </section>
+
+            {!sufficient && stockCheckResult && stockCheckResult.candidateTransferOrgs.length > 0 && (
+              <section className="recommendation-card">
+                <div className="recommendation-icon">↔</div>
+                <div>
+                  <span className="emergency-eyebrow">
+                    TRANSFER OPTIONS
+                  </span>
+                  <h2>Nearby organizations can help</h2>
+                  <p>
+                    The stock check found organizations with available blood
+                    units that may be suitable for transfer.
+                  </p>
+                  <div className="risk-metrics">
+                    {stockCheckResult.candidateTransferOrgs.slice(0, 3).map((candidate) => (
+                      <div key={candidate.organizationId}>
+                        <span>{candidate.organizationId}</span>
+                        <strong>{candidate.unitsAvailable} units</strong>
+                        <small>{candidate.distanceKm.toFixed(1)} km away</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
           </>
         )}
 

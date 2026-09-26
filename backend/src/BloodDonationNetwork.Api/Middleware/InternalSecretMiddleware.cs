@@ -3,7 +3,9 @@ namespace BloodDonationNetwork.Api.Middleware;
 public class InternalSecretMiddleware
 {
     private readonly RequestDelegate _next;
+
     private const string HeaderName = "X-Internal-Secret";
+    private const string EnvironmentVariableName = "INTERNAL_AGENT_SECRET";
 
     public InternalSecretMiddleware(RequestDelegate next)
     {
@@ -14,35 +16,52 @@ public class InternalSecretMiddleware
         HttpContext context,
         IConfiguration configuration)
     {
-        if (context.Request.Path.StartsWithSegments("/api/internal"))
+        if (!context.Request.Path.StartsWithSegments("/api/internal"))
         {
-            // Support both:
-            // 1. InternalAgentSecret
-            // 2. INTERNAL_AGENT_SECRET
-            var expectedSecret =
+            await _next(context);
+            return;
+        }
+
+        // Prefer the environment variable.
+        // This must match the secret used by the Python agent service.
+        var expectedSecret =
+            Environment.GetEnvironmentVariable(EnvironmentVariableName);
+
+        // Fallback to ASP.NET configuration.
+        if (string.IsNullOrWhiteSpace(expectedSecret))
+        {
+            expectedSecret =
                 configuration["InternalAgentSecret"]
-                ?? configuration["INTERNAL_AGENT_SECRET"];
+                ?? configuration[EnvironmentVariableName];
+        }
 
-            if (string.IsNullOrWhiteSpace(expectedSecret))
-            {
-                throw new InvalidOperationException(
-                    "InternalAgentSecret is not configured.");
-            }
+        if (string.IsNullOrWhiteSpace(expectedSecret))
+        {
+            context.Response.StatusCode =
+                StatusCodes.Status500InternalServerError;
 
-            var providedSecret =
-                context.Request.Headers[HeaderName].FirstOrDefault();
+            await context.Response.WriteAsync(
+                "Internal agent secret is not configured.");
 
-            if (string.IsNullOrEmpty(providedSecret) ||
-                providedSecret != expectedSecret)
-            {
-                context.Response.StatusCode =
-                    StatusCodes.Status401Unauthorized;
+            return;
+        }
 
-                await context.Response.WriteAsync(
-                    "Missing or invalid internal secret.");
+        var providedSecret =
+            context.Request.Headers[HeaderName].FirstOrDefault();
 
-                return;
-            }
+        if (string.IsNullOrWhiteSpace(providedSecret) ||
+            !string.Equals(
+                providedSecret.Trim(),
+                expectedSecret.Trim(),
+                StringComparison.Ordinal))
+        {
+            context.Response.StatusCode =
+                StatusCodes.Status401Unauthorized;
+
+            await context.Response.WriteAsync(
+                "Missing or invalid internal secret.");
+
+            return;
         }
 
         await _next(context);
