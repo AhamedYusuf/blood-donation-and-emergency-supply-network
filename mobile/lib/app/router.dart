@@ -22,137 +22,223 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// App router. Redirects between the login and home routes based on the
 /// auth state, and shows a splash while the session is being restored.
-/// The three tab destinations (Home / Donations / Profile) live behind a
-/// persistent bottom nav via [StatefulShellRoute.indexedStack]; booking a
-/// donation pushes full-screen on the root navigator, above the tab bar.
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+
     redirect: (context, state) {
-      final status = ref.read(authControllerProvider).status;
-      final loggingIn = state.matchedLocation == '/login';
-      final registering = state.matchedLocation == '/register';
-      final donorRegistration = state.matchedLocation == '/donor-registration';
+      final auth = ref.read(authControllerProvider);
+      final status = auth.status;
+
+      final loggingIn =
+          state.matchedLocation == '/login';
+
+      final registering =
+          state.matchedLocation == '/register';
+
+      final donorRegistration =
+          state.matchedLocation == '/donor-registration';
+
+      final workflowRoute =
+          state.matchedLocation
+                  .startsWith('/blood-requests/') &&
+              state.matchedLocation
+                  .endsWith('/workflow');
 
       switch (status) {
         case AuthStatus.unknown:
           return '/splash';
-        case AuthStatus.unauthenticated:
-          return loggingIn || registering ? null : '/login';
-        case AuthStatus.authenticated:
-          final auth = ref.read(authControllerProvider);
-          // Only donors are required to complete a donor profile before
-          // using the rest of the app — staff/admin accounts have no
-          // donorProfileId at all, so gating on it for every role traps
-          // them on a registration screen whose submit always 403s
-          // server-side (donor-only endpoint). Mirrors web's
-          // RequireDonorProfile guard in App.tsx.
-          final needsDonorRegistration =
-              auth.role == 'donor' && auth.donorProfileId == null;
 
-          if (loggingIn || registering || state.matchedLocation == '/splash') {
-            return needsDonorRegistration ? '/donor-registration' : '/';
+        case AuthStatus.unauthenticated:
+          return loggingIn || registering
+              ? null
+              : '/login';
+
+        case AuthStatus.authenticated:
+          final needsDonorRegistration =
+              auth.role == 'donor' &&
+              auth.donorProfileId == null;
+
+          if (loggingIn ||
+              registering ||
+              state.matchedLocation == '/splash') {
+            return needsDonorRegistration
+                ? '/donor-registration'
+                : '/';
           }
-          if (needsDonorRegistration && !donorRegistration) {
+
+          if (needsDonorRegistration &&
+              !donorRegistration) {
             return '/donor-registration';
           }
-          // POST /api/requests is [Authorize(Roles = "staff,admin")]-only
-          // server-side — a donor who reached this screen (deep link, a
-          // future teammate linking to it, etc.) could fill out the
-          // entire form only to have submission 403 with a generic
-          // "Request failed" message (ASP.NET's Forbid() has no body to
-          // surface). Gate it client-side too so that's a redirect, not
-          // a dead end after a completed form.
-          if (state.matchedLocation == '/blood-requests/new' &&
-              auth.role != 'staff' && auth.role != 'admin') {
+
+          // Blood request creation is only available
+          // to staff and admin users.
+          if (state.matchedLocation ==
+                  '/blood-requests/new' &&
+              auth.role != 'staff' &&
+              auth.role != 'admin') {
             return '/blood-requests';
           }
+
+          // Coordinator Workflow contains internal
+          // operational information.
+          // Only staff and admins may access it.
+          if (workflowRoute &&
+              auth.role != 'staff' &&
+              auth.role != 'admin') {
+            return '/blood-requests';
+          }
+
           return null;
       }
     },
+
     refreshListenable: _AuthRefresh(ref),
+
     routes: [
       StatefulShellRoute.indexedStack(
-        builder: (context, state, shell) => MobileShell(navigationShell: shell),
+        builder: (
+          context,
+          state,
+          shell,
+        ) =>
+            MobileShell(
+          navigationShell: shell,
+        ),
         branches: [
           StatefulShellBranch(
-            routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) =>
+                    const HomeScreen(),
+              ),
+            ],
           ),
+
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/appointments',
-                builder: (_, _) => const MyAppointmentsScreen(),
+                builder: (_, _) =>
+                    const MyAppointmentsScreen(),
               ),
             ],
           ),
+
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/profile',
-                builder: (_, _) => const ProfileScreen(),
+                builder: (_, _) =>
+                    const ProfileScreen(),
               ),
             ],
           ),
+
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/blood-requests',
-                builder: (_, _) => const BloodRequestsScreen(),
+                builder: (_, _) =>
+                    const BloodRequestsScreen(),
               ),
             ],
           ),
         ],
       ),
+
       GoRoute(
         path: '/appointments/book',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (_, _) => const BookAppointmentScreen(),
+        parentNavigatorKey:
+            _rootNavigatorKey,
+        builder: (_, _) =>
+            const BookAppointmentScreen(),
       ),
+
       GoRoute(
         path: '/blood-requests/new',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (_, _) => const CreateBloodRequestScreen(),
+        parentNavigatorKey:
+            _rootNavigatorKey,
+        builder: (_, _) =>
+            const CreateBloodRequestScreen(),
       ),
+
       GoRoute(
         path: '/blood-requests/:id',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey:
+            _rootNavigatorKey,
         builder: (_, state) =>
-            BloodRequestDetailsScreen(requestId: state.pathParameters['id']!),
+            BloodRequestDetailsScreen(
+          requestId:
+              state.pathParameters['id']!,
+        ),
       ),
+
       GoRoute(
-        path: '/blood-requests/:id/workflow',
-        parentNavigatorKey: _rootNavigatorKey,
+        path:
+            '/blood-requests/:id/workflow',
+        parentNavigatorKey:
+            _rootNavigatorKey,
         builder: (_, state) =>
-            CoordinatorWorkflowScreen(requestId: state.pathParameters['id']!),
+            CoordinatorWorkflowScreen(
+          requestId:
+              state.pathParameters['id']!,
+        ),
       ),
-      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+
+      GoRoute(
+        path: '/login',
+        builder: (_, _) =>
+            const LoginScreen(),
+      ),
+
+      GoRoute(
+        path: '/register',
+        builder: (_, _) =>
+            const RegisterScreen(),
+      ),
+
       GoRoute(
         path: '/donor-registration',
-        builder: (_, _) => const DonorRegistrationScreen(),
+        builder: (_, _) =>
+            const DonorRegistrationScreen(),
       ),
+
       GoRoute(
         path: '/donor-profile',
-        builder: (_, _) => const DonorProfileScreen(),
+        builder: (_, _) =>
+            const DonorProfileScreen(),
       ),
+
       GoRoute(
         path: '/eligibility',
-        builder: (_, _) => const EligibilityScreen(),
+        builder: (_, _) =>
+            const EligibilityScreen(),
       ),
+
       GoRoute(
         path: '/splash',
         builder: (_, _) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+            const Scaffold(
+          body: Center(
+            child:
+                CircularProgressIndicator(),
+          ),
+        ),
       ),
     ],
   );
 });
 
-/// Bridges Riverpod's auth state to GoRouter's Listenable-based refresh.
+/// Bridges Riverpod auth state to GoRouter refresh.
 class _AuthRefresh extends ChangeNotifier {
   _AuthRefresh(Ref ref) {
-    ref.listen(authControllerProvider, (_, _) => notifyListeners());
+    ref.listen(
+      authControllerProvider,
+      (_, _) => notifyListeners(),
+    );
   }
 }
