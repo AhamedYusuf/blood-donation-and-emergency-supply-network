@@ -10,7 +10,7 @@ namespace BloodDonationNetwork.Api.Controllers;
 
 [ApiController]
 [Route("api/agent/workflows")]
-[Authorize]
+[Authorize(Roles = "staff,admin")]
 public class AgentWorkflowsController : ControllerBase
 {
     private readonly IAgentWorkflowService _workflowService;
@@ -150,7 +150,6 @@ public class AgentWorkflowsController : ControllerBase
 
     // POST /api/agent/workflows/{id}/approve
     [HttpPost("{id:guid}/approve")]
-    [Authorize(Roles = "staff,admin")]
     public async Task<IActionResult> Approve(
         Guid id,
         [FromBody] WorkflowDecisionDto dto)
@@ -218,7 +217,6 @@ public class AgentWorkflowsController : ControllerBase
 
     // POST /api/agent/workflows/{id}/reject
     [HttpPost("{id:guid}/reject")]
-    [Authorize(Roles = "staff,admin")]
     public async Task<IActionResult> Reject(
         Guid id,
         [FromBody] WorkflowDecisionDto dto)
@@ -286,7 +284,6 @@ public class AgentWorkflowsController : ControllerBase
 
     // POST /api/agent/workflows/{id}/revise
     [HttpPost("{id:guid}/revise")]
-    [Authorize(Roles = "staff,admin")]
     public async Task<IActionResult> Revise(
         Guid id,
         [FromBody] WorkflowDecisionDto dto)
