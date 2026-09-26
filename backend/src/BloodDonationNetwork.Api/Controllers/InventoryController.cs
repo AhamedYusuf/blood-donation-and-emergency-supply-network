@@ -202,13 +202,13 @@ public class InventoryController : ControllerBase
 
     [HttpPost("/api/internal/agent/check-stock")]
     [AllowAnonymous]
-    public async Task<ActionResult<StockCheckResponse>> CheckStock(
-        [FromBody] StockCheckRequest request,
+    public async Task<ActionResult<StockCheckAgentResponse>> CheckStock(
+        [FromBody] StockCheckAgentRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _inventoryService.CheckStockAsync(
+            var result = await _inventoryService.CheckStockForAgentAsync(
                 request,
                 cancellationToken);
 
@@ -217,6 +217,10 @@ public class InventoryController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
     }
 

@@ -296,6 +296,8 @@ if (app.Environment.IsDevelopment())
         seedScope.ServiceProvider
             .GetRequiredService<AppDbContext>();
 
+    await seedContext.Database.MigrateAsync();
+
     if (!await seedContext.Users.AnyAsync(
             u =>
                 u.Role ==

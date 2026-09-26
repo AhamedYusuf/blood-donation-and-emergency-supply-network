@@ -2,10 +2,10 @@ import os
 import traceback
 import requests
 
-from uuid import uuid4
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langgraph.types import Command
@@ -16,6 +16,8 @@ from agents.stock_risk_agent import run as run_stock_risk
 from agents.emergency_recommendation_agent import (
     run as run_emergency_recommendation,
 )
+
+load_dotenv()
 
 
 # =========================================================
@@ -48,9 +50,10 @@ app.add_middleware(
 # =========================================================
 
 class StockCheckAgentRequest(BaseModel):
-    organizationId: str
+    workflowId: str
+    requestingOrgId: str
     bloodType: str
-    requiredUnits: int
+    unitsNeeded: int
 
 
 class StockRiskAgentRequest(BaseModel):
@@ -90,10 +93,10 @@ def agent_stock_check(
         # Send the exact field names expected by
         # stock_check_agent.py
         agent_request = {
-            "workflowId": str(uuid4()),
-            "organizationId": request.organizationId,
+            "workflowId": request.workflowId,
+            "requestingOrgId": request.requestingOrgId,
             "bloodType": request.bloodType,
-            "requiredUnits": request.requiredUnits,
+            "unitsNeeded": request.unitsNeeded,
         }
 
         print("\n[MAIN] SENDING TO STOCK CHECK AGENT")

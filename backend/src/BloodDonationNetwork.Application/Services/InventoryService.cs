@@ -268,6 +268,74 @@ public class InventoryService : IInventoryService
             availableUnits <= inventory.LowStockThreshold);
     }
 
+    public async Task<StockCheckAgentResponse> CheckStockForAgentAsync(
+        StockCheckAgentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateUnits(request.UnitsNeeded);
+
+        var bloodType = ParseBloodType(request.BloodType);
+        var requestingOrganization = await _db.Organizations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == request.RequestingOrgId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                "Requesting organization was not found.");
+
+        var ownInventory = await _db.BloodBankInventories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x =>
+                    x.OrganizationId == request.RequestingOrgId &&
+                    x.BloodType == bloodType,
+                cancellationToken);
+
+        var ownStockUnits = ownInventory?.UnitsAvailable ?? 0;
+        var shortfallUnits = Math.Max(
+            0,
+            request.UnitsNeeded - ownStockUnits);
+
+        if (shortfallUnits == 0)
+        {
+            return new StockCheckAgentResponse(
+                true,
+                ownStockUnits,
+                0,
+                Array.Empty<StockCheckCandidateTransferOrg>());
+        }
+
+        var candidates = await _db.BloodBankInventories
+            .AsNoTracking()
+            .Include(x => x.Organization)
+            .Where(x =>
+                x.OrganizationId != request.RequestingOrgId &&
+                x.BloodType == bloodType &&
+                x.UnitsAvailable > 0)
+            .ToListAsync(cancellationToken);
+
+        var candidateOrganizations = candidates
+            .Select(x => new StockCheckCandidateTransferOrg(
+                x.OrganizationId,
+                Math.Round(
+                    GeoUtils.DistanceKm(
+                        requestingOrganization.Latitude,
+                        requestingOrganization.Longitude,
+                        x.Organization.Latitude,
+                        x.Organization.Longitude),
+                    2),
+                x.UnitsAvailable))
+            .OrderBy(x => x.DistanceKm)
+            .ThenByDescending(x => x.UnitsAvailable)
+            .ToList();
+
+        return new StockCheckAgentResponse(
+            false,
+            ownStockUnits,
+            shortfallUnits,
+            candidateOrganizations);
+    }
+
     public async Task<StockRiskResponse> AnalyzeStockRiskAsync(
         Guid organizationId,
         Guid currentUserId,
@@ -453,6 +521,23 @@ public class InventoryService : IInventoryService
                 "Units must be greater than zero.",
                 nameof(units));
         }
+    }
+
+    private static BloodType ParseBloodType(string bloodType)
+    {
+        return bloodType?.Trim().ToUpperInvariant() switch
+        {
+            "A+" => BloodType.APositive,
+            "A-" => BloodType.ANegative,
+            "B+" => BloodType.BPositive,
+            "B-" => BloodType.BNegative,
+            "AB+" => BloodType.ABPositive,
+            "AB-" => BloodType.ABNegative,
+            "O+" => BloodType.OPositive,
+            "O-" => BloodType.ONegative,
+            _ => throw new ArgumentException(
+                $"Unsupported blood type: {bloodType}")
+        };
     }
 
     private static InventoryResponse ToResponse(

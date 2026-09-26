@@ -139,15 +139,7 @@ def stock_check_node(
     """
     Run the Stock Check Agent.
 
-    IMPORTANT:
-    stock_check_agent.py expects:
-        organizationId
-        bloodType
-        requiredUnits
-
-    Do not send:
-        requestingOrgId
-        unitsNeeded
+    Forward the shared workflow and stock-check contract.
     """
 
     started_at = utc_now_iso()
@@ -159,9 +151,9 @@ def stock_check_node(
 
     payload = {
         "workflowId": state.get("workflow_id"),
-        "organizationId": organization_id,
+        "requestingOrgId": organization_id,
         "bloodType": state.get("blood_type"),
-        "requiredUnits": state.get("units_needed"),
+        "unitsNeeded": state.get("units_needed"),
     }
 
     print("=" * 60)
@@ -174,24 +166,6 @@ def stock_check_node(
     print(
         f"[Coordinator] requiredUnits = "
         f"{state.get('units_needed')}"
-    log_workflow_step(
-        state,
-        agent_name="Stock Check Agent",
-        step_name="stock_check",
-        status="completed",
-        input_data={
-            "bloodType": state.get("blood_type"),
-            "unitsNeeded": state.get("units_needed"),
-            "location": state.get("location"),
-        },
-        output_data=result,
-        narrative=(
-            "Checked available blood stock. "
-            "Temporary Student 3 stub is currently in use."
-        ),
-        retry_count=0,
-        started_at=started_at,
-        completed_at=utc_now_iso(),
     )
     print(f"[Coordinator] payload = {payload}")
     print("=" * 60)
