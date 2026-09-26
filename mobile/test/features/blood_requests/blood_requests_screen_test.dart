@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:blood_donation_network/features/auth/auth_controller.dart';
 import 'package:blood_donation_network/features/blood_requests/blood_request.dart';
+import 'package:blood_donation_network/features/blood_requests/blood_requests_repository.dart';
 import 'package:blood_donation_network/features/blood_requests/blood_requests_screen.dart';
 import 'package:blood_donation_network/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -40,12 +41,15 @@ Widget _host(Override requestOverride) => ProviderScope(
 void main() {
   testWidgets('shows loading state while requests are pending', (tester) async {
     final pending = Completer<List<BloodRequest>>();
+
     await tester.pumpWidget(
       _host(bloodRequestsProvider.overrideWith((ref) => pending.future)),
     );
+
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
     pending.complete(const []);
   });
 
@@ -57,9 +61,11 @@ void main() {
         bloodRequestsProvider.overrideWith((ref) async => <BloodRequest>[]),
       ),
     );
+
     await tester.pumpAndSettle();
 
     expect(find.text('No blood requests'), findsOneWidget);
+
     expect(
       find.text('There are no blood requests to show right now.'),
       findsOneWidget,
@@ -72,10 +78,13 @@ void main() {
     await tester.pumpWidget(
       _host(bloodRequestsProvider.overrideWith((ref) async => [_request()])),
     );
+
     await tester.pumpAndSettle();
 
     expect(find.text('Central Hospital'), findsOneWidget);
+
     expect(find.text('O+'), findsOneWidget);
-    expect(find.text('open'), findsOneWidget);
+
+    expect(find.text('Open'), findsNWidgets(2));
   });
 }
