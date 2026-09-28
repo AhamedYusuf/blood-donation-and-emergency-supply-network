@@ -34,7 +34,7 @@ builder.Services.AddExceptionHandler<
 // EXTERNAL CLIENTS
 // =====================================================
 
-builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
+builder.Services.AddHttpClient<IGeocodingClient, LocationIqClient>(c =>
     c.DefaultRequestHeaders.Add(
         "User-Agent",
         "BloodDonationNetwork/1.0"));

@@ -84,6 +84,16 @@ services:
       - key: Seed__AdminPassword
         sync: false
 
+      # Nominatim (the free OpenStreetMap geocoder this originally used)
+      # actively blocks/rate-limits cloud-provider IP ranges — confirmed
+      # live, every address failed to geocode once deployed here even
+      # though the same address resolved fine from a residential
+      # network. LocationIQ is Nominatim-compatible but built to accept
+      # normal app traffic from hosts like this one. Free-tier API key
+      # from locationiq.com — paste it in via the dashboard, not here.
+      - key: LocationIq__ApiKey
+        sync: false
+
   # ---------------------------------------------------------------
   # React web app (static site)
   # ---------------------------------------------------------------
