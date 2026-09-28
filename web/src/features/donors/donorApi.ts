@@ -61,6 +61,7 @@ export interface EligibilityResponse {
 
 export interface DonorSearchParams {
   bloodType?: string;
+  search?: string;
   lat?: number;
   lng?: number;
   radiusKm?: number;
@@ -114,6 +115,21 @@ export const donorApi = baseApi.injectEndpoints({
       ],
     }),
 
+    updateDonorMedicalFlags: builder.mutation<
+      DonorProfileResponse,
+      { id: string; medicalFlags: Record<string, boolean> }
+    >({
+      query: ({ id, medicalFlags }) => ({
+        url: `/donors/${id}/medical-flags`,
+        method: "PUT",
+        body: medicalFlags,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Donor", id },
+        { type: "Donor", id: "LIST" },
+      ],
+    }),
+
     /**
      * GET /api/donors/search — staff / admin only
      * Note: lat/lng/radiusKm filtering is stored but not yet evaluated
@@ -123,9 +139,10 @@ export const donorApi = baseApi.injectEndpoints({
       PagedResult<DonorProfileResponse>,
       DonorSearchParams
     >({
-      query: ({ bloodType, lat, lng, radiusKm, page = 1, pageSize = 20 }) => {
+      query: ({ bloodType, search, lat, lng, radiusKm, page = 1, pageSize = 20 }) => {
         const params = new URLSearchParams();
         if (bloodType) params.set("bloodType", bloodType);
+        if (search) params.set("search", search);
         if (lat != null) params.set("lat", String(lat));
         if (lng != null) params.set("lng", String(lng));
         if (radiusKm != null) params.set("radiusKm", String(radiusKm));
@@ -168,6 +185,7 @@ export const {
   useRegisterDonorProfileMutation,
   useGetDonorProfileQuery,
   useUpdateDonorProfileMutation,
+  useUpdateDonorMedicalFlagsMutation,
   useSearchDonorsQuery,
   useVerifyDonorMutation,
   useGetDonorEligibilityQuery,

@@ -70,7 +70,7 @@ function VerifiedChip({ verified }: { verified: boolean }) {
         whiteSpace: "nowrap",
       }}
     >
-      {verified ? "Admin verified" : "Unverified"}
+      {verified ? "Admin verified" : "Pending verification"}
     </span>
   );
 }
@@ -246,10 +246,12 @@ function PaginationBar({
 
 export function DonorSearchPage() {
   const [bloodTypeFilter, setBloodTypeFilter] = useState("");
+  const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError, isFetching } = useSearchDonorsQuery({
     bloodType: bloodTypeFilter || undefined,
+    search: searchText.trim() || undefined,
     page,
     pageSize: 20,
   });
@@ -258,6 +260,8 @@ export function DonorSearchPage() {
     setBloodTypeFilter(v);
     setPage(1); // reset to page 1 on filter change
   };
+
+  const filteredItems = data?.items ?? [];
 
   return (
     <div
@@ -300,6 +304,13 @@ export function DonorSearchPage() {
         }}
       >
         {/* Blood type tabs */}
+        <input
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          placeholder="Search donor name or ID"
+          aria-label="Search donor name or ID"
+          style={{ border: "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", padding: "6px 9px", font: "inherit", fontSize: 12, minWidth: 190 }}
+        />
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
           <span
             className="text-label"
@@ -429,7 +440,7 @@ export function DonorSearchPage() {
         )}
 
         {/* Empty */}
-        {!isLoading && !isError && data && data.items.length === 0 && (
+        {!isLoading && !isError && data && filteredItems.length === 0 && (
           <div
             className="fade-enter"
             style={{ padding: "var(--space-xxl)", textAlign: "center" }}
@@ -460,7 +471,9 @@ export function DonorSearchPage() {
               className="text-body-sm"
               style={{ color: "var(--color-ink-muted)", margin: 0 }}
             >
-              {bloodTypeFilter
+              {searchText
+                ? `No donors match "${searchText}".`
+                : bloodTypeFilter
                 ? `No registered donors with blood type ${bloodTypeFilter}.`
                 : "No donors have registered yet."}
             </p>
@@ -470,7 +483,7 @@ export function DonorSearchPage() {
         {/* Rows */}
         {!isLoading &&
           !isError &&
-          data?.items.map((donor) => <DonorRow key={donor.id} donor={donor} />)}
+          filteredItems.map((donor) => <DonorRow key={donor.id} donor={donor} />)}
       </div>
 
       {/* Pagination */}

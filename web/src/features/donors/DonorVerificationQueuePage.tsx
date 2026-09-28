@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   useSearchDonorsQuery,
-  useUpdateDonorProfileMutation,
+  BLOOD_TYPE_OPTIONS,
+  useUpdateDonorMedicalFlagsMutation,
   useVerifyDonorMutation,
   type DonorProfileResponse,
 } from "./donorApi";
@@ -76,9 +79,9 @@ function SkeletonRow() {
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
-function DonorRow({ donor }: { donor: DonorProfileResponse }) {
+function DonorRow({ donor, isAdmin }: { donor: DonorProfileResponse; isAdmin: boolean }) {
   const [verify, { isLoading }] = useVerifyDonorMutation();
-  const [updateProfile, { isLoading: isSavingMedicalFlags }] = useUpdateDonorProfileMutation();
+  const [updateMedicalFlags, { isLoading: isSavingMedicalFlags }] = useUpdateDonorMedicalFlagsMutation();
   const [hovered, setHovered] = useState(false);
   const [editingMedicalFlags, setEditingMedicalFlags] = useState(false);
   const [medicalFlags, setMedicalFlags] = useState<Record<string, boolean>>(donor.medicalFlags ?? {});
@@ -95,7 +98,7 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
   const handleSaveMedicalFlags = async () => {
     setMedicalError(null);
     try {
-      await updateProfile({ id: donor.id, body: { medicalFlags } }).unwrap();
+      await updateMedicalFlags({ id: donor.id, medicalFlags }).unwrap();
       setEditingMedicalFlags(false);
     } catch {
       setMedicalError("Could not save medical flags.");
@@ -191,7 +194,7 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
       <StatusBadge status={donor.eligibilityStatus} />
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
-        {!donor.verifiedByAdmin && (
+        {isAdmin && !donor.verifiedByAdmin && (
           <button
             onClick={handleVerify}
             disabled={isLoading}
@@ -234,8 +237,14 @@ function DonorRow({ donor }: { donor: DonorProfileResponse }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function DonorVerificationQueuePage() {
+  const role = useSelector((state: RootState) => (state.auth.role ?? "").toLowerCase());
+  const isAdmin = role === "admin";
+  const [searchText, setSearchText] = useState("");
+  const [bloodTypeFilter, setBloodTypeFilter] = useState("");
   const [view, setView] = useState<"pending" | "all">("pending");
   const { data, isLoading, isError, error, refetch } = useSearchDonorsQuery({
+    bloodType: bloodTypeFilter || undefined,
+    search: searchText.trim() || undefined,
     pageSize: 1000,
   });
   const unverified = (data?.items ?? []).filter((d) => !d.verifiedByAdmin);
@@ -309,6 +318,35 @@ export function DonorVerificationQueuePage() {
             {option === "pending" ? `Pending verification (${unverified.length})` : `All donors (${data?.items.length ?? 0})`}
           </button>
         ))}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          flexWrap: "wrap",
+          padding: "0 var(--space-lg) var(--space-md)",
+        }}
+      >
+        <input
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          placeholder="Search donor name or ID"
+          aria-label="Search donor name or ID"
+          style={{ border: "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", padding: "7px 9px", font: "inherit", fontSize: 12, minWidth: 220 }}
+        />
+        <select
+          value={bloodTypeFilter}
+          onChange={(event) => setBloodTypeFilter(event.target.value)}
+          aria-label="Filter by blood type"
+          style={{ border: "1px solid var(--color-hairline-strong)", borderRadius: "var(--radius-sm)", padding: "7px 9px", font: "inherit", fontSize: 12, color: "var(--color-ink-secondary)" }}
+        >
+          <option value="">All blood types</option>
+          {BLOOD_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Counter badge */}
@@ -446,7 +484,7 @@ export function DonorVerificationQueuePage() {
         {/* Rows */}
         {!isLoading &&
           !isError &&
-          visibleDonors.map((donor) => <DonorRow key={donor.id} donor={donor} />)}
+          visibleDonors.map((donor) => <DonorRow key={donor.id} donor={donor} isAdmin={isAdmin} />)}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

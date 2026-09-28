@@ -50,10 +50,19 @@ public class DonorsController : ControllerBase
     public async Task<ActionResult<DonorProfileResponse>> Update(
         Guid id, [FromBody] DonorUpdateRequest request, CancellationToken ct)
     {
-        if (!await CanAccessDonorAsync(id, ct, allowAdmin: true))
+        if (!await CanAccessDonorAsync(id, ct, allowAdmin: true, allowStaff: false))
             return Forbid();
 
         var result = await _donorService.UpdateAsync(id, request, ct);
+        return Ok(result);
+    }
+
+    [HttpPut("{id:guid}/medical-flags")]
+    [Authorize(Roles = "staff,admin")]
+    public async Task<ActionResult<DonorProfileResponse>> UpdateMedicalFlags(
+        Guid id, [FromBody] Dictionary<string, bool> medicalFlags, CancellationToken ct)
+    {
+        var result = await _donorService.UpdateMedicalFlagsAsync(id, medicalFlags, ct);
         return Ok(result);
     }
 
@@ -61,6 +70,7 @@ public class DonorsController : ControllerBase
     [Authorize(Roles = "staff,admin")]
     public async Task<ActionResult<PagedResult<DonorProfileResponse>>> Search(
         [FromQuery] string? bloodType,
+        [FromQuery] string? search,
         [FromQuery] double? lat,
         [FromQuery] double? lng,
         [FromQuery] double? radiusKm,
@@ -68,7 +78,7 @@ public class DonorsController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
     {
-        var result = await _donorService.SearchAsync(bloodType, lat, lng, radiusKm, page, pageSize, ct);
+        var result = await _donorService.SearchAsync(bloodType, search, User.IsInRole("staff"), page, pageSize, ct);
         return Ok(result);
     }
 
@@ -90,9 +100,9 @@ public class DonorsController : ControllerBase
         return Ok(result);
     }
 
-    private async Task<bool> CanAccessDonorAsync(Guid donorId, CancellationToken ct, bool allowAdmin)
+    private async Task<bool> CanAccessDonorAsync(Guid donorId, CancellationToken ct, bool allowAdmin, bool allowStaff = true)
     {
-        if (User.IsInRole("staff") || (allowAdmin && User.IsInRole("admin")))
+        if ((allowStaff && User.IsInRole("staff")) || (allowAdmin && User.IsInRole("admin")))
             return true;
 
         if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
