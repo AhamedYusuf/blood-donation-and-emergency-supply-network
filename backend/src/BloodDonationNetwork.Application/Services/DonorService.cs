@@ -81,18 +81,49 @@ public class DonorService : IDonorService
             if (coords is { } c) { profile.Latitude = c.Item1; profile.Longitude = c.Item2; }
         }
 
+        RefreshEligibilityStatus(profile);
         profile.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
         return ToResponse(profile);
     }
 
-    public async Task<PagedResult<DonorProfileResponse>> SearchAsync(string? bloodType, double? lat, double? lng, double? radiusKm, int page, int pageSize, CancellationToken ct)
+    public async Task<DonorProfileResponse> UpdateMedicalFlagsAsync(Guid id, Dictionary<string, bool> medicalFlags, CancellationToken ct)
+    {
+        var profile = await _db.DonorProfiles.FindAsync(new object[] { id }, ct)
+            ?? throw new KeyNotFoundException("Donor profile not found");
+
+        profile.MedicalFlags = medicalFlags;
+        RefreshEligibilityStatus(profile);
+        profile.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return ToResponse(profile);
+    }
+
+    public async Task<PagedResult<DonorProfileResponse>> SearchAsync(string? bloodType, string? search, bool eligibleOnly, int page, int pageSize, CancellationToken ct)
     {
         var query = _db.DonorProfiles.AsQueryable();
         if (!string.IsNullOrWhiteSpace(bloodType)) query = query.Where(d => d.BloodType == bloodType);
 
-        var total = await query.CountAsync(ct);
-        var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var profiles = await query.ToListAsync(ct);
+        List<Guid>? matchingUserIds = null;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim();
+            matchingUserIds = await _db.Users
+                .Where(user => user.FullName.Contains(normalizedSearch))
+                .Select(user => user.Id)
+                .ToListAsync(ct);
+
+            profiles = profiles.Where(profile =>
+                profile.Id.ToString().Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
+                || profile.UserId.ToString().Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
+                || matchingUserIds.Contains(profile.UserId)).ToList();
+        }
+        if (eligibleOnly)
+            profiles = profiles.Where(profile => _eligibilityEngine.Evaluate(profile, profile.BloodType).IsEligible).ToList();
+
+        var total = profiles.Count;
+        var items = profiles.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         var userIds = items.Select(profile => profile.UserId).Distinct().ToList();
         var names = await _db.Users
             .Where(user => userIds.Contains(user.Id))
@@ -116,6 +147,7 @@ public class DonorService : IDonorService
         var profile = await _db.DonorProfiles.FindAsync(new object[] { id }, ct)
             ?? throw new KeyNotFoundException("Donor profile not found");
         profile.VerifiedByAdmin = true;
+        RefreshEligibilityStatus(profile);
         profile.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
@@ -142,4 +174,24 @@ public class DonorService : IDonorService
         MedicalFlags = p.MedicalFlags,
         Latitude = p.Latitude, Longitude = p.Longitude, LocationVerified = p.LocationVerified, VerifiedByAdmin = p.VerifiedByAdmin
     };
+
+    private void RefreshEligibilityStatus(DonorProfile profile)
+    {
+        if (profile.MedicalFlags.Values.Any(flag => flag))
+        {
+            profile.VerifiedByAdmin = false;
+            profile.EligibilityStatus = "pending_review";
+            return;
+        }
+
+        if (!profile.VerifiedByAdmin)
+        {
+            profile.EligibilityStatus = "pending_review";
+            return;
+        }
+
+        profile.EligibilityStatus = _eligibilityEngine.Evaluate(profile, profile.BloodType).IsEligible
+            ? "eligible"
+            : "not_eligible";
+    }
 }
