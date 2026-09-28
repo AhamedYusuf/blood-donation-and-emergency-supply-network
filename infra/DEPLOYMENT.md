@@ -36,8 +36,37 @@ model regardless. Run it locally for the live demo; see
      remember; write it in the deployment report's test-accounts
      section (not a secret you need to protect long-term, but also not
      something to leave as a guessable default).
-4. Wait for all three resources to finish their first deploy (a few
+4. Render will also prompt for `LocationIq__ApiKey` — see the
+   **Geocoding** section below for how to get one.
+5. Wait for all three resources to finish their first deploy (a few
    minutes — the API build in particular takes longer the first time).
+
+## Geocoding (LocationIQ)
+
+Donor registration and organization creation both auto-detect
+coordinates from a typed address. This originally called Nominatim
+(OpenStreetMap's free geocoder) directly, but Nominatim actively
+rate-limits and blocks requests from cloud/datacenter IP ranges —
+confirmed live: every address failed to geocode once deployed to
+Render, even ones verified to resolve fine from a residential network.
+Switched to **LocationIQ**, which is Nominatim-compatible (same
+response shape) but built to accept normal app traffic from hosts like
+Render.
+
+1. Sign up free at [locationiq.com](https://locationiq.com) (free tier:
+   5,000 requests/day, no card required).
+2. Dashboard → **Access Tokens** → copy your API key.
+3. Render → `blood-donation-api` → **Environment** → set
+   `LocationIq__ApiKey` to that key. Redeploy if the service was already
+   running (Environment → Manual Deploy → Deploy latest commit — a
+   plain env-var save usually triggers this automatically, but confirm).
+4. **Locally**, add the same key to
+   `backend/src/BloodDonationNetwork.Api/appsettings.Development.json`
+   under `"LocationIq": { "ApiKey": "..." }` (already stubbed in with a
+   placeholder — this file is gitignored, so it's safe to put a real key
+   there). Without it, any local donor-registration or
+   organization-creation test will fail with a clear startup-config
+   error rather than silently misbehaving.
 
 ## After the first deploy — checking the frontend's API URL
 
