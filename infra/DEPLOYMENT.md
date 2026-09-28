@@ -42,18 +42,27 @@ model regardless. Run it locally for the live demo; see
 ## After the first deploy — checking the frontend's API URL
 
 Vite bakes `VITE_API_BASE_URL` into the built JS at **build time**, not
-read at runtime. `render.yaml` guesses the API's URL will be
-`https://blood-donation-api.onrender.com` (Render names services after
-what you give them, unless that name was already taken globally, in
-which case it appends random characters instead).
+read at runtime. The plain names in `render.yaml` (`blood-donation-api`,
+`blood-donation-web`) were already taken globally on Render for this
+project, so it assigned random suffixes instead — this is exactly what
+happened on first deploy here, and it's why login/registration failed
+initially (the frontend was built pointing at a URL nothing was
+listening on).
 
-- Open the `blood-donation-api` service in the Render dashboard and
-  copy its actual URL.
-- If it matches the guess in `render.yaml`, you're done.
-- If it doesn't: open `blood-donation-web` → Environment, edit
-  `VITE_API_BASE_URL` to `<real-api-url>/api`, then trigger **Manual
-  Deploy → Clear build cache & deploy** (a plain restart won't rebuild
-  the JS, so the old baked-in URL would stick).
+- Open the API service in the Render dashboard and copy its actual URL.
+- If it doesn't match what's in `render.yaml`'s `VITE_API_BASE_URL`:
+  update that value (in the file, or as a live env-var edit on the web
+  service) to `<real-api-url>/api`, then trigger **Manual Deploy →
+  Clear build cache & deploy** (a plain restart won't rebuild the JS,
+  so the old baked-in URL would stick).
+
+## Live deployment (this project)
+
+- API: `https://blood-donation-api-h3cp.onrender.com`
+- Web: `https://blood-donation-web-2o3n.onrender.com`
+
+Both confirmed reachable: `/health` → `{"status":"ok"}`, `/swagger` →
+200.
 
 ## Verifying the deployment
 

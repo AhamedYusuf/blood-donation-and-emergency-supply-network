@@ -12,7 +12,31 @@ public class NominatimClient : IGeocodingClient
     public async Task<(double, double)?> GeocodeAsync(string address, CancellationToken ct = default)
     {
         var url = $"https://nominatim.openstreetmap.org/search?q={Uri.EscapeDataString(address)}&format=json&limit=1";
-        var resp = await _http.GetFromJsonAsync<List<NominatimResult>>(url, ct);
+
+        List<NominatimResult>? resp;
+
+        try
+        {
+            resp = await _http.GetFromJsonAsync<List<NominatimResult>>(url, ct);
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException or
+                  TaskCanceledException or
+                  System.Text.Json.JsonException)
+        {
+            // Nominatim is a free, shared service that actively rate-limits
+            // and sometimes blocks requests from cloud/datacenter IP ranges
+            // (exactly what a Render-hosted backend is) — a non-success
+            // response, a timeout, or an unexpected body here previously
+            // threw straight through as an unhandled exception, turning
+            // donor registration into a raw 500 instead of the same
+            // graceful "could not locate that address" 400 a genuinely
+            // unmatched address already produces below. Treating any of
+            // these as "couldn't geocode" keeps the caller's contract the
+            // same either way.
+            return null;
+        }
+
         var first = resp?.FirstOrDefault();
         if (first is null)
             return null;
