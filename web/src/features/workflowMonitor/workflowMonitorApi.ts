@@ -40,6 +40,17 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
         `/agent/workflows/${id}/summary`,
     }),
 
+    // approveWorkflow's HTTP response doesn't come back until the backend
+    // has synchronously awaited the whole Python coordinator resume cycle
+    // (AgentWorkflowsController.Approve awaits ResumePythonWorkflowAsync,
+    // which awaits POST /resume-workflow — confirmed live: by the time
+    // this call resolves, a sufficient-stock approval has already
+    // deducted real inventory and an insufficient-stock one has already
+    // created real appointments). So invalidating these tags on success
+    // is safe and accurate, not premature — previously this mutation had
+    // no invalidatesTags at all, so e.g. the Inventory page's stock count
+    // only ever picked up a post-approval deduction on a full page
+    // refresh, never from the live app.
     approveWorkflow: builder.mutation<
       AgentWorkflow,
       {
@@ -52,8 +63,12 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Inventory", "Request", "Appointment"],
     }),
 
+    // Rejecting a workflow now also cancels its BloodRequest server-side
+    // (see AgentWorkflowService.RejectAsync) — invalidate "Request" so
+    // any open Requests list/detail view picks that up live too.
     rejectWorkflow: builder.mutation<
       AgentWorkflow,
       {
@@ -66,6 +81,7 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Request"],
     }),
 
     reviseWorkflow: builder.mutation<
