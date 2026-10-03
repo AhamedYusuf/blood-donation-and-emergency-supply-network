@@ -159,6 +159,23 @@ export function AppointmentsConsolePage() {
     setSelected(null);
   };
 
+  // Staff previously had no way to reject a scheduled appointment at all
+  // — only Complete (after the fact) or Mark no-show (after a missed
+  // slot). This covers the case upfront: a donor self-booked via "I can
+  // donate" on a blood request turns out ineligible (wrong blood type,
+  // etc.) or the slot otherwise can't go ahead. The backend's status
+  // endpoint already allows staff/admin to set any status including
+  // "cancelled" — this was purely a missing UI affordance.
+  const handleDecline = async () => {
+    if (!selected) return;
+    const confirmed = window.confirm(
+      "Decline this appointment? The donor will see it as cancelled and the slot is released."
+    );
+    if (!confirmed) return;
+    await updateStatus({ id: selected.id, newStatus: "cancelled" }).unwrap();
+    setSelected(null);
+  };
+
   if (!effectiveOrgId) {
     // Admins aren't tied to one org (organizationId is only ever set for
     // staff), but the backend already lets them query any org's queue —
@@ -747,6 +764,26 @@ export function AppointmentsConsolePage() {
                 }}
               >
                 {isUpdatingStatus ? "Updating…" : "Mark no-show"}
+              </button>
+              <button
+                onClick={handleDecline}
+                disabled={isUpdatingStatus}
+                className="transition-fast"
+                style={{
+                  width: "100%",
+                  marginTop: "var(--space-xs)",
+                  padding: "8px 14px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-ink-secondary)",
+                  border: "1px solid var(--color-hairline-strong)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  fontFamily: "var(--font-sans)",
+                  cursor: isUpdatingStatus ? "default" : "pointer",
+                }}
+              >
+                {isUpdatingStatus ? "Updating…" : "Decline"}
               </button>
             </div>
           )}

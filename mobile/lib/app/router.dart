@@ -17,6 +17,7 @@ import '../features/blood_requests/blood_request_details_screen.dart';
 import '../features/blood_requests/blood_requests_screen.dart';
 import '../features/blood_requests/coordinator_workflow_screen.dart';
 import '../features/blood_requests/create_blood_request_screen.dart';
+import '../features/nearby_banks_map/nearby_banks_map_screen.dart';
 import 'mobile_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -52,11 +53,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           return '/splash';
 
         case AuthStatus.unauthenticated:
-          return loggingIn || registering
-              ? null
-              : '/login';
+          return loggingIn || registering ? null : '/login';
 
         case AuthStatus.authenticated:
+          final auth = ref.read(authControllerProvider);
+
+          // Donors must complete their donor profile before using the app.
+          // Staff/admin users are not required to have a donor profile.
           final needsDonorRegistration =
               auth.role == 'donor' &&
               auth.donorProfileId == null;
@@ -99,22 +102,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: _AuthRefresh(ref),
 
     routes: [
+      // ---------------------------------------------------------------
+      // Main application tabs
+      // ---------------------------------------------------------------
       StatefulShellRoute.indexedStack(
-        builder: (
-          context,
-          state,
-          shell,
-        ) =>
-            MobileShell(
-          navigationShell: shell,
-        ),
+        builder: (context, state, shell) {
+          return MobileShell(navigationShell: shell);
+        },
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/',
-                builder: (_, _) =>
-                    const HomeScreen(),
+                builder: (_, _) => const HomeScreen(),
               ),
             ],
           ),
@@ -165,6 +165,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             _rootNavigatorKey,
         builder: (_, _) =>
             const NotificationInboxScreen(),
+      ),
+
+      GoRoute(
+        path: '/nearby-banks',
+        parentNavigatorKey:
+            _rootNavigatorKey,
+        builder: (_, _) =>
+            const NearbyBanksMapScreen(),
       ),
 
       GoRoute(

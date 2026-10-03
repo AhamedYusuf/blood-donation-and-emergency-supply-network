@@ -68,6 +68,9 @@ export interface RequestResponseDto {
   fulfilledAt: string | null;
 
   closedAt: string | null;
+
+  /** Only populated when the list query was called with nearLat/nearLng. */
+  distanceKm: number | null;
 }
 
 export interface RequestStatusUpdateDto {
@@ -90,4 +93,11 @@ export interface RequestFilters {
   sortBy?: string;
 
   descending?: boolean;
+
+  /** Donor browse view: restricts results to within radiusKm (default 50) of this point. */
+  nearLat?: number;
+
+  nearLng?: number;
+
+  radiusKm?: number;
 }

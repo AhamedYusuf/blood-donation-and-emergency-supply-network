@@ -114,11 +114,12 @@ export default function RequestDetailsPage() {
   const canManageRequests =
     role === "staff" || role === "admin";
 
+  const isDonor = role === "donor";
+
   const {
     data: organizations = [],
     isLoading: organizationsLoading,
   } = useGetOrganizationsQuery();
-
 
   const {
     data: request,
@@ -849,6 +850,52 @@ export default function RequestDetailsPage() {
           </button>
 
         </aside>
+        )}
+
+        {isDonor && (
+          <aside className="request-actions-card">
+            <span className="requests-eyebrow">
+              RESPOND
+            </span>
+
+            <h3>
+              Can you help?
+            </h3>
+
+            {[
+              BloodRequestStatus.Fulfilled,
+              BloodRequestStatus.Expired,
+              BloodRequestStatus.Cancelled,
+            ].includes(request.status) ? (
+              <p>
+                This request is no longer active, so it isn't accepting
+                donations.
+              </p>
+            ) : (
+              <>
+                <p>
+                  Booking a donation reserves a time at{" "}
+                  {organizationName} so they can put it toward this
+                  need.
+                </p>
+
+                <button
+                  type="button"
+                  className="requests-primary-button"
+                  onClick={() =>
+                    navigate("/appointments/book", {
+                      state: {
+                        organizationId: request.organizationId,
+                        hospitalName: organizationName,
+                      },
+                    })
+                  }
+                >
+                  I can donate
+                </button>
+              </>
+            )}
+          </aside>
         )}
 
       </section>

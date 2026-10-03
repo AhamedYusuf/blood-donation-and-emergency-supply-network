@@ -1,3 +1,4 @@
+using BloodDonationNetwork.Application.Common;
 using BloodDonationNetwork.Application.DTOs.Requests;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
@@ -8,6 +9,11 @@ namespace BloodDonationNetwork.Application.Services;
 
 public class RequestService : IRequestService
 {
+    // Matches the radius matching_dispatch_agent.py defaults to when
+    // searching for donors, so "nearby" means the same distance everywhere
+    // in the system.
+    private const double DefaultNearbyRadiusKm = 50;
+
     private readonly IApplicationDbContext _context;
 
     private static readonly HashSet<string> ValidRequestStatuses =
@@ -97,7 +103,10 @@ public class RequestService : IRequestService
         int page = 1,
         int pageSize = 10,
         string sortBy = "createdAt",
-        bool descending = true)
+        bool descending = true,
+        double? nearLat = null,
+        double? nearLng = null,
+        double? radiusKm = null)
     {
         var query = _context.BloodRequests
             .AsNoTracking()
@@ -136,6 +145,62 @@ public class RequestService : IRequestService
         pageSize = pageSize < 1 ? 10 : pageSize;
         pageSize = pageSize > 100 ? 100 : pageSize;
 
+        var isNearbyFilter = nearLat.HasValue && nearLng.HasValue;
+
+        // EF Core can't translate Haversine (Math.Sin/Cos) into SQL — same
+        // reason MatchingDispatchAgentService computes distance in-memory
+        // — so a nearby-filtered call has to materialize first, then
+        // filter/sort/paginate in-memory instead of doing it all in SQL.
+        if (isNearbyFilter)
+        {
+            var effectiveRadiusKm = radiusKm ?? DefaultNearbyRadiusKm;
+
+            var candidates = await query.ToListAsync();
+
+            var withDistance = candidates
+                .Select(r => (
+                    Request: r,
+                    DistanceKm: GeoUtils.DistanceKm(
+                        nearLat!.Value, nearLng!.Value,
+                        r.Latitude, r.Longitude)))
+                .Where(x => x.DistanceKm <= effectiveRadiusKm);
+
+            withDistance = sortBy.ToLowerInvariant() switch
+            {
+                "distance" => descending
+                    ? withDistance.OrderByDescending(x => x.DistanceKm)
+                    : withDistance.OrderBy(x => x.DistanceKm),
+
+                "urgency" => descending
+                    ? withDistance.OrderByDescending(x => x.Request.Urgency)
+                    : withDistance.OrderBy(x => x.Request.Urgency),
+
+                "bloodtype" => descending
+                    ? withDistance.OrderByDescending(x => x.Request.BloodType)
+                    : withDistance.OrderBy(x => x.Request.BloodType),
+
+                "unitsrequested" => descending
+                    ? withDistance.OrderByDescending(x => x.Request.UnitsRequested)
+                    : withDistance.OrderBy(x => x.Request.UnitsRequested),
+
+                "status" => descending
+                    ? withDistance.OrderByDescending(x => x.Request.Status)
+                    : withDistance.OrderBy(x => x.Request.Status),
+
+                _ => descending
+                    ? withDistance.OrderByDescending(x => x.Request.CreatedAt)
+                    : withDistance.OrderBy(x => x.Request.CreatedAt)
+            };
+
+            var pagedWithDistance = withDistance
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return pagedWithDistance.Select(
+                x => MapToResponse(x.Request, x.DistanceKm));
+        }
+
         // Sorting
         query = sortBy.ToLowerInvariant() switch
         {
@@ -166,7 +231,7 @@ public class RequestService : IRequestService
             .Take(pageSize)
             .ToListAsync();
 
-        return requests.Select(MapToResponse);
+        return requests.Select(r => MapToResponse(r));
     }
 
     // 4. Update request status
@@ -322,7 +387,8 @@ public class RequestService : IRequestService
 
     // Convert BloodRequest entity into response DTO
     private static RequestResponseDto MapToResponse(
-        BloodRequest request)
+        BloodRequest request,
+        double? distanceKm = null)
     {
         return new RequestResponseDto
         {
@@ -339,7 +405,8 @@ public class RequestService : IRequestService
             Notes = request.Notes,
             CreatedAt = request.CreatedAt,
             FulfilledAt = request.FulfilledAt,
-            ClosedAt = request.ClosedAt
+            ClosedAt = request.ClosedAt,
+            DistanceKm = distanceKm
         };
     }
 }

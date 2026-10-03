@@ -44,6 +44,19 @@ public interface IInventoryService
         StockCheckAgentRequest request,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Deducts <paramref name="request"/>.UnitsNeeded from the requesting
+    /// org's own stock and marks the related BloodRequest fulfilled. Only
+    /// valid for an approved workflow (same guard Mode 2 dispatch
+    /// enforces) — throws <see cref="InvalidOperationException"/>
+    /// otherwise, and if the live stock can no longer cover the request
+    /// (it can change between the original check-stock call and human
+    /// approval).
+    /// </summary>
+    Task<FulfillFromStockResponse> FulfillFromStockAsync(
+        StockCheckAgentRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<StockCheckAgentResponse> CheckStockWithTransferCandidatesAsync(
         StockCheckRequest request,
         Guid currentUserId,

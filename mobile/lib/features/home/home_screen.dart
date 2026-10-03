@@ -37,7 +37,12 @@ class HomeScreen extends ConsumerWidget {
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, AppSpacing.xs, AppSpacing.gutter, AppSpacing.xl),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.xs,
+            AppSpacing.gutter,
+            AppSpacing.xl,
+          ),
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -47,7 +52,10 @@ class HomeScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(_greeting(), style: AppText.bodySmall),
-                      Text(auth.firstName ?? 'Donor', style: AppText.largeTitle),
+                      Text(
+                        auth.firstName ?? 'Donor',
+                        style: AppText.largeTitle,
+                      ),
                     ],
                   ),
                 ),
@@ -56,7 +64,10 @@ class HomeScreen extends ConsumerWidget {
                 InkWell(
                   onTap: () => context.go('/profile'),
                   customBorder: const CircleBorder(),
-                  child: InitialsAvatar(initials: auth.initials, size: 40),
+                  child: InitialsAvatar(
+                    initials: auth.initials,
+                    size: 40,
+                  ),
                 ),
               ],
             ),
@@ -75,11 +86,15 @@ class HomeScreen extends ConsumerWidget {
                       iconColor: AppColors.primary,
                       iconBg: AppColors.primarySubtle,
                       title: 'My donations',
-                      subtitle: 'View, book and manage your appointments',
+                      subtitle:
+                          'View, book and manage your appointments',
                       onTap: () => context.go('/appointments'),
                     ),
                   ),
-                  const Divider(height: 1, indent: AppSpacing.md + 40 + AppSpacing.sm),
+                  const Divider(
+                    height: 1,
+                    indent: AppSpacing.md + 40 + AppSpacing.sm,
+                  ),
                   FadeSlideIn(
                     index: 1,
                     child: _ActionRow(
@@ -110,7 +125,10 @@ class HomeScreen extends ConsumerWidget {
                       subtitle: 'Requests matched to your blood type',
                     ),
                   ),
-                  const Divider(height: 1, indent: AppSpacing.md + 40 + AppSpacing.sm),
+                  const Divider(
+                    height: 1,
+                    indent: AppSpacing.md + 40 + AppSpacing.sm,
+                  ),
                   FadeSlideIn(
                     index: 3,
                     child: const _ActionRow(
@@ -121,15 +139,21 @@ class HomeScreen extends ConsumerWidget {
                       subtitle: 'When you can next donate',
                     ),
                   ),
-                  const Divider(height: 1, indent: AppSpacing.md + 40 + AppSpacing.sm),
+                  const Divider(
+                    height: 1,
+                    indent: AppSpacing.md + 40 + AppSpacing.sm,
+                  ),
+
+                  // Nearby Blood Banks is now active.
                   FadeSlideIn(
                     index: 4,
-                    child: const _ActionRow(
+                    child: _ActionRow(
                       icon: Icons.map_outlined,
-                      iconColor: AppColors.inkMuted,
-                      iconBg: AppColors.surfaceSunken,
+                      iconColor: AppColors.primary,
+                      iconBg: AppColors.primarySubtle,
                       title: 'Nearby blood banks',
                       subtitle: 'Find a place to donate',
+                      onTap: () => context.push('/nearby-banks'),
                     ),
                   ),
                 ],
@@ -146,12 +170,18 @@ class HomeScreen extends ConsumerWidget {
 
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.appointments});
+
   final AsyncValue<List<Appointment>> appointments;
 
   @override
   Widget build(BuildContext context) {
-    final upcoming = appointments.valueOrNull?.where((a) => a.isUpcoming).length;
-    final completed = appointments.valueOrNull?.where((a) => a.status == 'completed').length;
+    final upcoming =
+        appointments.valueOrNull?.where((a) => a.isUpcoming).length;
+
+    final completed =
+        appointments.valueOrNull
+            ?.where((a) => a.status == 'completed')
+            .length;
 
     return Row(
       children: [
@@ -180,7 +210,14 @@ class _StatsRow extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.icon, required this.iconColor, required this.label, required this.value, required this.loading});
+  const _StatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.loading,
+  });
+
   final IconData icon;
   final Color iconColor;
   final String label;
@@ -193,14 +230,24 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: iconColor),
+          Icon(
+            icon,
+            size: 18,
+            color: iconColor,
+          ),
           const SizedBox(width: AppSpacing.xs),
           Text(
             loading || value == null ? '—' : '$value',
             style: AppText.title.copyWith(fontSize: 22),
           ),
           const SizedBox(width: 6),
-          Expanded(child: Text(label, style: AppText.bodySmall, overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              label,
+              style: AppText.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -218,6 +265,7 @@ class _ActionRow extends StatelessWidget {
     required this.subtitle,
     this.onTap,
   });
+
   final IconData icon;
   final Color iconColor;
   final Color iconBg;
@@ -228,6 +276,7 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -235,28 +284,51 @@ class _ActionRow extends StatelessWidget {
         child: Opacity(
           opacity: enabled ? 1 : 0.5,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             child: Row(
               children: [
                 Container(
                   width: 32,
                   height: 32,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(AppRadii.sm - 2)),
-                  child: Icon(icon, size: 17, color: iconColor),
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(
+                      AppRadii.sm - 2,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 17,
+                    color: iconColor,
+                  ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: AppText.bodyStrong),
+                      Text(
+                        title,
+                        style: AppText.bodyStrong,
+                      ),
                       const SizedBox(height: 1),
-                      Text(subtitle, style: AppText.caption),
+                      Text(
+                        subtitle,
+                        style: AppText.caption,
+                      ),
                     ],
                   ),
                 ),
-                if (enabled) const Icon(Icons.chevron_right, size: 20, color: AppColors.inkFaint),
+                if (enabled)
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: AppColors.inkFaint,
+                  ),
               ],
             ),
           ),

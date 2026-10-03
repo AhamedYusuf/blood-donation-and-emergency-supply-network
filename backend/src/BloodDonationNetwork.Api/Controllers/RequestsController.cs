@@ -130,6 +130,10 @@ public class RequestsController : ControllerBase
     }
 
     // GET /api/requests
+    // nearLat/nearLng/radiusKm: the donor-facing "Blood requests" browse
+    // view passes these (their own DonorProfile location) to restrict
+    // results to nearby requests instead of every request network-wide.
+    // Staff/admin callers omit them and see the unfiltered list as before.
     [HttpGet]
     public async Task<ActionResult<IEnumerable<RequestResponseDto>>>
         GetAll(
@@ -140,7 +144,10 @@ public class RequestsController : ControllerBase
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] string sortBy = "createdAt",
-            [FromQuery] bool descending = true)
+            [FromQuery] bool descending = true,
+            [FromQuery] double? nearLat = null,
+            [FromQuery] double? nearLng = null,
+            [FromQuery] double? radiusKm = null)
     {
         try
         {
@@ -153,7 +160,10 @@ public class RequestsController : ControllerBase
                     page,
                     pageSize,
                     sortBy,
-                    descending);
+                    descending,
+                    nearLat,
+                    nearLng,
+                    radiusKm);
 
             return Ok(requests);
         }

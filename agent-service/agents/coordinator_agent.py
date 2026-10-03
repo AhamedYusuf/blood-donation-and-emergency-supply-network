@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from agents.eligibility_validation_agent import run as run_eligibility
+from agents.stock_check_agent import fulfill as run_fulfill_from_stock
 from agents.stock_check_agent import run as run_stock_check
 from agents.matching_dispatch_agent import dispatch as run_dispatch
 from agents.matching_dispatch_agent import search as run_search
@@ -44,8 +45,10 @@ class CoordinatorState(TypedDict, total=False):
     approval_decision: str
     approval_comments: str | None
 
-    # Final result
+    # Final result — exactly one of these is populated, depending on
+    # whether the own-stock path or the donor-search/dispatch path ran.
     dispatch_result: dict[str, Any]
+    fulfill_result: dict[str, Any]
 
     # Failure information
     error: str | None
@@ -665,6 +668,7 @@ def revision_replan_node(
         "donor_search_result": {},
         "eligibility_result": {},
         "dispatch_result": {},
+        "fulfill_result": {},
 
         # Next approval interrupt will populate these again.
         "approval_decision": "",
@@ -690,9 +694,12 @@ def route_after_approval(
     """
     Route according to the human decision.
 
-    approve -> dispatch
-    revise  -> re-plan and run workflow again
-    reject  -> end
+    approve, stock was sufficient -> fulfill_from_stock (no donors were
+                                      ever searched for, so there is
+                                      nothing to dispatch)
+    approve, donors were matched  -> dispatch
+    revise                        -> re-plan and run workflow again
+    reject                        -> end
     """
 
     decision = state.get(
@@ -701,12 +708,70 @@ def route_after_approval(
     ).lower()
 
     if decision == "approve":
+        stock_result = state.get(
+            "stock_result",
+            {},
+        )
+
+        if stock_result.get("sufficient") is True:
+            return "fulfill_from_stock"
+
         return "dispatch"
 
     if decision == "revise":
         return "revision_replan"
 
     return "end"
+
+
+# ============================================================
+# FULFILL FROM OWN STOCK
+# ============================================================
+
+def fulfill_from_stock_node(
+    state: CoordinatorState,
+) -> dict[str, Any]:
+    """
+    Student 3's Stock-Check Agent - fulfill mode.
+
+    Reached only when stock_check already found the requesting org's own
+    stock sufficient and a human has since approved the workflow. Donor
+    search/dispatch never ran for this request — there was no shortfall
+    to source donors for — so this deducts the units from the org's own
+    inventory and marks the BloodRequest fulfilled instead.
+
+    The backend endpoint owns its own AgentStep logging, same as
+    search_donors/dispatch/validate_eligibility.
+    """
+
+    organization_id = (
+        state.get("requesting_org_id")
+        or state.get("organization_id")
+    )
+
+    fulfill_input = {
+        "workflowId": state.get("workflow_id"),
+        "requestingOrgId": organization_id,
+        "bloodType": state.get("blood_type"),
+        "unitsNeeded": state.get("units_needed"),
+    }
+
+    try:
+        result = run_fulfill_from_stock(fulfill_input)
+
+        return {
+            "current_step": "fulfill_from_stock",
+            "fulfill_result": result,
+        }
+
+    except (InternalClientError, ValueError) as exc:
+        error_message = f"fulfill_from_stock failed: {exc}"
+
+        return {
+            "current_step": "fulfill_from_stock",
+            "fulfill_result": {"status": "failed"},
+            "error": error_message,
+        }
 
 
 # ============================================================
@@ -772,10 +837,10 @@ def finalize_workflow_node(
     state: CoordinatorState,
 ) -> dict[str, Any]:
     """
-    Persist the final workflow status after dispatch.
+    Persist the final workflow status after dispatch or fulfill_from_stock.
 
-    Successful dispatch -> completed
-    Failed dispatch     -> failed
+    Successful dispatch/fulfill -> completed
+    Failed dispatch/fulfill     -> failed
     """
 
     workflow_id = state.get(
@@ -792,11 +857,17 @@ def finalize_workflow_node(
         {},
     )
 
-    dispatch_failed = (
-        dispatch_result.get("status") == "failed"
+    fulfill_result = state.get(
+        "fulfill_result",
+        {},
     )
 
-    if dispatch_failed:
+    final_step_failed = (
+        dispatch_result.get("status") == "failed"
+        or fulfill_result.get("status") == "failed"
+    )
+
+    if final_step_failed:
         final_status = "failed"
         failure_reason = (
             state.get("error")
@@ -831,6 +902,7 @@ def finalize_workflow_node(
         status="completed",
         input_data={
             "dispatchResult": dispatch_result,
+            "fulfillResult": fulfill_result,
         },
         output_data={
             "workflowStatus": final_status,
@@ -849,7 +921,7 @@ def finalize_workflow_node(
         "current_step": "finalize_workflow",
         **(
             {"error": failure_reason}
-            if dispatch_failed
+            if final_step_failed
             else {}
         ),
     }
@@ -920,6 +992,11 @@ def build_coordinator_graph() -> StateGraph:
     builder.add_node(
         "revision_replan",
         revision_replan_node,
+    )
+
+    builder.add_node(
+        "fulfill_from_stock",
+        fulfill_from_stock_node,
     )
 
     builder.add_node(
@@ -1004,6 +1081,8 @@ def build_coordinator_graph() -> StateGraph:
         "await_approval",
         route_after_approval,
         {
+            "fulfill_from_stock":
+                "fulfill_from_stock",
             "dispatch": "dispatch",
             "revision_replan":
                 "revision_replan",
@@ -1025,11 +1104,16 @@ def build_coordinator_graph() -> StateGraph:
     )
 
     # --------------------------------------------------------
-    # Dispatch -> final DB status
+    # Dispatch / fulfill-from-stock -> final DB status
     # --------------------------------------------------------
 
     builder.add_edge(
         "dispatch",
+        "finalize_workflow",
+    )
+
+    builder.add_edge(
+        "fulfill_from_stock",
         "finalize_workflow",
     )
 

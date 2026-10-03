@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { RootState } from "../app/store";
 import { logout } from "../features/auth/authSlice";
+import "./app-shell.css";
 
 // ── Nav item definitions ──────────────────────────────────────────────────────
 // `roles`: which roles can navigate to this item. Empty = all authenticated users.
@@ -25,7 +26,7 @@ interface NavItem {
   built?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const OPERATIONS_NAV_ITEMS: NavItem[] = [
   { label: "Appointments", icon: "◧", path: "/" },
   { label: "Requests", icon: "◇", path: "/requests" },
   { label: "Inventory", icon: "▤", path: "/inventory", allowedRoles: ["staff", "admin"] },
@@ -41,6 +42,13 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const DONOR_NAV_ITEMS: NavItem[] = [
+  { label: "Home", icon: "⌂", path: "/" },
+  { label: "Donations", icon: "◷", path: "/appointments" },
+  { label: "Requests", icon: "◇", path: "/requests" },
+  { label: "Profile", icon: "◎", path: "/profile" },
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -50,6 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const navItems = role === "donor" ? DONOR_NAV_ITEMS : OPERATIONS_NAV_ITEMS;
 
   const resolveNavPath = (item: NavItem): string | null => {
     // Not built yet — no route exists to send them to.
@@ -71,161 +80,70 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "var(--font-sans)" }}>
-      {/* ── Dark nav rail ── */}
-      <nav
-        style={{
-          width: 56,
-          background: "var(--color-ink)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          paddingTop: "var(--space-md)",
-          gap: 4,
-          flexShrink: 0,
-        }}
-      >
-        {/* Logo mark */}
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: "var(--radius-sm)",
-            background: "var(--color-primary)",
-            color: "var(--color-on-primary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 700,
-            fontSize: 14,
-            marginBottom: "var(--space-md)",
-          }}
-        >
-          B
+    <div className="app-shell">
+      <nav className="app-sidebar" aria-label="Main navigation">
+        <div className="app-brand">
+          <div className="app-brand__mark" aria-hidden="true">
+            <span className="app-brand__plus" />
+          </div>
+          <div>
+            <strong>Blood Donation</strong>
+            <span>Network</span>
+          </div>
         </div>
 
-        {NAV_ITEMS.map((item) => {
-          const targetPath = resolveNavPath(item);
-          const active = isActive(item);
-          const clickable = targetPath !== null;
+        <div className="app-sidebar__section-label">Workspace</div>
+        <div className="app-sidebar__nav">
+          {navItems.map((item) => {
+            const targetPath = resolveNavPath(item);
+            const active = isActive(item);
+            const clickable = targetPath !== null;
 
-          return (
-            <div
-              key={item.label}
-              title={
-                clickable
-                  ? item.label
-                  : item.built === false
-                  ? `${item.label} — coming soon`
-                  : `${item.label} — not available for your role`
-              }
-              onClick={() => clickable && navigate(targetPath!)}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "var(--radius-sm)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 16,
-                cursor: clickable ? "pointer" : "default",
-                background: active
-                  ? "rgba(255,255,255,0.12)"
-                  : "transparent",
-                color: active
-                  ? "#FFFFFF"
-                  : clickable
-                  ? "rgba(255,255,255,0.55)"
-                  : "rgba(255,255,255,0.20)",
-                transition: `background var(--duration-fast) var(--ease-standard)`,
-              }}
-              onMouseEnter={(e) => {
-                if (clickable && !active)
-                  e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                if (!active) e.currentTarget.style.background = "transparent";
-              }}
-            >
-              {item.icon}
-            </div>
-          );
-        })}
+            return (
+              <button
+                key={item.label}
+                type="button"
+                className={`app-nav-item${active ? " app-nav-item--active" : ""}${!clickable ? " app-nav-item--disabled" : ""}`}
+                title={
+                  clickable
+                    ? item.label
+                    : item.built === false
+                    ? `${item.label} — coming soon`
+                    : `${item.label} — not available for your role`
+                }
+                onClick={() => clickable && navigate(targetPath!)}
+                disabled={!clickable}
+              >
+                <span className="app-nav-item__icon" aria-hidden="true">{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="app-sidebar__footer">
+          <span className="app-sidebar__role">{role || "USER"}</span>
+          <span className="app-sidebar__footer-copy">Secure donor network</span>
+        </div>
       </nav>
 
       {/* ── Content area ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div className="app-shell__content">
         {/* Light header */}
-        <header
-          style={{
-            height: 52,
-            borderBottom: "1px solid var(--color-hairline)",
-            background: "var(--color-surface)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 var(--space-lg)",
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <header className="app-header">
+          <div className="app-header__title">
             {/* TODO: organization name needs a lookup — the JWT/auth response
                 only carries organizationId, not the name. */}
             <span className="text-subheading" style={{ color: "var(--color-ink)" }}>
               Blood Donation Network
             </span>
-            <span
-              className="text-caption"
-              style={{
-                padding: "2px 6px",
-                borderRadius: "var(--radius-xs)",
-                background: "var(--color-surface-sunken)",
-                color: "var(--color-ink-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.3px",
-              }}
-            >
-              {role || "USER"}
-            </span>
+            <span className="app-header__role">{role || "USER"}</span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {fullName && (
-              <span
-                className="text-body-sm"
-                style={{ color: "var(--color-ink-secondary)", fontWeight: 500 }}
-              >
-                {fullName}
-              </span>
-            )}
-            <span
-              className="text-body-sm"
-              style={{ color: "var(--color-ink-faint)" }}
-            >
-              {email}
-            </span>
-            <button
-              onClick={() => dispatch(logout())}
-              className="transition-fast"
-              style={{
-                border: "1px solid var(--color-hairline-strong)",
-                background: "var(--color-surface)",
-                borderRadius: "var(--radius-sm)",
-                padding: "5px 10px",
-                fontSize: 12,
-                fontFamily: "var(--font-sans)",
-                color: "var(--color-ink-secondary)",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "var(--color-surface-sunken)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "var(--color-surface)")
-              }
-            >
-              Log out
-            </button>
+          <div className="app-header__account">
+            {fullName && <span className="app-header__name">{fullName}</span>}
+            <span className="app-header__email">{email}</span>
+            <button onClick={() => dispatch(logout())} className="app-header__logout">Log out</button>
           </div>
         </header>
 

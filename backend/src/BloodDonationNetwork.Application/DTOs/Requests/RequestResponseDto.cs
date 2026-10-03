@@ -35,4 +35,12 @@ public class RequestResponseDto
     public DateTime? FulfilledAt { get; set; }
 
     public DateTime? ClosedAt { get; set; }
+
+    /// <summary>
+    /// Distance from the caller-supplied nearLat/nearLng to this request's
+    /// hospital location — only populated when GET /api/requests was
+    /// called with those query params (the donor-facing "nearby" browse
+    /// view); null otherwise.
+    /// </summary>
+    public double? DistanceKm { get; set; }
 }
