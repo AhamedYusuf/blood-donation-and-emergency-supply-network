@@ -53,4 +53,29 @@ public class BloodCompatibilityTests
     {
         Assert.Throws<ArgumentException>(() => BloodCompatibility.GetCompatibleDonorTypes("X+"));
     }
+
+    [Theory]
+    [InlineData("O-", "O-", true)]
+    [InlineData("O-", "AB+", true)]
+    [InlineData("O+", "A+", true)]
+    [InlineData("O+", "A-", false)]
+    [InlineData("A-", "AB-", true)]
+    [InlineData("A+", "AB+", true)]
+    [InlineData("B-", "AB-", true)]
+    [InlineData("B+", "AB+", true)]
+    [InlineData("AB-", "AB+", true)]
+    [InlineData("AB+", "AB+", true)]
+    [InlineData("AB+", "A+", false)]
+    public void CanDonateTo_uses_donor_to_recipient_direction(
+        string donorBloodType, string recipientBloodType, bool expected)
+    {
+        Assert.Equal(expected, BloodCompatibility.CanDonateTo(donorBloodType, recipientBloodType));
+    }
+
+    [Fact]
+    public void CanDonateTo_fails_closed_for_unknown_values()
+    {
+        Assert.False(BloodCompatibility.CanDonateTo("X+", "AB+"));
+        Assert.False(BloodCompatibility.CanDonateTo("O-", "X+"));
+    }
 }

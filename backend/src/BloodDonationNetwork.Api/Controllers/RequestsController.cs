@@ -144,6 +144,13 @@ public class RequestsController : ControllerBase
     {
         try
         {
+            Guid? donorUserId = null;
+            if (User.IsInRole("donor") &&
+                Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var authenticatedDonorId))
+            {
+                donorUserId = authenticatedDonorId;
+            }
+
             var requests =
                 await _requestService.GetAllAsync(
                     bloodType,
@@ -156,7 +163,8 @@ public class RequestsController : ControllerBase
                     descending,
                     nearLat,
                     nearLng,
-                    radiusKm);
+                    radiusKm,
+                    donorUserId);
 
             return Ok(requests);
         }

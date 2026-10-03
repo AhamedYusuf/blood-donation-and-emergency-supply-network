@@ -35,7 +35,8 @@ public interface IRequestService
         bool descending = true,
         double? nearLat = null,
         double? nearLng = null,
-        double? radiusKm = null);
+        double? radiusKm = null,
+        Guid? donorUserId = null);
 
     /// <summary>
     /// Throws <see cref="UnauthorizedAccessException"/> if the caller is
