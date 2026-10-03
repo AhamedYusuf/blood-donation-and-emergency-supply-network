@@ -16,6 +16,7 @@ import {
 } from "./requestsApi";
 
 import {
+  useStartWorkflowForBloodRequestMutation,
   useGetLatestWorkflowByBloodRequestQuery,
 } from "../workflowMonitor/workflowMonitorApi";
 import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
@@ -151,9 +152,15 @@ export default function RequestDetailsPage() {
   } = useGetLatestWorkflowByBloodRequestQuery(
     request?.id ?? "",
     {
-    skip: !request?.id || !canManageRequests,
+      skip: !request?.id || !canManageRequests,
+      refetchOnMountOrArgChange: true,
     }
   );
+
+  const [
+    startWorkflowForBloodRequest,
+    { isLoading: isStartingWorkflow },
+  ] = useStartWorkflowForBloodRequestMutation();
 
 
   const [
@@ -339,12 +346,41 @@ export default function RequestDetailsPage() {
           return;
         }
 
+        const lookupError = result.error;
+        const isNotFound =
+          typeof lookupError === "object" &&
+          lookupError !== null &&
+          "status" in lookupError &&
+          lookupError.status === 404;
+
+        if (!isNotFound) {
+          setActionError(
+            "Unable to load workflow information."
+          );
+          return;
+        }
+
+        const startedWorkflow =
+          await startWorkflowForBloodRequest(
+            request?.id ?? ""
+          ).unwrap();
+
+        if (startedWorkflow.id) {
+          navigate(
+            `/workflows/${startedWorkflow.id}`
+          );
+          return;
+        }
+
         setActionError(
-          "No workflow has been created for this blood request yet."
+          "The workflow was started, but its details could not be loaded."
         );
-      } catch {
+      } catch (error: unknown) {
         setActionError(
-          "Unable to load workflow information."
+          getApiErrorMessage(
+            error,
+            "Unable to start the Coordinator workflow."
+          )
         );
       }
     };
@@ -783,7 +819,9 @@ export default function RequestDetailsPage() {
             type="button"
             className="requests-primary-button"
             disabled={
-              isWorkflowLoading
+              isWorkflowLoading ||
+              isStartingWorkflow ||
+              !canManageRequests
             }
             onClick={
               handleOpenWorkflow
@@ -793,7 +831,9 @@ export default function RequestDetailsPage() {
               ? "Loading Workflow..."
               : workflow?.id
                 ? "Open Workflow Monitor"
-                : "Find Workflow"}
+                : isStartingWorkflow
+                  ? "Starting Workflow..."
+                  : "Start Workflow"}
           </button>
 
 

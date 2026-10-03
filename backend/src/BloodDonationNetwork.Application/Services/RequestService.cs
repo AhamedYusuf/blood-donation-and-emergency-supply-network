@@ -96,6 +96,8 @@ public class RequestService : IRequestService
 
     // 3. List requests with filters, sorting and pagination
     public async Task<IEnumerable<RequestResponseDto>> GetAllAsync(
+        Guid requestingUserId,
+        UserRole requestingUserRole,
         BloodType? bloodType = null,
         RequestUrgency? urgency = null,
         string? status = null,
@@ -111,6 +113,24 @@ public class RequestService : IRequestService
         var query = _context.BloodRequests
             .AsNoTracking()
             .AsQueryable();
+
+        if (requestingUserRole == UserRole.Staff)
+        {
+            var staffOrganizationId =
+                await _context.Users
+                    .AsNoTracking()
+                    .Where(user =>
+                        user.Id == requestingUserId &&
+                        user.Role == UserRole.Staff)
+                    .Select(user => user.OrganizationId)
+                    .FirstOrDefaultAsync();
+
+            query = staffOrganizationId.HasValue
+                ? query.Where(request =>
+                    request.OrganizationId ==
+                    staffOrganizationId.Value)
+                : query.Where(_ => false);
+        }
 
         // Filters
         if (bloodType.HasValue)

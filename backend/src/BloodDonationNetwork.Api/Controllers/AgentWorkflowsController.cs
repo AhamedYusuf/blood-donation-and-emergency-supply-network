@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using BloodDonationNetwork.Application.DTOs.Workflows;
 using BloodDonationNetwork.Application.Interfaces;
+using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -94,6 +95,101 @@ public class AgentWorkflowsController : ControllerBase
             workflow.CompletedAt,
             workflow.FailureReason
         });
+    }
+
+    // POST /api/agent/workflows/request/{bloodRequestId}/start
+    [HttpPost("request/{bloodRequestId:guid}/start")]
+    public async Task<IActionResult> StartWorkflowForBloodRequest(
+        Guid bloodRequestId)
+    {
+        var bloodRequest =
+            await _context.BloodRequests
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    request => request.Id == bloodRequestId);
+
+        if (bloodRequest == null)
+        {
+            return NotFound(new
+            {
+                message = "Blood request not found."
+            });
+        }
+
+        var userId = CurrentUserId();
+        if (!User.IsInRole(UserRoles.Admin))
+        {
+            var staffOrganizationId =
+                await _context.Users
+                    .AsNoTracking()
+                    .Where(user =>
+                        user.Id == userId &&
+                        user.Role == UserRole.Staff)
+                    .Select(user => user.OrganizationId)
+                    .FirstOrDefaultAsync();
+
+            if (staffOrganizationId !=
+                bloodRequest.OrganizationId)
+            {
+                return Forbid();
+            }
+        }
+
+        var existingWorkflow =
+            await _workflowService
+                .GetLatestByBloodRequestIdAsync(
+                    bloodRequestId);
+
+        if (existingWorkflow != null)
+        {
+            return Ok(ToWorkflowResponse(existingWorkflow));
+        }
+
+        var startResult =
+            await StartPythonWorkflowAsync(
+                bloodRequestId);
+
+        if (!startResult.Success)
+        {
+            _logger.LogError(
+                "Coordinator workflow could not be started for blood request. " +
+                "BloodRequestId={BloodRequestId}, AgentError={AgentError}",
+                bloodRequestId,
+                startResult.Error);
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The Coordinator workflow could not be started.",
+                    agentError = startResult.Error
+                });
+        }
+
+        var workflow =
+            await _workflowService
+                .GetLatestByBloodRequestIdAsync(
+                    bloodRequestId);
+
+        if (workflow == null)
+        {
+            _logger.LogError(
+                "Agent service reported workflow start success but no workflow " +
+                "record was found for blood request {BloodRequestId}.",
+                bloodRequestId);
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The Coordinator workflow started without a persisted " +
+                        "workflow record."
+                });
+        }
+
+        return Ok(ToWorkflowResponse(workflow));
     }
 
     // GET /api/agent/workflows/{id}/steps
@@ -466,6 +562,72 @@ public class AgentWorkflowsController : ControllerBase
                 false,
                 ex.Message);
         }
+    }
+
+    private async Task<AgentResumeResult>
+        StartPythonWorkflowAsync(
+            Guid bloodRequestId)
+    {
+        try
+        {
+            var client =
+                _httpClientFactory.CreateClient(
+                    "AgentService");
+
+            var response =
+                await client.PostAsJsonAsync(
+                    "/run-workflow",
+                    new
+                    {
+                        bloodRequestId =
+                            bloodRequestId.ToString()
+                    });
+
+            if (response.IsSuccessStatusCode)
+            {
+                return new AgentResumeResult(
+                    true,
+                    null);
+            }
+
+            var errorBody =
+                await response.Content
+                    .ReadAsStringAsync();
+
+            return new AgentResumeResult(
+                false,
+                errorBody);
+        }
+        catch (HttpRequestException ex)
+        {
+            return new AgentResumeResult(
+                false,
+                ex.Message);
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new AgentResumeResult(
+                false,
+                ex.Message);
+        }
+    }
+
+    private static object ToWorkflowResponse(
+        AgentWorkflow workflow)
+    {
+        return new
+        {
+            workflow.Id,
+            workflow.BloodRequestId,
+            workflow.Objective,
+            workflow.CurrentAgent,
+            workflow.Status,
+            workflow.RevisionCount,
+            workflow.StartedAt,
+            workflow.UpdatedAt,
+            workflow.CompletedAt,
+            workflow.FailureReason
+        };
     }
 
     private Guid CurrentUserId()

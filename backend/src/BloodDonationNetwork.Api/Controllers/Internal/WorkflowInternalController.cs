@@ -38,6 +38,30 @@ public class WorkflowInternalController : ControllerBase
             });
         }
 
+        var existingWorkflow =
+            await _context.AgentWorkflows
+                .Where(workflow =>
+                    workflow.BloodRequestId ==
+                    request.BloodRequestId)
+                .OrderByDescending(workflow =>
+                    workflow.StartedAt)
+                .FirstOrDefaultAsync();
+
+        if (existingWorkflow is not null)
+        {
+            return Ok(new
+            {
+                existingWorkflow.Id,
+                existingWorkflow.BloodRequestId,
+                existingWorkflow.Status,
+                existingWorkflow.Objective,
+                existingWorkflow.CurrentAgent,
+                existingWorkflow.RevisionCount,
+                existingWorkflow.StartedAt,
+                alreadyExists = true
+            });
+        }
+
         var now = DateTime.UtcNow;
 
         var bloodType =
@@ -73,7 +97,8 @@ public class WorkflowInternalController : ControllerBase
                 workflow.Objective,
                 workflow.CurrentAgent,
                 workflow.RevisionCount,
-                workflow.StartedAt
+                workflow.StartedAt,
+                alreadyExists = false
             });
     }
 

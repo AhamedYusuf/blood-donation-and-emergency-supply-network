@@ -324,6 +324,8 @@ public class AgentWorkflowServiceTests : IDisposable
                 request.Id);
         var dashboardRequests =
             await requestService.GetAllAsync(
+                request.RequesterId,
+                UserRole.Admin,
                 pageSize: 100);
 
         Assert.NotNull(requestResponse);
@@ -495,6 +497,38 @@ public class AgentWorkflowServiceTests : IDisposable
         Assert.Equal(
             WorkflowStatuses.AwaitingApproval,
             result.Status);
+    }
+
+    [Fact]
+    public async Task GetLatestByBloodRequestIdAsync_ReturnsNull_WhenRequestHasNoWorkflow()
+    {
+        var result =
+            await _service.GetLatestByBloodRequestIdAsync(
+                Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetLatestByBloodRequestIdAsync_ReturnsNewestWorkflowForRequest()
+    {
+        var bloodRequestId = Guid.NewGuid();
+        var olderWorkflow = await CreateWorkflowAsync(
+            bloodRequestId: bloodRequestId);
+        olderWorkflow.StartedAt =
+            DateTime.UtcNow.AddMinutes(-1);
+        await _context.SaveChangesAsync();
+
+        var latestWorkflow = await CreateWorkflowAsync(
+            bloodRequestId: bloodRequestId);
+
+        var result =
+            await _service.GetLatestByBloodRequestIdAsync(
+                bloodRequestId);
+
+        Assert.NotNull(result);
+        Assert.Equal(latestWorkflow.Id, result.Id);
+        Assert.NotEqual(olderWorkflow.Id, result.Id);
     }
 
     [Fact]
