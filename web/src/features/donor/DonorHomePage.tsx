@@ -49,7 +49,7 @@ export function DonorHomePage() {
         {next ? (
           <article className="donor-feature-card"><div className="donor-feature-card__icon">+</div><div><span className="donor-card-label">{next.status.replace("_", " ")}</span><h3>{formatDate(next.scheduledTime)}</h3><p>Keep this time free for your donation visit.</p></div><Link to="/appointments">Manage</Link></article>
         ) : (
-          <article className="donor-empty-card"><div><h3>No donation booked yet</h3><p>Choose a blood bank and a time when you are ready to give.</p></div><Link className="donor-button" to="/appointments">View donations</Link></article>
+          <article className="donor-empty-card"><div><h3>No donation booked yet</h3><p>Choose a blood bank and a time when you are ready to give.</p></div><Link className="donor-button" to="/appointments/book">Book a donation</Link></article>
         )}
       </section>
 

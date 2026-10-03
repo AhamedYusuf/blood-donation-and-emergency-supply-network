@@ -1,32 +1,26 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
-import { useBookAppointmentMutation } from "./appointmentsApi";
+import { useBookAppointmentMutation } from "../appointments/appointmentsApi";
 import { FormField } from "../../components/FormField";
 import { SelectField } from "../../components/SelectField";
+import "./donor.css";
 
 // Donor-facing booking form — mirrors the mobile app's
-// book_appointment_screen.dart (pick a blood bank, a date, a time),
-// web's own equivalent of that screen. Previously there was no way for
-// a donor to book an appointment on web at all; `/` only ever showed
-// the staff-facing console, which 403s for a donor's own
-// GET /appointments/bloodbank/{orgId}/upcoming call (not that a donor
-// was ever shown a way to call it).
+// book_appointment_screen.dart (pick a blood bank, a date, a time).
+// Styled to match the rest of the donor shell (donor.css) rather than
+// standing apart from DonorHomePage/DonorAppointmentsPage.
 
 export function BookAppointmentPage() {
   const navigate = useNavigate();
 
   const { data: organizations = [], isLoading: isLoadingOrgs } = useGetOrganizationsQuery();
   // The backend serializes OrganizationType as its raw C# enum name
-  // ("BloodBank", "Hospital" — see OrganizationService.ToResponse),
-  // not a snake_case string. A "blood_bank" comparison here (the
-  // mobile app's own appointments_repository.dart had the identical
-  // bug) would never match anything, leaving this picker permanently
-  // empty against live data — confirmed live against the real API,
-  // not assumed.
-  const bloodBanks = organizations.filter(
-    (o) => o.type.toLowerCase() === "bloodbank"
-  );
+  // ("BloodBank", "Hospital" — OrganizationService.ToResponse does
+  // `organization.Type.ToString()`), not a snake_case string — confirmed
+  // live against the real API. Mobile's own equivalent filter had the
+  // identical bug (checking for 'blood_bank'), fixed alongside this.
+  const bloodBanks = organizations.filter((o) => o.type.toLowerCase() === "bloodbank");
 
   const [organizationId, setOrganizationId] = useState("");
   const [date, setDate] = useState("");
@@ -37,13 +31,10 @@ export function BookAppointmentPage() {
   const [bookAppointment, { isLoading: isBooking }] = useBookAppointmentMutation();
 
   const today = new Date().toISOString().split("T")[0];
-
-  const scheduledTime =
-    date && time ? new Date(`${date}T${time}:00`) : null;
+  const scheduledTime = date && time ? new Date(`${date}T${time}:00`) : null;
 
   const errors = {
-    organizationId:
-      touched && !organizationId ? "Choose a blood bank." : "",
+    organizationId: touched && !organizationId ? "Choose a blood bank." : "",
     date: touched && !date ? "Pick a date." : "",
     time: touched && !time ? "Pick a time." : "",
     slot:
@@ -52,25 +43,17 @@ export function BookAppointmentPage() {
         : "",
   };
 
-  const isFormValid =
-    !!organizationId &&
-    !!scheduledTime &&
-    scheduledTime.getTime() > Date.now();
+  const isFormValid = !!organizationId && !!scheduledTime && scheduledTime.getTime() > Date.now();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
     setApiError(null);
-
     if (!isFormValid || !scheduledTime) return;
 
     try {
-      await bookAppointment({
-        organizationId,
-        scheduledTime: scheduledTime.toISOString(),
-      }).unwrap();
-
-      navigate("/");
+      await bookAppointment({ organizationId, scheduledTime: scheduledTime.toISOString() }).unwrap();
+      navigate("/appointments");
     } catch (err: unknown) {
       const e = err as { data?: { message?: string } };
       setApiError(e.data?.message ?? "Could not book that slot. Please try again.");
@@ -78,28 +61,17 @@ export function BookAppointmentPage() {
   };
 
   return (
-    <div
-      style={{
-        padding: "var(--space-xl)",
-        fontFamily: "var(--font-sans)",
-        background: "var(--color-canvas)",
-        height: "100%",
-        overflowY: "auto",
-      }}
-    >
-      <div style={{ maxWidth: 440 }}>
-        <h1 className="text-display" style={{ margin: "0 0 var(--space-xxs)", color: "var(--color-ink)" }}>
-          Book a donation
-        </h1>
-        <p className="text-body" style={{ color: "var(--color-ink-secondary)", margin: "0 0 var(--space-xl)" }}>
-          Pick a blood bank and a time that works for you.
-        </p>
+    <main className="donor-page">
+      <header className="donor-page-heading">
+        <div>
+          <span className="donor-eyebrow">DONATIONS</span>
+          <h1>Book a donation</h1>
+          <p>Pick a blood bank and a time that works for you.</p>
+        </div>
+      </header>
 
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}
-        >
+      <section className="donor-profile-card" style={{ marginTop: 28, maxWidth: 480, padding: 28 }}>
+        <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {apiError && (
             <div
               role="alert"
@@ -109,8 +81,8 @@ export function BookAppointmentPage() {
                 borderRadius: "var(--radius-sm)",
                 padding: "10px 14px",
                 color: "var(--color-critical)",
+                fontSize: 13,
               }}
-              className="text-body-sm"
             >
               {apiError}
             </div>
@@ -128,7 +100,7 @@ export function BookAppointmentPage() {
             options={bloodBanks.map((b) => ({ value: b.id, label: b.name }))}
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-sm)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField
               id="book-date"
               label="Date"
@@ -150,51 +122,34 @@ export function BookAppointmentPage() {
             />
           </div>
           {errors.slot && (
-            <p className="text-body-sm" style={{ margin: 0, color: "var(--color-critical)" }}>
-              {errors.slot}
-            </p>
+            <p style={{ margin: 0, color: "var(--color-critical)", fontSize: 13 }}>{errors.slot}</p>
           )}
 
-          <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-xs)" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <button
               type="button"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/appointments")}
               style={{
                 flex: 1,
+                border: "1px solid var(--color-hairline-strong)",
+                borderRadius: 9,
+                padding: "11px 16px",
                 background: "var(--color-surface)",
                 color: "var(--color-ink-secondary)",
-                border: "1px solid var(--color-hairline-strong)",
-                borderRadius: "var(--radius-sm)",
-                padding: "9px 16px",
+                font: "inherit",
                 fontSize: 13,
-                fontWeight: 500,
-                fontFamily: "var(--font-sans)",
+                fontWeight: 600,
                 cursor: "pointer",
               }}
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={isBooking}
-              style={{
-                flex: 2,
-                background: isBooking ? "var(--color-primary-press)" : "var(--color-primary)",
-                color: "var(--color-on-primary)",
-                border: "none",
-                borderRadius: "var(--radius-sm)",
-                padding: "9px 16px",
-                fontSize: 13,
-                fontWeight: 500,
-                fontFamily: "var(--font-sans)",
-                cursor: isBooking ? "not-allowed" : "pointer",
-              }}
-            >
+            <button type="submit" disabled={isBooking} className="donor-button" style={{ flex: 2 }}>
               {isBooking ? "Booking…" : "Confirm booking"}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

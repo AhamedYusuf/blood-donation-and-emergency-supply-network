@@ -67,11 +67,10 @@ export const appointmentsApi = baseApi.injectEndpoints({
     }),
 
     // ── Donor-facing (mirrors the mobile app's appointments_repository.dart) ──
+    // getMyAppointments above already covers the donor's own list — these
+    // cover the actions mobile has that web didn't yet: booking, and
+    // responding to an agent-dispatched (pending_confirmation) appointment.
 
-    getByDonor: builder.query<Appointment[], string>({
-      query: (donorId) => `/appointments/donor/${donorId}`,
-      providesTags: ["Appointment"],
-    }),
     bookAppointment: builder.mutation<Appointment, BookArgs>({
       query: ({ organizationId, scheduledTime, relatedWorkflowId = null }) => ({
         url: "/appointments",
@@ -104,7 +103,6 @@ export const {
   useGetMyAppointmentsQuery,
   useCompleteAppointmentMutation,
   useUpdateAppointmentStatusMutation,
-  useGetByDonorQuery,
   useBookAppointmentMutation,
   useConfirmAppointmentMutation,
   useDeclineAppointmentMutation,
