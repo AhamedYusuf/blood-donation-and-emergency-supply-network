@@ -109,6 +109,71 @@ void main() {
     expect(jsonDecode(req.body), {'newStatus': 'cancelled'});
   });
 
+  test('confirm POSTs to /confirm and returns the updated appointment', () async {
+    final h = _harness((_) => _json({
+          'id': 'a5',
+          'donorId': 'd1',
+          'organizationId': 'o1',
+          'relatedWorkflowId': 'w1',
+          'scheduledTime': '2026-09-20T09:30:00Z',
+          'status': 'scheduled',
+          'donorBloodType': 'O+',
+          'unitsDonated': null,
+        }));
+
+    final result = await h.repo.confirm('a5');
+
+    final req = h.requests.single;
+    expect(req.method, 'POST');
+    expect(req.url.path, '/api/appointments/a5/confirm');
+    expect(result.status, 'scheduled');
+  });
+
+  test('decline POSTs to /decline and returns the updated appointment', () async {
+    final h = _harness((_) => _json({
+          'id': 'a5',
+          'donorId': 'd1',
+          'organizationId': 'o1',
+          'relatedWorkflowId': 'w1',
+          'scheduledTime': '2026-09-20T09:30:00Z',
+          'status': 'declined',
+          'donorBloodType': 'O+',
+          'unitsDonated': null,
+        }));
+
+    final result = await h.repo.decline('a5');
+
+    final req = h.requests.single;
+    expect(req.method, 'POST');
+    expect(req.url.path, '/api/appointments/a5/decline');
+    expect(result.status, 'declined');
+  });
+
+  test('reschedule PUTs the new UTC time to /reschedule', () async {
+    final h = _harness((_) => _json({
+          'id': 'a5',
+          'donorId': 'd1',
+          'organizationId': 'o1',
+          'relatedWorkflowId': null,
+          'scheduledTime': '2026-09-25T12:00:00Z',
+          'status': 'scheduled',
+          'donorBloodType': 'O+',
+          'unitsDonated': null,
+        }));
+
+    final localTime = DateTime(2026, 9, 25, 18, 0); // local
+    final result = await h.repo.reschedule('a5', localTime);
+
+    final req = h.requests.single;
+    expect(req.method, 'PUT');
+    expect(req.url.path, '/api/appointments/a5/reschedule');
+    final sent = jsonDecode(req.body) as Map<String, dynamic>;
+    expect(sent['newScheduledTime'], endsWith('Z'));
+    expect(DateTime.parse(sent['newScheduledTime'] as String).toUtc(),
+        localTime.toUtc());
+    expect(result.status, 'scheduled');
+  });
+
   test('bloodBanks keeps only blood_bank organizations', () async {
     final h = _harness((_) => _json([
           {'id': 'o1', 'name': 'City Blood Bank', 'address': 'A', 'type': 'blood_bank'},

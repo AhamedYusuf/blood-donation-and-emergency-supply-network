@@ -3,6 +3,8 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
   completed: { label: "Completed", color: "var(--color-success)", bg: "var(--color-success-subtle)" },
   no_show: { label: "No-show", color: "var(--color-critical)", bg: "var(--color-critical-subtle)" },
   cancelled: { label: "Cancelled", color: "var(--color-neutral-status)", bg: "var(--color-neutral-status-subtle)" },
+  pending_confirmation: { label: "Awaiting donor", color: "var(--color-urgent)", bg: "var(--color-urgent-subtle)" },
+  declined: { label: "Declined", color: "var(--color-neutral-status)", bg: "var(--color-neutral-status-subtle)" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
