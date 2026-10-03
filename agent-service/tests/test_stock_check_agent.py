@@ -8,7 +8,9 @@ import pytest
 
 from agents.stock_check_agent import (
     CHECK_STOCK_PATH,
+    FULFILL_FROM_STOCK_PATH,
     StockCheckAgentError,
+    fulfill,
     run,
 )
 from shared.internal_client import InternalClientError
@@ -137,3 +139,95 @@ def test_run_propagates_backend_client_error():
 def test_run_rejects_invalid_backend_response(bad_response):
     with pytest.raises(InternalClientError):
         run(valid_payload(), client=FakeClient(response=bad_response))
+
+
+def valid_fulfill_response(**overrides):
+    response = {
+        "workflowId": "wf-1",
+        "bloodRequestId": "req-1",
+        "bloodType": "O-",
+        "unitsDeducted": 2,
+        "remainingUnits": 3,
+        "bloodRequestStatus": "fulfilled",
+    }
+    response.update(overrides)
+    return response
+
+
+def test_fulfill_forwards_exact_spec_contract():
+    client = FakeClient(response=valid_fulfill_response())
+
+    result = fulfill(valid_payload(), client=client)
+
+    assert client.calls == [
+        (
+            FULFILL_FROM_STOCK_PATH,
+            {
+                "workflowId": "wf-1",
+                "requestingOrgId": "org-1",
+                "bloodType": "O-",
+                "unitsNeeded": 2,
+            },
+        )
+    ]
+    assert result["unitsDeducted"] == 2
+    assert result["remainingUnits"] == 3
+    assert result["bloodRequestStatus"] == "fulfilled"
+    assert result["current_agent"] == "stock_check_agent"
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["workflowId", "requestingOrgId", "bloodType", "unitsNeeded"],
+)
+def test_fulfill_rejects_missing_required_fields(missing):
+    payload = valid_payload()
+    del payload[missing]
+
+    with pytest.raises(StockCheckAgentError):
+        fulfill(payload, client=FakeClient())
+
+
+@pytest.mark.parametrize(
+    "blood_type",
+    ["", "A", "a+", "XYZ", None, 123],
+)
+def test_fulfill_rejects_invalid_blood_type(blood_type):
+    with pytest.raises(StockCheckAgentError):
+        fulfill(valid_payload(bloodType=blood_type), client=FakeClient())
+
+
+@pytest.mark.parametrize(
+    "units",
+    [0, -1, 2.5, "2", True, None],
+)
+def test_fulfill_rejects_invalid_units(units):
+    with pytest.raises(StockCheckAgentError):
+        fulfill(valid_payload(unitsNeeded=units), client=FakeClient())
+
+
+def test_fulfill_propagates_backend_client_error():
+    client = FakeClient(error=InternalClientError("backend unavailable"))
+
+    with pytest.raises(InternalClientError):
+        fulfill(valid_payload(), client=client)
+
+
+@pytest.mark.parametrize(
+    "bad_response",
+    [
+        {},
+        {"workflowId": "wf-1"},
+        {
+            "workflowId": "wf-1",
+            "bloodRequestId": "req-1",
+            "bloodType": "O-",
+            "unitsDeducted": 2,
+            "remainingUnits": 3,
+            # bloodRequestStatus missing
+        },
+    ],
+)
+def test_fulfill_rejects_invalid_backend_response(bad_response):
+    with pytest.raises(InternalClientError):
+        fulfill(valid_payload(), client=FakeClient(response=bad_response))

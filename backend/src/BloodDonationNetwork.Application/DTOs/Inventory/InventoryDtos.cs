@@ -68,6 +68,19 @@ public record StockCheckAgentResponse(
     int ShortfallUnits,
     IReadOnlyList<StockCheckCandidateTransferOrg> CandidateTransferOrgs);
 
+// Reuses StockCheckAgentRequest's shape (WorkflowId, RequestingOrgId,
+// BloodType, UnitsNeeded) as its own request — the Coordinator only calls
+// this with the same values it already sent to check-stock, once a human
+// has approved.
+public record FulfillFromStockResponse(
+    Guid WorkflowId,
+    Guid BloodRequestId,
+    [property: JsonConverter(typeof(BloodTypeJsonConverter))]
+    BloodType BloodType,
+    int UnitsDeducted,
+    int RemainingUnits,
+    string BloodRequestStatus);
+
 public record StockRiskResponse(
     Guid OrganizationId,
     string RiskLevel,

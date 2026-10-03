@@ -345,6 +345,95 @@ public class InventoryService : IInventoryService
             cancellationToken);
     }
 
+    // When stock_check_node finds the requesting org's own stock
+    // sufficient, the Coordinator skips donor search/dispatch entirely
+    // and routes straight to human approval. Previously nothing ever
+    // followed up after that approval — the workflow was marked
+    // "completed" but the inventory was never actually deducted and the
+    // BloodRequest itself stayed "open" forever. This is the method that
+    // closes that gap, called by the Coordinator's new
+    // fulfill_from_stock node once a human approves.
+    public async Task<FulfillFromStockResponse> FulfillFromStockAsync(
+        StockCheckAgentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateUnits(request.UnitsNeeded);
+
+        var bloodType = ParseBloodType(request.BloodType);
+
+        var workflow = await _db.AgentWorkflows
+            .FirstOrDefaultAsync(
+                w => w.Id == request.WorkflowId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                $"Workflow {request.WorkflowId} not found.");
+
+        // Same guard Mode 2 dispatch enforces (Tech Doc §4.4): only an
+        // approved workflow may consume real inventory. The Coordinator
+        // only calls this after a human approves, but the backend
+        // enforces it independently rather than trusting the caller.
+        if (workflow.Status != WorkflowStatuses.Approved)
+        {
+            throw new InvalidOperationException(
+                $"Workflow {workflow.Id} is not approved (status: '{workflow.Status}'). " +
+                "Fulfilling from stock is only allowed for approved workflows.");
+        }
+
+        var bloodRequest = await _db.BloodRequests
+            .FirstOrDefaultAsync(
+                r => r.Id == workflow.BloodRequestId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                $"Blood request {workflow.BloodRequestId} not found.");
+
+        var inventory = await _db.BloodBankInventories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x =>
+                    x.OrganizationId == request.RequestingOrgId &&
+                    x.BloodType == bloodType,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                "Inventory record not found for this blood type.");
+
+        // Stock can change between the original stock_check call and this
+        // one — a human can sit on the approval for a while.
+        // ApplyStockChangeAsync re-checks against the row's live value in
+        // one atomic UPDATE, so a race that has already eaten into the
+        // stock surfaces as a clear InvalidOperationException here
+        // instead of silently going negative.
+        var updatedInventory = await ApplyStockChangeAsync(
+            inventory.Id,
+            -request.UnitsNeeded,
+            cancellationToken);
+
+        _db.InventoryTransactions.Add(new InventoryTransaction
+        {
+            Id = Guid.NewGuid(),
+            InventoryId = updatedInventory.Id,
+            TransactionType = InventoryTransactionType.UsageOut,
+            Units = request.UnitsNeeded,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        if (bloodRequest.Status != RequestStatuses.Fulfilled &&
+            bloodRequest.Status != RequestStatuses.Cancelled)
+        {
+            bloodRequest.Status = RequestStatuses.Fulfilled;
+            bloodRequest.FulfilledAt ??= DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new FulfillFromStockResponse(
+            workflow.Id,
+            bloodRequest.Id,
+            bloodType,
+            request.UnitsNeeded,
+            updatedInventory.UnitsAvailable,
+            bloodRequest.Status);
+    }
+
     public async Task<StockCheckAgentResponse> CheckStockWithTransferCandidatesAsync(
         StockCheckRequest request,
         Guid currentUserId,

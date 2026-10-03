@@ -13,6 +13,7 @@ from shared.internal_client import InternalClient, InternalClientError
 
 
 CHECK_STOCK_PATH = "/api/internal/agent/check-stock"
+FULFILL_FROM_STOCK_PATH = "/api/internal/agent/fulfill-from-stock"
 VALID_BLOOD_TYPES = {
     "A+",
     "A-",
@@ -127,6 +128,82 @@ def run(
     active_client = client or InternalClient()
     result = active_client.post(CHECK_STOCK_PATH, payload)
     _validate_response(result)
+
+    return {
+        **result,
+        "current_agent": "stock_check_agent",
+    }
+
+
+def _validate_fulfill_response(result: dict[str, Any]) -> None:
+    required_fields = {
+        "workflowId",
+        "bloodRequestId",
+        "bloodType",
+        "unitsDeducted",
+        "remainingUnits",
+        "bloodRequestStatus",
+    }
+
+    if not isinstance(result, dict):
+        raise InternalClientError(
+            "fulfill-from-stock returned an unexpected response type"
+        )
+
+    missing = required_fields.difference(result)
+    if missing:
+        raise InternalClientError(
+            "fulfill-from-stock response is missing fields: "
+            + ", ".join(sorted(missing))
+        )
+
+
+def fulfill(
+    request: dict[str, Any],
+    *,
+    client: InternalClient | None = None,
+) -> dict[str, Any]:
+    """Deduct units from the org's own stock and mark the BloodRequest
+    fulfilled.
+
+    Only called by the Coordinator when ``run()`` already found the
+    requesting org's own stock sufficient *and* a human has since approved
+    the workflow — the backend endpoint independently re-checks both the
+    approval status and the live stock level (which can have changed
+    between the original check and the approval) before deducting
+    anything, rather than trusting this call.
+    """
+
+    workflow_id = _require_non_empty_string(request, "workflowId")
+    requesting_org_id = _require_non_empty_string(request, "requestingOrgId")
+
+    blood_type = request.get("bloodType")
+    if not isinstance(blood_type, str) or blood_type not in VALID_BLOOD_TYPES:
+        raise StockCheckAgentError(
+            "bloodType must be one of: "
+            + ", ".join(sorted(VALID_BLOOD_TYPES))
+        )
+
+    units_needed = request.get("unitsNeeded")
+    if (
+        isinstance(units_needed, bool)
+        or not isinstance(units_needed, int)
+        or units_needed <= 0
+    ):
+        raise StockCheckAgentError(
+            "unitsNeeded must be a positive integer"
+        )
+
+    payload = {
+        "workflowId": workflow_id,
+        "requestingOrgId": requesting_org_id,
+        "bloodType": blood_type,
+        "unitsNeeded": units_needed,
+    }
+
+    active_client = client or InternalClient()
+    result = active_client.post(FULFILL_FROM_STOCK_PATH, payload)
+    _validate_fulfill_response(result)
 
     return {
         **result,
