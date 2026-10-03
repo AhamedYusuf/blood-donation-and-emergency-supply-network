@@ -61,7 +61,10 @@ class HomeScreen extends ConsumerWidget {
                 InkWell(
                   onTap: () => context.go('/profile'),
                   customBorder: const CircleBorder(),
-                  child: InitialsAvatar(initials: auth.initials, size: 40),
+                  child: InitialsAvatar(
+                    initials: auth.initials,
+                    size: 40,
+                  ),
                 ),
               ],
             ),
@@ -80,7 +83,8 @@ class HomeScreen extends ConsumerWidget {
                       iconColor: AppColors.primary,
                       iconBg: AppColors.primarySubtle,
                       title: 'My donations',
-                      subtitle: 'View, book and manage your appointments',
+                      subtitle:
+                          'View, book and manage your appointments',
                       onTap: () => context.go('/appointments'),
                     ),
                   ),
@@ -136,6 +140,8 @@ class HomeScreen extends ConsumerWidget {
                     height: 1,
                     indent: AppSpacing.md + 40 + AppSpacing.sm,
                   ),
+
+                  // Nearby Blood Banks is now active.
                   FadeSlideIn(
                     index: 4,
                     child: _ActionRow(
@@ -166,13 +172,13 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final upcoming = appointments.valueOrNull
-        ?.where((a) => a.isUpcoming)
-        .length;
+    final upcoming =
+        appointments.valueOrNull?.where((a) => a.isUpcoming).length;
 
-    final completed = appointments.valueOrNull
-        ?.where((a) => a.status == 'completed')
-        .length;
+    final completed =
+        appointments.valueOrNull
+            ?.where((a) => a.status == 'completed')
+            .length;
 
     return Row(
       children: [
@@ -221,7 +227,11 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: iconColor),
+          Icon(
+            icon,
+            size: 18,
+            color: iconColor,
+          ),
           const SizedBox(width: AppSpacing.xs),
           Text(
             loading || value == null ? '—' : '$value',
@@ -283,7 +293,9 @@ class _ActionRow extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: iconBg,
-                    borderRadius: BorderRadius.circular(AppRadii.sm - 2),
+                    borderRadius: BorderRadius.circular(
+                      AppRadii.sm - 2,
+                    ),
                   ),
                   child: Icon(
                     icon,
