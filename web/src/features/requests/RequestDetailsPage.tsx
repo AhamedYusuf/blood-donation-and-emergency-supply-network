@@ -16,8 +16,10 @@ import {
 } from "./requestsApi";
 
 import {
+  useStartWorkflowForBloodRequestMutation,
   useGetLatestWorkflowByBloodRequestQuery,
 } from "../workflowMonitor/workflowMonitorApi";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 
 import {
   BloodRequestStatus,
@@ -115,6 +117,10 @@ export default function RequestDetailsPage() {
 
   const isDonor = role === "donor";
 
+  const {
+    data: organizations = [],
+    isLoading: organizationsLoading,
+  } = useGetOrganizationsQuery();
 
   const {
     data: request,
@@ -128,6 +134,15 @@ export default function RequestDetailsPage() {
     }
   );
 
+  const organization = organizations.find(
+    (item) => item.id === request?.organizationId
+  );
+
+  const organizationName =
+    organization?.name ??
+    (organizationsLoading
+      ? "Loading organization..."
+      : "Organization unavailable");
 
   const {
     data: workflow,
@@ -137,9 +152,15 @@ export default function RequestDetailsPage() {
   } = useGetLatestWorkflowByBloodRequestQuery(
     request?.id ?? "",
     {
-      skip: !request?.id,
+      skip: !request?.id || !canManageRequests,
+      refetchOnMountOrArgChange: true,
     }
   );
+
+  const [
+    startWorkflowForBloodRequest,
+    { isLoading: isStartingWorkflow },
+  ] = useStartWorkflowForBloodRequestMutation();
 
 
   const [
@@ -325,12 +346,41 @@ export default function RequestDetailsPage() {
           return;
         }
 
+        const lookupError = result.error;
+        const isNotFound =
+          typeof lookupError === "object" &&
+          lookupError !== null &&
+          "status" in lookupError &&
+          lookupError.status === 404;
+
+        if (!isNotFound) {
+          setActionError(
+            "Unable to load workflow information."
+          );
+          return;
+        }
+
+        const startedWorkflow =
+          await startWorkflowForBloodRequest(
+            request?.id ?? ""
+          ).unwrap();
+
+        if (startedWorkflow.id) {
+          navigate(
+            `/workflows/${startedWorkflow.id}`
+          );
+          return;
+        }
+
         setActionError(
-          "No workflow has been created for this blood request yet."
+          "The workflow was started, but its details could not be loaded."
         );
-      } catch {
+      } catch (error: unknown) {
         setActionError(
-          "Unable to load workflow information."
+          getApiErrorMessage(
+            error,
+            "Unable to start the Coordinator workflow."
+          )
         );
       }
     };
@@ -420,7 +470,7 @@ export default function RequestDetailsPage() {
           </span>
 
           <h1>
-            {request.hospitalName}
+            {organizationName}
           </h1>
 
           <div className="request-details-hero-meta">
@@ -556,57 +606,41 @@ export default function RequestDetailsPage() {
 
             <div className="request-detail-item">
               <span>
-                Request ID
-              </span>
-
-              <strong className="request-detail-id">
-                {request.id}
-              </strong>
-            </div>
-
-
-            <div className="request-detail-item">
-              <span>
-                Organization ID
-              </span>
-
-              <strong className="request-detail-id">
-                {request.organizationId}
-              </strong>
-            </div>
-
-
-            <div className="request-detail-item">
-              <span>
-                Requester ID
-              </span>
-
-              <strong className="request-detail-id">
-                {request.requesterId}
-              </strong>
-            </div>
-
-
-            <div className="request-detail-item">
-              <span>
-                Latitude
+                Organization
               </span>
 
               <strong>
-                {request.latitude}
+                {organizationName}
               </strong>
             </div>
 
+            {canManageRequests && (
+              <>
+                <div className="request-detail-item">
+                  <span>Request ID</span>
+                  <strong className="request-detail-id">
+                    {request.id}
+                  </strong>
+                </div>
 
-            <div className="request-detail-item">
-              <span>
-                Longitude
-              </span>
+                <div className="request-detail-item">
+                  <span>Requester ID</span>
+                  <strong className="request-detail-id">
+                    {request.requesterId}
+                  </strong>
+                </div>
 
-              <strong>
-                {request.longitude}
-              </strong>
-            </div>
+                <div className="request-detail-item">
+                  <span>Latitude</span>
+                  <strong>{request.latitude}</strong>
+                </div>
+
+                <div className="request-detail-item">
+                  <span>Longitude</span>
+                  <strong>{request.longitude}</strong>
+                </div>
+              </>
+            )}
 
 
             {request.fulfilledAt && (
@@ -641,17 +675,16 @@ export default function RequestDetailsPage() {
           </div>
 
 
-          <div className="request-details-notes">
-            <span>
-              Notes
-            </span>
-
-            <p>
-              {request.notes.trim()
-                ? request.notes
-                : "No additional notes were provided."}
-            </p>
-          </div>
+          {canManageRequests && (
+            <div className="request-details-notes">
+              <span>Notes</span>
+              <p>
+                {request.notes.trim()
+                  ? request.notes
+                  : "No additional notes were provided."}
+              </p>
+            </div>
+          )}
 
         </div>
 
@@ -786,7 +819,9 @@ export default function RequestDetailsPage() {
             type="button"
             className="requests-primary-button"
             disabled={
-              isWorkflowLoading
+              isWorkflowLoading ||
+              isStartingWorkflow ||
+              !canManageRequests
             }
             onClick={
               handleOpenWorkflow
@@ -796,7 +831,9 @@ export default function RequestDetailsPage() {
               ? "Loading Workflow..."
               : workflow?.id
                 ? "Open Workflow Monitor"
-                : "Find Workflow"}
+                : isStartingWorkflow
+                  ? "Starting Workflow..."
+                  : "Start Workflow"}
           </button>
 
 
@@ -878,7 +915,7 @@ export default function RequestDetailsPage() {
               <>
                 <p>
                   Booking a donation reserves a time at{" "}
-                  {request.hospitalName} so they can put it toward this
+                  {organizationName} so they can put it toward this
                   need.
                 </p>
 
@@ -889,7 +926,7 @@ export default function RequestDetailsPage() {
                     navigate("/appointments/book", {
                       state: {
                         organizationId: request.organizationId,
-                        hospitalName: request.hospitalName,
+                        hospitalName: organizationName,
                       },
                     })
                   }

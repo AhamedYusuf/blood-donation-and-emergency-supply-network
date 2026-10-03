@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using BloodDonationNetwork.Application.DTOs.Requests;
 using BloodDonationNetwork.Application.Interfaces;
+using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,18 @@ namespace BloodDonationNetwork.Api.Controllers;
 public class RequestsController : ControllerBase
 {
     private readonly IRequestService _requestService;
+    private readonly IAgentWorkflowService _workflowService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<RequestsController> _logger;
 
     public RequestsController(
         IRequestService requestService,
+        IAgentWorkflowService workflowService,
         IHttpClientFactory httpClientFactory,
         ILogger<RequestsController> logger)
     {
         _requestService = requestService;
+        _workflowService = workflowService;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -45,40 +49,103 @@ public class RequestsController : ControllerBase
                 dto);
 
             // 2. Automatically start the Coordinator Agent workflow
+            Uri? agentServiceBaseAddress = null;
             try
             {
                 var agentClient =
                     _httpClientFactory.CreateClient("AgentService");
+                agentServiceBaseAddress =
+                    agentClient.BaseAddress;
 
-                var agentResponse =
-                    await agentClient.PostAsJsonAsync(
-                        "/run-workflow",
-                        new
-                        {
-                            bloodRequestId =
-                                request.Id.ToString()
-                        });
-
-                if (!agentResponse.IsSuccessStatusCode)
+                for (var attempt = 1; attempt <= 2; attempt++)
                 {
+                    var agentResponse =
+                        await agentClient.PostAsJsonAsync(
+                            "/run-workflow",
+                            new
+                            {
+                                bloodRequestId =
+                                    request.Id.ToString()
+                            });
+
+                    if (agentResponse.IsSuccessStatusCode)
+                    {
+                        var createdWorkflow =
+                            await _workflowService
+                                .GetLatestByBloodRequestIdAsync(
+                                    request.Id);
+
+                        if (createdWorkflow is not null)
+                        {
+                            _logger.LogInformation(
+                                "Agent workflow {WorkflowId} started " +
+                                "automatically for blood request " +
+                                "{BloodRequestId}.",
+                                createdWorkflow.Id,
+                                request.Id);
+                            break;
+                        }
+
+                        var successBody =
+                            await agentResponse.Content
+                                .ReadAsStringAsync();
+
+                        if (attempt == 1)
+                        {
+                            _logger.LogWarning(
+                                "Agent Service returned success for " +
+                                "blood request {BloodRequestId}, but no " +
+                                "workflow record was found. Retrying once. " +
+                                "BaseAddress={BaseAddress}. Response={Response}",
+                                request.Id,
+                                agentServiceBaseAddress,
+                                successBody);
+                            continue;
+                        }
+
+                        _logger.LogError(
+                            "Agent Service returned success for blood " +
+                            "request {BloodRequestId}, but no workflow " +
+                            "record was persisted after retry. " +
+                            "BaseAddress={BaseAddress}. Response={Response}",
+                            request.Id,
+                            agentServiceBaseAddress,
+                            successBody);
+                        break;
+                    }
+
                     var errorBody =
                         await agentResponse.Content
                             .ReadAsStringAsync();
 
+                    var existingWorkflow =
+                        await _workflowService
+                            .GetLatestByBloodRequestIdAsync(
+                                request.Id);
+
+                    if (attempt == 1 &&
+                        existingWorkflow == null)
+                    {
+                        _logger.LogWarning(
+                            "Agent workflow start failed for blood request " +
+                            "{BloodRequestId}; no workflow record exists. " +
+                            "Retrying once. Status: {StatusCode}. Response: {Response}",
+                            request.Id,
+                            agentResponse.StatusCode,
+                            errorBody);
+                        continue;
+                    }
+
                     _logger.LogWarning(
                         "Blood request {BloodRequestId} was created, " +
                         "but the agent workflow could not be started. " +
+                        "WorkflowRecordExists={WorkflowRecordExists}. " +
                         "Status: {StatusCode}. Response: {Response}",
                         request.Id,
+                        existingWorkflow != null,
                         agentResponse.StatusCode,
                         errorBody);
-                }
-                else
-                {
-                    _logger.LogInformation(
-                        "Agent workflow started automatically for " +
-                        "blood request {BloodRequestId}.",
-                        request.Id);
+                    break;
                 }
             }
             catch (Exception ex)
@@ -88,7 +155,9 @@ public class RequestsController : ControllerBase
                 _logger.LogError(
                     ex,
                     "Blood request {BloodRequestId} was created, " +
-                    "but the Agent Service could not be reached.",
+                    "but the Agent Service at {BaseAddress} could not " +
+                    "complete workflow startup.",
+                    agentServiceBaseAddress,
                     request.Id);
             }
 
@@ -100,6 +169,13 @@ public class RequestsController : ControllerBase
         catch (UnauthorizedAccessException)
         {
             return Forbid();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
         }
     }
 
@@ -144,15 +220,25 @@ public class RequestsController : ControllerBase
     {
         try
         {
-            Guid? donorUserId = null;
-            if (User.IsInRole("donor") &&
-                Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var authenticatedDonorId))
+            if (!Guid.TryParse(
+                    User.FindFirstValue(
+                        ClaimTypes.NameIdentifier),
+                    out var requestingUserId) ||
+                !Enum.TryParse<UserRole>(
+                    User.FindFirstValue(ClaimTypes.Role),
+                    ignoreCase: true,
+                    out var requestingUserRole) ||
+                !Enum.IsDefined(
+                    typeof(UserRole),
+                    requestingUserRole))
             {
-                donorUserId = authenticatedDonorId;
+                return Forbid();
             }
 
             var requests =
                 await _requestService.GetAllAsync(
+                    requestingUserId,
+                    requestingUserRole,
                     bloodType,
                     urgency,
                     status,

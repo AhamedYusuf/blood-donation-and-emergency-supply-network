@@ -42,24 +42,35 @@ builder.Services.AddHttpClient<IGeocodingClient, LocationIqClient>(c =>
 // Python Agent Service
 builder.Services.AddHttpClient("AgentService", client =>
 {
-    client.BaseAddress = new Uri(
+    var agentServiceBaseUrl =
         builder.Configuration["AgentService:BaseUrl"]
-        // agent-service/README.md documents `uvicorn main:app --port 8000`
-        // with no env var to change it — this fallback must match that,
-        // not an arbitrary port, or approve/reject/revise resume and the
-        // auto-start-on-request-creation call both silently fail.
-        ?? "http://localhost:8000");
+        ?? "http://localhost:8000";
+    if (!Uri.TryCreate(
+            agentServiceBaseUrl,
+            UriKind.Absolute,
+            out var agentServiceUri) ||
+        (agentServiceUri.Scheme != Uri.UriSchemeHttp &&
+         agentServiceUri.Scheme != Uri.UriSchemeHttps))
+    {
+        throw new InvalidOperationException(
+            "AgentService:BaseUrl must be an absolute HTTP or HTTPS URL.");
+    }
+
+    client.BaseAddress = agentServiceUri;
 
     var internalAgentSecret =
         builder.Configuration["InternalAgentSecret"]
         ?? builder.Configuration["INTERNAL_AGENT_SECRET"];
 
-    if (!string.IsNullOrWhiteSpace(internalAgentSecret))
+    if (string.IsNullOrWhiteSpace(internalAgentSecret))
     {
-        client.DefaultRequestHeaders.Add(
-            "X-Internal-Secret",
-            internalAgentSecret);
+        throw new InvalidOperationException(
+            "InternalAgentSecret must be configured for AgentService calls.");
     }
+
+    client.DefaultRequestHeaders.Add(
+        "X-Internal-Secret",
+        internalAgentSecret.Trim());
 });
 
 // =====================================================

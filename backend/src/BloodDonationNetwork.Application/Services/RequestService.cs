@@ -48,6 +48,17 @@ public class RequestService : IRequestService
             isAdmin,
             dto.OrganizationId);
 
+        var organization = await _context.Organizations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.Id == dto.OrganizationId);
+
+        if (organization == null)
+        {
+            throw new ArgumentException(
+                "The selected organization was not found.");
+        }
+
         var request = new BloodRequest
         {
             Id = Guid.NewGuid(),
@@ -57,9 +68,9 @@ public class RequestService : IRequestService
             UnitsRequested = dto.UnitsRequested,
             Urgency = dto.Urgency,
             Status = RequestStatuses.Open,
-            HospitalName = dto.HospitalName,
-            Latitude = dto.Latitude,
-            Longitude = dto.Longitude,
+            HospitalName = string.Empty,
+            Latitude = organization.Latitude,
+            Longitude = organization.Longitude,
             Notes = dto.Notes,
             CreatedAt = DateTime.UtcNow
         };
@@ -87,6 +98,8 @@ public class RequestService : IRequestService
 
     // 3. List requests with filters, sorting and pagination
     public async Task<IEnumerable<RequestResponseDto>> GetAllAsync(
+        Guid requestingUserId,
+        UserRole requestingUserRole,
         BloodType? bloodType = null,
         RequestUrgency? urgency = null,
         string? status = null,
@@ -103,6 +116,24 @@ public class RequestService : IRequestService
         var query = _context.BloodRequests
             .AsNoTracking()
             .AsQueryable();
+
+        if (requestingUserRole == UserRole.Staff)
+        {
+            var staffOrganizationId =
+                await _context.Users
+                    .AsNoTracking()
+                    .Where(user =>
+                        user.Id == requestingUserId &&
+                        user.Role == UserRole.Staff)
+                    .Select(user => user.OrganizationId)
+                    .FirstOrDefaultAsync();
+
+            query = staffOrganizationId.HasValue
+                ? query.Where(request =>
+                    request.OrganizationId ==
+                    staffOrganizationId.Value)
+                : query.Where(_ => false);
+        }
 
         // Filters
         if (bloodType.HasValue)
