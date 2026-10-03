@@ -17,6 +17,8 @@ import { DonorVerificationQueuePage } from "./features/donors/DonorVerificationQ
 import { DonorSearchPage } from "./features/donors/DonorSearchPage";
 
 import { AppointmentsConsolePage } from "./features/appointments/AppointmentsConsolePage";
+import { MyAppointmentsPage } from "./features/appointments/MyAppointmentsPage";
+import { BookAppointmentPage } from "./features/appointments/BookAppointmentPage";
 import { AppShell } from "./components/AppShell";
 
 import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
@@ -125,6 +127,20 @@ export function RequireDonorProfile({
   return <>{children}</>;
 }
 
+/**
+ * `/` used to always render the staff-facing AppointmentsConsolePage,
+ * regardless of role — a donor landing there got a dead-end "your
+ * account isn't linked to an organization" message, with no way to
+ * book or see their own appointments at all (the console's own data
+ * query is staff/admin-only). This mirrors mobile's app, where "my
+ * appointments" is the donor's home experience; staff/admin keep the
+ * console they already had.
+ */
+function AppointmentsHome() {
+  const role = useSelector((state: RootState) => (state.auth.role ?? "").toLowerCase());
+  return role === "donor" ? <MyAppointmentsPage /> : <AppointmentsConsolePage />;
+}
+
 // =====================================================
 // APP
 // =====================================================
@@ -182,9 +198,22 @@ export function App() {
             <RequireAuth>
               <RequireDonorProfile>
                 <AppShell>
-                  <AppointmentsConsolePage />
+                  <AppointmentsHome />
                 </AppShell>
               </RequireDonorProfile>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/appointments/book"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <AppShell>
+                  <BookAppointmentPage />
+                </AppShell>
+              </RequireRole>
             </RequireAuth>
           }
         />
