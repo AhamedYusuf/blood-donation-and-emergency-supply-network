@@ -19,8 +19,18 @@ class DonorProfileScreen extends ConsumerStatefulWidget {
 class _DonorProfileScreenState extends ConsumerState<DonorProfileScreen> {
   final _address = TextEditingController();
   DateTime? _lastDonationDate;
+  Map<String, bool> _medicalFlags = {};
+  String? _loadedProfileId;
   bool _saving = false;
   String? _error;
+
+  static const _medicalFlagLabels = <String, String>{
+    'recent_illness': 'Recent illness or infection',
+    'recent_surgery': 'Recent surgery',
+    'chronic_condition': 'Chronic condition',
+    'hiv_positive': 'HIV positive',
+    'hepatitis': 'Hepatitis',
+  };
 
   @override
   void dispose() {
@@ -38,7 +48,7 @@ class _DonorProfileScreenState extends ConsumerState<DonorProfileScreen> {
     try {
       await ref.read(donorRepositoryProvider).update(id, {
         'address': _address.text.trim(),
-        'medicalFlags': medicalFlags,
+        'medicalFlags': _medicalFlags,
         'lastDonationDate': _lastDonationDate == null ? null : isoDate(_lastDonationDate!),
       }, token: token);
       ref.invalidate(donorProfileProvider);
@@ -62,6 +72,7 @@ class _DonorProfileScreenState extends ConsumerState<DonorProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(donorProfileProvider);
+    final eligibility = ref.watch(eligibilityProvider).valueOrNull;
     return Scaffold(
       appBar: AppBar(title: const Text('Donor profile')),
       body: profileAsync.when(
@@ -71,8 +82,21 @@ class _DonorProfileScreenState extends ConsumerState<DonorProfileScreen> {
           if (profile == null) {
             return Center(child: FilledButton(onPressed: () => context.go('/donor-registration'), child: const Text('Register as a donor')));
           }
-          if (_address.text.isEmpty) _address.text = profile.address ?? '';
-          _lastDonationDate ??= profile.lastDonationDate;
+          if (_loadedProfileId != profile.id) {
+            _loadedProfileId = profile.id;
+            _address.text = profile.address ?? '';
+            _lastDonationDate = profile.lastDonationDate;
+            _medicalFlags = Map<String, bool>.from(profile.medicalFlags);
+          }
+          final availability = eligibility?.isEligible == true
+              ? 'Eligible to donate now'
+              : eligibility?.daysUntilEligible != null && eligibility!.daysUntilEligible! > 0
+                  ? '${eligibility.daysUntilEligible} days until you can donate again'
+                  : 'Not currently eligible';
+          final activeMedicalFlags = profile.medicalFlags.entries
+              .where((entry) => entry.value)
+              .map((entry) => _medicalFlagLabels[entry.key] ?? entry.key)
+              .toList();
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.gutter),
             children: [
@@ -84,8 +108,45 @@ class _DonorProfileScreenState extends ConsumerState<DonorProfileScreen> {
                 _Badge(label: profile.verifiedByAdmin ? 'Verified' : 'Pending verification', color: profile.verifiedByAdmin ? AppColors.success : AppColors.scheduled),
               ]),
               const SizedBox(height: AppSpacing.xl),
+              _DetailsCard(
+                title: 'Donation availability',
+                children: [
+                  _DetailRow(label: 'Eligibility', value: availability),
+                  _DetailRow(label: 'Last donation', value: _formatDate(profile.lastDonationDate)),
+                  _DetailRow(label: 'Date of birth', value: _formatDate(profile.dateOfBirth)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _DetailsCard(
+                title: 'Location and health',
+                children: [
+                  _DetailRow(label: 'Address', value: profile.address?.isNotEmpty == true ? profile.address! : 'Not provided'),
+                  _DetailRow(
+                    label: 'Coordinates',
+                    value: profile.locationVerified && profile.latitude != null && profile.longitude != null
+                        ? '${profile.latitude!.toStringAsFixed(4)}, ${profile.longitude!.toStringAsFixed(4)}'
+                        : 'Location not verified',
+                  ),
+                  _DetailRow(
+                    label: 'Illness or medical cases',
+                    value: activeMedicalFlags.isEmpty ? 'None reported' : activeMedicalFlags.join(', '),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
               TextFormField(controller: _address, maxLines: 2, decoration: const InputDecoration(labelText: 'Address')),
               const SizedBox(height: AppSpacing.md),
+              Text('Illness and medical cases', style: AppText.bodyStrong),
+              const SizedBox(height: AppSpacing.xs),
+              for (final entry in _medicalFlagLabels.entries)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(entry.value),
+                  value: _medicalFlags[entry.key] ?? false,
+                  onChanged: _saving ? null : (value) => setState(() => _medicalFlags = {..._medicalFlags, entry.key: value ?? false}),
+                ),
+              const SizedBox(height: AppSpacing.xs),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Last donation date'),
@@ -97,7 +158,7 @@ class _DonorProfileScreenState extends ConsumerState<DonorProfileScreen> {
               const SizedBox(height: AppSpacing.lg),
               FilledButton(onPressed: _saving ? null : () => _save(profile.id, profile.medicalFlags), child: _saving ? const CircularProgressIndicator() : const Text('Save changes')),
               const SizedBox(height: AppSpacing.sm),
-              OutlinedButton(onPressed: () => context.go('/eligibility'), child: const Text('Check eligibility')),
+              OutlinedButton(onPressed: () => context.go('/eligibility'), child: const Text('View eligibility details')),
             ],
           );
         },
@@ -122,4 +183,49 @@ class _ErrorState extends StatelessWidget {
         const Text('Could not load your profile.'),
         TextButton(onPressed: onRetry, child: const Text('Retry')),
       ]));
+}
+
+String _formatDate(DateTime? date) {
+  if (date == null) return 'Not recorded';
+  return isoDate(date);
+}
+
+class _DetailsCard extends StatelessWidget {
+  const _DetailsCard({required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppText.bodyStrong),
+              const SizedBox(height: AppSpacing.xs),
+              ...children,
+            ],
+          ),
+        ),
+      );
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: Text(label, style: AppText.bodySmall)),
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(child: Text(value, style: AppText.bodyStrong, textAlign: TextAlign.end)),
+          ],
+        ),
+      );
 }

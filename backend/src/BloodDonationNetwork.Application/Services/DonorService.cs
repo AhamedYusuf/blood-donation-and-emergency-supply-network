@@ -69,8 +69,12 @@ public class DonorService : IDonorService
         var profile = await _db.DonorProfiles.FindAsync(new object[] { id }, ct)
             ?? throw new KeyNotFoundException("Donor profile not found");
 
-        var addressChanged = request.Address is not null && request.Address != profile.Address;
-        if (request.Address is not null) profile.Address = request.Address;
+        var normalizedAddress = request.Address?.Trim();
+        if (request.Address is not null && string.IsNullOrWhiteSpace(normalizedAddress))
+            throw new InvalidOperationException("A valid address is required.");
+
+        var addressChanged = normalizedAddress is not null && normalizedAddress != profile.Address;
+        if (normalizedAddress is not null) profile.Address = normalizedAddress;
         if (request.MedicalFlags is not null) profile.MedicalFlags = request.MedicalFlags;
         if (request.LastDonationDate is not null) profile.LastDonationDate = request.LastDonationDate;
 
@@ -78,7 +82,16 @@ public class DonorService : IDonorService
         {
             var coords = await _geocoder.GeocodeAsync(profile.Address!, ct);
             profile.LocationVerified = coords is not null;
-            if (coords is { } c) { profile.Latitude = c.Item1; profile.Longitude = c.Item2; }
+            if (coords is { } c)
+            {
+                profile.Latitude = c.Item1;
+                profile.Longitude = c.Item2;
+            }
+            else
+            {
+                profile.Latitude = null;
+                profile.Longitude = null;
+            }
         }
 
         RefreshEligibilityStatus(profile);
