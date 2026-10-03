@@ -224,6 +224,30 @@ public class AgentWorkflowService : IAgentWorkflowService
         _context.ApprovalDecisions.Add(
             decision);
 
+        // Reject is only reachable from Planning/AwaitingApproval (see
+        // EnsureDecisionAllowed below), i.e. strictly before the dispatch
+        // step — no donor has been contacted about this specific request
+        // yet, so there is nothing to notify them of here. But the
+        // underlying BloodRequest itself was left in its original "open"
+        // (or similar active) status with no code path ever closing it,
+        // so a rejected request kept appearing as active/open indefinitely
+        // — including to donors browsing open requests. Rejecting a
+        // workflow is staff deciding not to proceed with sourcing donors
+        // for this request at all, so the request itself must also stop
+        // being active.
+        var bloodRequest =
+            await _context.BloodRequests
+                .FirstOrDefaultAsync(
+                    r => r.Id == workflow.BloodRequestId);
+
+        if (bloodRequest != null &&
+            bloodRequest.Status != RequestStatuses.Fulfilled &&
+            bloodRequest.Status != RequestStatuses.Cancelled)
+        {
+            bloodRequest.Status = RequestStatuses.Cancelled;
+            bloodRequest.ClosedAt = now;
+        }
+
         await _context.SaveChangesAsync();
 
         return workflow;
