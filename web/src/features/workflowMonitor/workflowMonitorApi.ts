@@ -14,6 +14,10 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
       string
     >({
       query: (id) => `/agent/workflows/${id}`,
+      providesTags: (_result, _error, id) => [
+        "Workflow",
+        { type: "Workflow", id },
+      ],
     }),
 
     getLatestWorkflowByBloodRequest: builder.query<
@@ -22,6 +26,7 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
     >({
       query: (bloodRequestId) =>
         `/agent/workflows/request/${bloodRequestId}`,
+      providesTags: ["Workflow"],
     }),
 
     getWorkflowSteps: builder.query<
@@ -30,6 +35,10 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
     >({
       query: (id) =>
         `/agent/workflows/${id}/steps`,
+      providesTags: (_result, _error, id) => [
+        "Workflow",
+        { type: "Workflow", id },
+      ],
     }),
 
     getWorkflowSummary: builder.query<
@@ -38,6 +47,10 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
     >({
       query: (id) =>
         `/agent/workflows/${id}/summary`,
+      providesTags: (_result, _error, id) => [
+        "Workflow",
+        { type: "Workflow", id },
+      ],
     }),
 
     approveWorkflow: builder.mutation<
@@ -52,6 +65,11 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Request",
+        "Workflow",
+        { type: "Workflow", id },
+      ],
     }),
 
     rejectWorkflow: builder.mutation<
@@ -66,6 +84,11 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Request",
+        "Workflow",
+        { type: "Workflow", id },
+      ],
     }),
 
     reviseWorkflow: builder.mutation<
@@ -80,6 +103,11 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Request",
+        "Workflow",
+        { type: "Workflow", id },
+      ],
     }),
   }),
 });

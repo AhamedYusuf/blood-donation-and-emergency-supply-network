@@ -78,6 +78,7 @@ export const requestsApi = baseApi.injectEndpoints({
       query: (id) => `/requests/${id}`,
 
       providesTags: (_result, _error, id) => [
+        "Request",
         {
           type: "Request",
           id,

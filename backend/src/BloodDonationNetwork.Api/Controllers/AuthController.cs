@@ -1,5 +1,8 @@
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 using BloodDonationNetwork.Application.DTOs.Auth;
 using BloodDonationNetwork.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BloodDonationNetwork.Api.Controllers;
@@ -15,6 +18,27 @@ public class AuthController : ControllerBase
     {
         _authService = authService;
         _staffInvitationService = staffInvitationService;
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<CurrentUserResponse>> GetCurrentUser()
+    {
+        var userIdValue =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var currentUser =
+            await _authService.GetCurrentUserAsync(userId);
+
+        return currentUser is null
+            ? NotFound()
+            : Ok(currentUser);
     }
 
     [HttpPost("register")]

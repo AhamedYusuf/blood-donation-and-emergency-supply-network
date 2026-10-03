@@ -35,8 +35,6 @@ export interface CreateRequestDto {
 
   urgency: RequestUrgency;
 
-  hospitalName: string;
-
   latitude: number;
 
   longitude: number;
@@ -58,8 +56,6 @@ export interface RequestResponseDto {
   urgency: RequestUrgency;
 
   status: BloodRequestStatus;
-
-  hospitalName: string;
 
   latitude: number;
 

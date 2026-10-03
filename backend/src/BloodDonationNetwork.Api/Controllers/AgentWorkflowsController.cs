@@ -3,6 +3,7 @@ using System.Security.Claims;
 using BloodDonationNetwork.Application.DTOs.Workflows;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,13 +16,19 @@ public class AgentWorkflowsController : ControllerBase
 {
     private readonly IAgentWorkflowService _workflowService;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IApplicationDbContext _context;
+    private readonly ILogger<AgentWorkflowsController> _logger;
 
     public AgentWorkflowsController(
         IAgentWorkflowService workflowService,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IApplicationDbContext context,
+        ILogger<AgentWorkflowsController> logger)
     {
         _workflowService = workflowService;
         _httpClientFactory = httpClientFactory;
+        _context = context;
+        _logger = logger;
     }
 
     // GET /api/agent/workflows/{id}
@@ -157,6 +164,19 @@ public class AgentWorkflowsController : ControllerBase
         try
         {
             var userId = CurrentUserId();
+            var bloodRequestId =
+                await _context.AgentWorkflows
+                    .AsNoTracking()
+                    .Where(workflow => workflow.Id == id)
+                    .Select(workflow => workflow.BloodRequestId)
+                    .FirstOrDefaultAsync();
+            var oldRequestStatus =
+                await _context.BloodRequests
+                    .AsNoTracking()
+                    .Where(request =>
+                        request.Id == bloodRequestId)
+                    .Select(request => request.Status)
+                    .FirstOrDefaultAsync();
 
             var workflow =
                 await _workflowService.ApproveAsync(
@@ -180,6 +200,16 @@ public class AgentWorkflowsController : ControllerBase
 
             if (!resumeResult.Success)
             {
+                _logger.LogError(
+                    "Workflow approval was saved but agent resume failed. " +
+                    "WorkflowId={WorkflowId}, BloodRequestId={BloodRequestId}, " +
+                    "OldBloodRequestStatus={OldBloodRequestStatus}, " +
+                    "AgentError={AgentError}",
+                    workflow.Id,
+                    workflow.BloodRequestId,
+                    oldRequestStatus,
+                    resumeResult.Error);
+
                 return StatusCode(502, new
                 {
                     message =
@@ -192,6 +222,26 @@ public class AgentWorkflowsController : ControllerBase
                     agentError = resumeResult.Error
                 });
             }
+
+            var persistedRequestStatus =
+                await _context.BloodRequests
+                    .AsNoTracking()
+                    .Where(request =>
+                        request.Id == workflow.BloodRequestId)
+                    .Select(request => request.Status)
+                    .FirstOrDefaultAsync();
+
+            _logger.LogInformation(
+                "Human approval persisted and workflow resume returned. " +
+                "WorkflowId={WorkflowId}, BloodRequestId={BloodRequestId}, " +
+                "OldBloodRequestStatus={OldBloodRequestStatus}, " +
+                "PersistedBloodRequestStatus={PersistedBloodRequestStatus}, " +
+                "ApprovalSaveChangesAsyncSucceeded={SaveSucceeded}",
+                workflow.Id,
+                workflow.BloodRequestId,
+                oldRequestStatus,
+                persistedRequestStatus,
+                true);
 
             return Ok(new
             {

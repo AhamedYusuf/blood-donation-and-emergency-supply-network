@@ -101,6 +101,13 @@ public class RequestsController : ControllerBase
         {
             return Forbid();
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
     // GET /api/requests/{id}
