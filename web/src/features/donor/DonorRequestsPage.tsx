@@ -4,6 +4,7 @@ import type { RootState } from "../../app/store";
 import { useGetRequestsQuery } from "../requests/requestsApi";
 import { BloodRequestStatus } from "../requests/requestTypes";
 import { useGetDonorProfileQuery } from "../donors/donorApi";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 import "./donor.css";
 
 // Previously this fetched every blood request network-wide, from every
@@ -18,6 +19,13 @@ export function DonorRequestsPage() {
   const donorId = useSelector((state: RootState) => state.auth.donorId);
 
   const { data: profile } = useGetDonorProfileQuery(donorId ?? "", { skip: !donorId });
+  const { data: organizations = [], isLoading: organizationsLoading } = useGetOrganizationsQuery();
+  const organizationNames = new Map(
+    organizations.map((organization) => [
+      organization.id,
+      organization.name,
+    ]),
+  );
   const hasLocation = profile?.latitude != null && profile?.longitude != null;
 
   const { data = [], isLoading, isError, refetch } = useGetRequestsQuery(
@@ -74,7 +82,12 @@ export function DonorRequestsPage() {
               <div className={`donor-blood-type donor-blood-type--${request.urgency}`}>{request.bloodType}</div>
               <div>
                 <span className="donor-card-label">{request.urgency} need</span>
-                <h2>{request.hospitalName}</h2>
+                <h2>
+                  {organizationNames.get(request.organizationId) ??
+                    (organizationsLoading
+                      ? "Loading organization..."
+                      : "Organization unavailable")}
+                </h2>
                 <p>
                   {request.unitsRequested} unit{request.unitsRequested === 1 ? "" : "s"} requested · {request.status.replaceAll("_", " ")}
                   {request.distanceKm != null ? ` · ${request.distanceKm.toFixed(1)} km away` : ""}
