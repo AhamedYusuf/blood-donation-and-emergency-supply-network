@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { getApiErrorMessage } from "../../api/getApiErrorMessage";
 
+import { useGetCurrentUserQuery } from "../auth/authApi";
 import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 
 import { useCreateRequestMutation } from "./requestsApi";
@@ -60,6 +61,21 @@ export default function CreateRequestPage() {
     (state: RootState) => state.auth.organizationId
   );
 
+  const role = useSelector(
+    (state: RootState) => state.auth.role
+  );
+
+  const isStaff = (role ?? "").toLowerCase() === "staff";
+
+  const {
+    data: currentUser,
+    isFetching: currentUserLoading,
+    isError: currentUserError,
+  } = useGetCurrentUserQuery(undefined, {
+    skip: !isStaff,
+    refetchOnMountOrArgChange: true,
+  });
+
   const {
     data: organizations = [],
     isLoading: organizationsLoading,
@@ -79,7 +95,6 @@ export default function CreateRequestPage() {
     bloodType: BloodType.APositive,
     unitsRequested: 1,
     urgency: RequestUrgency.Normal,
-    hospitalName: "",
     latitude: 0,
     longitude: 0,
     notes: "",
@@ -91,14 +106,57 @@ export default function CreateRequestPage() {
   const [submitError, setSubmitError] =
     useState<string | null>(null);
 
+  const staffOrganizationId =
+    currentUserLoading || currentUserError
+      ? ""
+      : currentUser?.organizationId ?? "";
+
+  const assignedOrganization = organizations.find(
+    (organization) =>
+      organization.id === staffOrganizationId
+  );
+
+  const staffOrganizationError = isStaff
+    ? currentUserLoading
+      ? null
+      : currentUserError || !currentUser
+        ? "Unable to verify your staff account. Please sign in again."
+        : !staffOrganizationId
+          ? "Your staff account is not assigned to an organization. Contact an administrator."
+          : organizationsError
+        ? "Unable to verify your assigned organization. Please try again."
+        : !organizationsLoading && !assignedOrganization
+          ? "Your assigned organization could not be found. Contact an administrator."
+          : null
+    : null;
+
+  const availableOrganizations = isStaff
+    ? organizations.filter(
+        (organization) =>
+          organization.id === staffOrganizationId
+      )
+    : organizations;
+
   useEffect(() => {
-    if (!userOrganizationId) {
+    const organizationId = isStaff
+      ? staffOrganizationId
+      : userOrganizationId;
+
+    if (!organizationId) {
+      if (isStaff) {
+        setForm((current) => ({
+          ...current,
+          organizationId: "",
+          latitude: Number.NaN,
+          longitude: Number.NaN,
+        }));
+      }
       return;
     }
 
     const selectedOrganization = organizations.find(
       (organization) =>
-        organization.id === userOrganizationId
+        organization.id === organizationId
     );
 
     const coordinatesAvailable = (
@@ -109,7 +167,7 @@ export default function CreateRequestPage() {
 
     setForm((current) => ({
       ...current,
-      organizationId: userOrganizationId,
+      organizationId,
       latitude: coordinatesAvailable
         ? selectedOrganization.latitude
         : Number.NaN,
@@ -117,7 +175,15 @@ export default function CreateRequestPage() {
         ? selectedOrganization.longitude
         : Number.NaN,
     }));
-  }, [organizations, userOrganizationId]);
+  }, [
+    currentUser?.organizationId,
+    currentUserError,
+    currentUserLoading,
+    isStaff,
+    organizations,
+    staffOrganizationId,
+    userOrganizationId,
+  ]);
 
   const updateField = <K extends keyof CreateRequestDto>(
     field: K,
@@ -139,6 +205,10 @@ export default function CreateRequestPage() {
   const handleOrganizationChange = (
     organizationId: string
   ) => {
+    if (isStaff) {
+      return;
+    }
+
     const selectedOrganization = organizations.find(
       (organization) => organization.id === organizationId
     );
@@ -188,9 +258,27 @@ export default function CreateRequestPage() {
       return;
     }
 
+    if (isStaff && currentUserLoading) {
+      setSubmitError(
+        "Please wait while your assigned organization is verified."
+      );
+      return;
+    }
+
+    if (staffOrganizationError) {
+      setErrors((current) => ({
+        ...current,
+        organizationId: staffOrganizationError,
+      }));
+      setSubmitError(staffOrganizationError);
+      return;
+    }
+
     const payload: CreateRequestDto = {
       ...form,
-      hospitalName: form.hospitalName.trim(),
+      organizationId: isStaff
+        ? staffOrganizationId
+        : form.organizationId,
       notes: form.notes.trim(),
     };
 
@@ -259,7 +347,7 @@ export default function CreateRequestPage() {
 
             <p>
               Enter the required blood type, quantity,
-              urgency and hospital information.
+              urgency and organization information.
             </p>
           </div>
 
@@ -271,21 +359,47 @@ export default function CreateRequestPage() {
 
               <select
                 id="organizationId"
-                value={form.organizationId}
-                disabled={organizationsLoading}
+                value={isStaff
+                  ? staffOrganizationId
+                  : form.organizationId}
+                disabled={
+                  organizationsLoading ||
+                  currentUserLoading ||
+                  isStaff
+                }
                 onChange={(event) =>
                   handleOrganizationChange(
                     event.target.value
                   )
                 }
               >
-                <option value="">
-                  {organizationsLoading
-                    ? "Loading organizations..."
-                    : "Select organization"}
-                </option>
+                {isStaff
+                  ? staffOrganizationId && !assignedOrganization
+                    ? (
+                      <option value={staffOrganizationId}>
+                        {organizationsLoading
+                          ? "Loading assigned organization..."
+                          : "Assigned organization unavailable"}
+                      </option>
+                    )
+                    : !staffOrganizationId
+                      ? (
+                        <option value="">
+                          {currentUserLoading
+                            ? "Loading staff account..."
+                            : "Assigned organization unavailable"}
+                        </option>
+                      )
+                      : null
+                  : (
+                    <option value="">
+                      {organizationsLoading
+                        ? "Loading organizations..."
+                        : "Select organization"}
+                    </option>
+                  )}
 
-                {organizations.map((organization) => (
+                {availableOrganizations.map((organization) => (
                   <option
                     key={organization.id}
                     value={organization.id}
@@ -295,41 +409,21 @@ export default function CreateRequestPage() {
                 ))}
               </select>
 
-              {errors.organizationId && (
+              {errors.organizationId && !staffOrganizationError && (
                 <span className="request-field-error">
                   {errors.organizationId}
                 </span>
               )}
 
-              {organizationsError && (
+              {staffOrganizationError && (
                 <span className="request-field-error">
-                  Unable to load organizations.
+                  {staffOrganizationError}
                 </span>
               )}
-            </div>
 
-            <div className="request-field">
-              <label htmlFor="hospitalName">
-                Hospital Name
-              </label>
-
-              <input
-                id="hospitalName"
-                type="text"
-                maxLength={200}
-                placeholder="Enter hospital name"
-                value={form.hospitalName}
-                onChange={(event) =>
-                  updateField(
-                    "hospitalName",
-                    event.target.value
-                  )
-                }
-              />
-
-              {errors.hospitalName && (
+              {organizationsError && !isStaff && (
                 <span className="request-field-error">
-                  {errors.hospitalName}
+                  Unable to load organizations.
                 </span>
               )}
             </div>
@@ -524,6 +618,8 @@ export default function CreateRequestPage() {
               disabled={
                 isCreating ||
                 organizationsLoading ||
+                currentUserLoading ||
+                Boolean(staffOrganizationError) ||
                 !userId
               }
             >
@@ -547,7 +643,7 @@ export default function CreateRequestPage() {
 
           <p>
             Blood type, urgency, required units and
-            hospital location help the coordination
+            organization location help the coordination
             workflow respond correctly.
           </p>
 

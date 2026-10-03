@@ -18,6 +18,7 @@ import {
 import {
   useGetLatestWorkflowByBloodRequestQuery,
 } from "../workflowMonitor/workflowMonitorApi";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 
 import {
   BloodRequestStatus,
@@ -115,6 +116,10 @@ export default function RequestDetailsPage() {
 
   const isDonor = role === "donor";
 
+  const {
+    data: organizations = [],
+    isLoading: organizationsLoading,
+  } = useGetOrganizationsQuery();
 
   const {
     data: request,
@@ -128,6 +133,15 @@ export default function RequestDetailsPage() {
     }
   );
 
+  const organization = organizations.find(
+    (item) => item.id === request?.organizationId
+  );
+
+  const organizationName =
+    organization?.name ??
+    (organizationsLoading
+      ? "Loading organization..."
+      : "Organization unavailable");
 
   const {
     data: workflow,
@@ -137,7 +151,7 @@ export default function RequestDetailsPage() {
   } = useGetLatestWorkflowByBloodRequestQuery(
     request?.id ?? "",
     {
-      skip: !request?.id,
+    skip: !request?.id || !canManageRequests,
     }
   );
 
@@ -420,7 +434,7 @@ export default function RequestDetailsPage() {
           </span>
 
           <h1>
-            {request.hospitalName}
+            {organizationName}
           </h1>
 
           <div className="request-details-hero-meta">
@@ -556,57 +570,41 @@ export default function RequestDetailsPage() {
 
             <div className="request-detail-item">
               <span>
-                Request ID
-              </span>
-
-              <strong className="request-detail-id">
-                {request.id}
-              </strong>
-            </div>
-
-
-            <div className="request-detail-item">
-              <span>
-                Organization ID
-              </span>
-
-              <strong className="request-detail-id">
-                {request.organizationId}
-              </strong>
-            </div>
-
-
-            <div className="request-detail-item">
-              <span>
-                Requester ID
-              </span>
-
-              <strong className="request-detail-id">
-                {request.requesterId}
-              </strong>
-            </div>
-
-
-            <div className="request-detail-item">
-              <span>
-                Latitude
+                Organization
               </span>
 
               <strong>
-                {request.latitude}
+                {organizationName}
               </strong>
             </div>
 
+            {canManageRequests && (
+              <>
+                <div className="request-detail-item">
+                  <span>Request ID</span>
+                  <strong className="request-detail-id">
+                    {request.id}
+                  </strong>
+                </div>
 
-            <div className="request-detail-item">
-              <span>
-                Longitude
-              </span>
+                <div className="request-detail-item">
+                  <span>Requester ID</span>
+                  <strong className="request-detail-id">
+                    {request.requesterId}
+                  </strong>
+                </div>
 
-              <strong>
-                {request.longitude}
-              </strong>
-            </div>
+                <div className="request-detail-item">
+                  <span>Latitude</span>
+                  <strong>{request.latitude}</strong>
+                </div>
+
+                <div className="request-detail-item">
+                  <span>Longitude</span>
+                  <strong>{request.longitude}</strong>
+                </div>
+              </>
+            )}
 
 
             {request.fulfilledAt && (
@@ -641,17 +639,16 @@ export default function RequestDetailsPage() {
           </div>
 
 
-          <div className="request-details-notes">
-            <span>
-              Notes
-            </span>
-
-            <p>
-              {request.notes.trim()
-                ? request.notes
-                : "No additional notes were provided."}
-            </p>
-          </div>
+          {canManageRequests && (
+            <div className="request-details-notes">
+              <span>Notes</span>
+              <p>
+                {request.notes.trim()
+                  ? request.notes
+                  : "No additional notes were provided."}
+              </p>
+            </div>
+          )}
 
         </div>
 
@@ -878,7 +875,7 @@ export default function RequestDetailsPage() {
               <>
                 <p>
                   Booking a donation reserves a time at{" "}
-                  {request.hospitalName} so they can put it toward this
+                  {organizationName} so they can put it toward this
                   need.
                 </p>
 
@@ -889,7 +886,7 @@ export default function RequestDetailsPage() {
                     navigate("/appointments/book", {
                       state: {
                         organizationId: request.organizationId,
-                        hospitalName: request.hospitalName,
+                        hospitalName: organizationName,
                       },
                     })
                   }

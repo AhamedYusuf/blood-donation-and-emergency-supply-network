@@ -152,6 +152,12 @@ public class AgentWorkflowService : IAgentWorkflowService
 
         workflow.UpdatedAt = now;
 
+        await UpdateRequestStatusIfExpectedAsync(
+            workflow.BloodRequestId,
+            RequestStatuses.Matching,
+            RequestStatuses.Open,
+            RequestStatuses.AwaitingApproval);
+
         var decision =
             new ApprovalDecision
             {
@@ -204,6 +210,18 @@ public class AgentWorkflowService : IAgentWorkflowService
         // Rejected is a terminal state,
         // so there is no active agent.
         workflow.CurrentAgent = null;
+
+        var rejectedRequest =
+            await UpdateRequestStatusIfExpectedAsync(
+                workflow.BloodRequestId,
+                RequestStatuses.Cancelled,
+                RequestStatuses.Open,
+                RequestStatuses.AwaitingApproval);
+
+        if (rejectedRequest is not null)
+        {
+            rejectedRequest.ClosedAt = now;
+        }
 
         var decision =
             new ApprovalDecision
@@ -287,6 +305,12 @@ public class AgentWorkflowService : IAgentWorkflowService
             // Failed is terminal.
             workflow.CurrentAgent = null;
 
+            await UpdateRequestStatusIfExpectedAsync(
+                workflow.BloodRequestId,
+                RequestStatuses.Open,
+                RequestStatuses.AwaitingApproval,
+                RequestStatuses.Matching);
+
             var failedDecision =
                 new ApprovalDecision
                 {
@@ -324,6 +348,13 @@ public class AgentWorkflowService : IAgentWorkflowService
 
         workflow.UpdatedAt = now;
 
+        await UpdateRequestStatusIfExpectedAsync(
+            workflow.BloodRequestId,
+            RequestStatuses.Matching,
+            RequestStatuses.Open,
+            RequestStatuses.AwaitingApproval,
+            RequestStatuses.Matching);
+
         var decision =
             new ApprovalDecision
             {
@@ -347,6 +378,25 @@ public class AgentWorkflowService : IAgentWorkflowService
         await _context.SaveChangesAsync();
 
         return workflow;
+    }
+
+    private async Task<BloodRequest?> UpdateRequestStatusIfExpectedAsync(
+        Guid bloodRequestId,
+        string nextStatus,
+        params string[] expectedStatuses)
+    {
+        var request = await _context.BloodRequests
+            .FirstOrDefaultAsync(
+                item => item.Id == bloodRequestId);
+
+        if (request is not null &&
+            expectedStatuses.Contains(request.Status))
+        {
+            request.Status = nextStatus;
+            return request;
+        }
+
+        return null;
     }
 
     private static void EnsureDecisionAllowed(

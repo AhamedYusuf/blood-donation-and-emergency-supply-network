@@ -8,6 +8,7 @@ import {
 } from "./requestTypes";
 
 import { useGetRequestsQuery } from "./requestsApi";
+import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 
 import "./requests.css";
 
@@ -96,6 +97,18 @@ export default function RequestsPage() {
   const canManageRequests = role === "staff" || role === "admin";
 
   const {
+    data: organizations = [],
+    isLoading: organizationsLoading,
+  } = useGetOrganizationsQuery();
+
+  const organizationNames = new Map(
+    organizations.map((organization) => [
+      organization.id,
+      organization.name,
+    ])
+  );
+
+  const {
     data: requests = [],
     isLoading,
     isError,
@@ -139,15 +152,21 @@ export default function RequestsPage() {
         <div className="requests-hero__content">
 
           <span className="requests-eyebrow">
-            COORDINATOR AI · REQUEST OPERATIONS
+            {canManageRequests
+              ? "COORDINATOR AI · REQUEST OPERATIONS"
+              : "BLOOD REQUESTS"}
           </span>
 
           <h1>
-            Blood Request Coordination
+            {canManageRequests
+              ? "Blood Request Coordination"
+              : "Blood Requests"}
           </h1>
 
           <p>
-            Create, prioritize and coordinate emergency blood requests with AI-assisted workflow management.
+            {canManageRequests
+              ? "Create, prioritize and coordinate emergency blood requests with AI-assisted workflow management."
+              : "Browse current blood requests and their requirements."}
           </p>
 
           {canManageRequests && (
@@ -180,6 +199,7 @@ export default function RequestsPage() {
       </section>
 
 
+      {canManageRequests && (
       <section className="requests-summary-grid">
 
         <article className="request-summary-card">
@@ -250,7 +270,9 @@ export default function RequestsPage() {
         </article>
 
       </section>
+      )}
 
+      {canManageRequests && (
       <section className="requests-coordinator-section">
         <div className="requests-section-heading requests-section-heading--coordinator">
           <div>
@@ -274,6 +296,7 @@ export default function RequestsPage() {
           ))}
         </div>
       </section>
+      )}
 
 
       <section className="requests-content-card">
@@ -355,17 +378,19 @@ export default function RequestsPage() {
               </h3>
 
               <p>
-                Create the first blood request to
-                start coordinating availability and
-                fulfillment.
+                {canManageRequests
+                  ? "Create the first blood request to start coordinating availability and fulfillment."
+                  : "There are no blood requests to display right now."}
               </p>
 
-              <Link
-                to="/requests/create"
-                className="requests-primary-button"
-              >
-                Create Blood Request
-              </Link>
+              {canManageRequests && (
+                <Link
+                  to="/requests/create"
+                  className="requests-primary-button"
+                >
+                  Create Blood Request
+                </Link>
+              )}
 
             </div>
           )}
@@ -381,7 +406,7 @@ export default function RequestsPage() {
 
                 <thead>
                   <tr>
-                    <th>Hospital</th>
+                    <th>Organization</th>
                     <th>Blood Type</th>
                     <th>Units</th>
                     <th>Urgency</th>
@@ -400,7 +425,10 @@ export default function RequestsPage() {
 
                       <td>
                         <strong>
-                          {request.hospitalName}
+                          {organizationNames.get(request.organizationId) ??
+                            (organizationsLoading
+                              ? "Loading organization..."
+                              : "Organization unavailable")}
                         </strong>
                       </td>
 

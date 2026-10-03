@@ -46,6 +46,17 @@ public class RequestService : IRequestService
             isAdmin,
             dto.OrganizationId);
 
+        var organization = await _context.Organizations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.Id == dto.OrganizationId);
+
+        if (organization == null)
+        {
+            throw new ArgumentException(
+                "The selected organization was not found.");
+        }
+
         var request = new BloodRequest
         {
             Id = Guid.NewGuid(),
@@ -55,9 +66,9 @@ public class RequestService : IRequestService
             UnitsRequested = dto.UnitsRequested,
             Urgency = dto.Urgency,
             Status = RequestStatuses.Open,
-            HospitalName = dto.HospitalName,
-            Latitude = dto.Latitude,
-            Longitude = dto.Longitude,
+            HospitalName = string.Empty,
+            Latitude = organization.Latitude,
+            Longitude = organization.Longitude,
             Notes = dto.Notes,
             CreatedAt = DateTime.UtcNow
         };

@@ -2,6 +2,7 @@ using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BloodDonationNetwork.Api.Controllers.Internal;
 
@@ -10,11 +11,14 @@ namespace BloodDonationNetwork.Api.Controllers.Internal;
 public class WorkflowInternalController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly ILogger<WorkflowInternalController> _logger;
 
     public WorkflowInternalController(
-        IApplicationDbContext context)
+        IApplicationDbContext context,
+        ILogger<WorkflowInternalController> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     // POST /api/internal/agent/workflows
@@ -127,6 +131,12 @@ public class WorkflowInternalController : ControllerBase
             });
         }
 
+        var bloodRequest =
+            await _context.BloodRequests.FindAsync(
+                workflow.BloodRequestId);
+        var oldRequestStatus =
+            bloodRequest?.Status;
+
         workflow.Status = request.Status;
         workflow.UpdatedAt = DateTime.UtcNow;
 
@@ -136,6 +146,25 @@ public class WorkflowInternalController : ControllerBase
         if (request.Status == WorkflowStatuses.AwaitingApproval)
         {
             workflow.CurrentAgent = AgentNames.Coordinator;
+
+            if (bloodRequest?.Status == RequestStatuses.Open ||
+                bloodRequest?.Status == RequestStatuses.Matching)
+            {
+                bloodRequest.Status =
+                    RequestStatuses.AwaitingApproval;
+            }
+        }
+
+        if (request.Status == WorkflowStatuses.Completed)
+        {
+            if (bloodRequest is not null &&
+                (bloodRequest.Status == RequestStatuses.Open ||
+                 bloodRequest.Status == RequestStatuses.Matching ||
+                 bloodRequest.Status == RequestStatuses.AwaitingApproval))
+            {
+                bloodRequest.Status =
+                    RequestStatuses.DonorsNotified;
+            }
         }
 
         if (request.Status == WorkflowStatuses.Completed ||
@@ -155,7 +184,53 @@ public class WorkflowInternalController : ControllerBase
                 request.FailureReason;
         }
 
-        await _context.SaveChangesAsync();
+        var savedChanges =
+            await _context.SaveChangesAsync();
+
+        var persistedRequestStatus =
+            await _context.BloodRequests
+                .AsNoTracking()
+                .Where(item =>
+                    item.Id == workflow.BloodRequestId)
+                .Select(item => item.Status)
+                .FirstOrDefaultAsync();
+
+        _logger.LogInformation(
+            "Workflow status callback persisted. WorkflowId={WorkflowId}, " +
+            "BloodRequestId={BloodRequestId}, WorkflowStatus={WorkflowStatus}, " +
+            "OldBloodRequestStatus={OldBloodRequestStatus}, " +
+            "NewBloodRequestStatus={NewBloodRequestStatus}, " +
+            "PersistedBloodRequestStatus={PersistedBloodRequestStatus}, " +
+            "SaveChangesAffected={SaveChangesAffected}",
+            workflow.Id,
+            workflow.BloodRequestId,
+            workflow.Status,
+            oldRequestStatus,
+            bloodRequest?.Status,
+            persistedRequestStatus,
+            savedChanges);
+
+        if (bloodRequest is not null &&
+            persistedRequestStatus != bloodRequest.Status)
+        {
+            _logger.LogError(
+                "Blood request status did not persist with workflow callback. " +
+                "WorkflowId={WorkflowId}, BloodRequestId={BloodRequestId}, " +
+                "ExpectedStatus={ExpectedStatus}, PersistedStatus={PersistedStatus}",
+                workflow.Id,
+                workflow.BloodRequestId,
+                bloodRequest.Status,
+                persistedRequestStatus);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    message =
+                        "Workflow status was saved, but the linked blood request " +
+                        "status was not persisted."
+                });
+        }
 
         return Ok(new
         {
