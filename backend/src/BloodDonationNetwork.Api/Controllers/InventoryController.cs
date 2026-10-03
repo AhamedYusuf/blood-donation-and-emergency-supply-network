@@ -337,6 +337,123 @@ public class InventoryController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    // The Coordinator calls this when stock_check found the org's own
+    // stock sufficient and a human has since approved the workflow —
+    // deducts the units and marks the BloodRequest fulfilled instead of
+    // leaving the workflow "completed" with inventory never touched.
+    [HttpPost("/api/internal/agent/fulfill-from-stock")]
+    [AllowAnonymous]
+    public async Task<ActionResult<FulfillFromStockResponse>> FulfillFromStock(
+        [FromBody] StockCheckAgentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var startedAt = DateTime.UtcNow;
+
+        try
+        {
+            var result = await _inventoryService.FulfillFromStockAsync(
+                request,
+                cancellationToken);
+
+            await LogFulfillFromStockStepAsync(
+                request.WorkflowId,
+                request,
+                result,
+                "completed",
+                startedAt,
+                null,
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await LogFulfillFromStockStepAsync(
+                request.WorkflowId,
+                request,
+                null,
+                "failed",
+                startedAt,
+                ex.Message,
+                CancellationToken.None);
+
+            return Conflict(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            await LogFulfillFromStockStepAsync(
+                request.WorkflowId,
+                request,
+                null,
+                "failed",
+                startedAt,
+                ex.Message,
+                CancellationToken.None);
+
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            await LogFulfillFromStockStepAsync(
+                request.WorkflowId,
+                request,
+                null,
+                "failed",
+                startedAt,
+                ex.Message,
+                CancellationToken.None);
+
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    private async Task LogFulfillFromStockStepAsync(
+        Guid workflowId,
+        StockCheckAgentRequest request,
+        FulfillFromStockResponse? response,
+        string status,
+        DateTime startedAt,
+        string? errorMessage,
+        CancellationToken cancellationToken)
+    {
+        var workflow = await _db.AgentWorkflows
+            .FirstOrDefaultAsync(
+                x => x.Id == workflowId,
+                cancellationToken);
+
+        if (workflow is null)
+        {
+            return;
+        }
+
+        // Control returns to the Coordinator next (to finalize), same as
+        // every other agent step handoff.
+        workflow.CurrentAgent = AgentNames.Coordinator;
+        workflow.UpdatedAt = DateTime.UtcNow;
+
+        _db.AgentSteps.Add(new AgentStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowId = workflowId,
+            AgentName = AgentNames.StockCheck,
+            StepName = "fulfill_from_stock",
+            Status = status,
+            InputJson = JsonSerializer.Serialize(request),
+            OutputJson = response is null
+                ? null
+                : JsonSerializer.Serialize(response),
+            Narrative = response is null
+                ? "Fulfilling from own stock failed."
+                : $"Fulfilled {response.UnitsDeducted} unit(s) of {response.BloodType} from own stock; {response.RemainingUnits} unit(s) remaining.",
+            RetryCount = 0,
+            StartedAt = startedAt,
+            CompletedAt = DateTime.UtcNow,
+            ErrorMessage = errorMessage,
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     [HttpGet("/api/internal/agent/stock-risk/{organizationId:guid}")]
     [AllowAnonymous]
     public async Task<ActionResult<StockRiskResponse>> AnalyzeStockRisk(
