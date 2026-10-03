@@ -111,12 +111,19 @@ class _NearbyBanksMapScreenState
         return;
       }
 
+      // Without a time limit, this hangs indefinitely on a device/emulator
+      // with no GPS fix available (common on Android emulators unless a
+      // mock location is set) — reproduced live: the screen got stuck on
+      // "Loading blood banks..." until Android killed it with an ANR. A
+      // timeout lets the existing catch block below show its intended
+      // graceful fallback instead.
       final position =
           await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           distanceFilter: 0,
         ),
+        timeLimit: const Duration(seconds: 10),
       );
 
       if (!mounted) return;
