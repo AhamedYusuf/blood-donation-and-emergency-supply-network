@@ -15,13 +15,24 @@ class RegisterScreen extends ConsumerStatefulWidget {
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
+// Mirrors the web app's RegisterPage.tsx validation exactly (EMAIL_RE /
+// PHONE_RE / validateFullName / validatePassword) — these used to be
+// looser on mobile (6-char password with no complexity rule, no format
+// checks on email/phone/name, no confirm-password field at all), so a
+// donor could end up with a weaker account via mobile than the same
+// sign-up would ever allow on web.
+final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+final _phoneRe = RegExp(r'^\+?[\d\s\-]{7,15}$');
+
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullName = TextEditingController();
   final _email = TextEditingController();
   final _phoneNumber = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   bool _obscure = true;
+  bool _obscureConfirm = true;
   bool _submitting = false;
   String? _error;
 
@@ -31,6 +42,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _email.dispose();
     _phoneNumber.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -84,21 +96,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     Text('Create your donor account', style: AppText.title, textAlign: TextAlign.center),
                     const SizedBox(height: AppSpacing.xxl),
-                    _field('Full name', _fullName, validator: (value) => _required(value, 'Enter your full name')),
+                    _field(
+                      'Full name',
+                      _fullName,
+                      validator: (value) {
+                        final trimmed = value?.trim() ?? '';
+                        if (trimmed.isEmpty) return 'Enter your full name';
+                        if (trimmed.length < 2) return 'Must be at least 2 characters';
+                        if (RegExp(r'\d').hasMatch(trimmed)) return 'Name must not contain numbers';
+                        return null;
+                      },
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     _field(
                       'Email',
                       _email,
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) {
-                        final error = _required(value, 'Enter your email');
-                        if (error != null) return error;
-                        return value!.contains('@') && value.contains('.') ? null : 'Enter a valid email';
+                        final trimmed = value?.trim() ?? '';
+                        if (trimmed.isEmpty) return 'Enter your email';
+                        return _emailRe.hasMatch(trimmed) ? null : 'Enter a valid email address';
                       },
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    _field('Phone number', _phoneNumber, keyboardType: TextInputType.phone,
-                        validator: (value) => _required(value, 'Enter your phone number')),
+                    _field(
+                      'Phone number',
+                      _phoneNumber,
+                      keyboardType: TextInputType.phone,
+                      validator: (value) {
+                        final trimmed = value?.trim() ?? '';
+                        if (trimmed.isEmpty) return 'Enter your phone number';
+                        return _phoneRe.hasMatch(trimmed)
+                            ? null
+                            : 'Enter a valid phone number (7-15 digits)';
+                      },
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     _field(
                       'Password',
@@ -109,9 +141,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                       validator: (value) {
-                        final error = _required(value, 'Enter a password');
-                        if (error != null) return error;
-                        return value!.length >= 6 ? null : 'Use at least 6 characters';
+                        if (value == null || value.isEmpty) return 'Enter a password';
+                        if (value.length < 8) return 'Password must be at least 8 characters';
+                        if (!RegExp(r'(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
+                          return 'Must contain at least one letter and one number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      'Min. 8 characters, including a letter and a number.',
+                      style: AppText.caption.copyWith(color: AppColors.inkFaint),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _field(
+                      'Confirm password',
+                      _confirmPassword,
+                      obscureText: _obscureConfirm,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                            _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                        onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Please confirm your password';
+                        return value == _password.text ? null : 'Passwords do not match';
                       },
                     ),
                     if (_error != null) ...[
@@ -165,7 +220,4 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ],
     );
   }
-
-  String? _required(String? value, String message) =>
-      value == null || value.trim().isEmpty ? message : null;
 }
