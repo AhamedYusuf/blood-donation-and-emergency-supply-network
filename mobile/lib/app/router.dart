@@ -168,6 +168,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       GoRoute(
+        path: '/nearby-banks',
+        parentNavigatorKey:
+            _rootNavigatorKey,
+        builder: (_, _) =>
+            const NearbyBanksMapScreen(),
+      ),
+
+      GoRoute(
         path: '/blood-requests/new',
         parentNavigatorKey:
             _rootNavigatorKey,
