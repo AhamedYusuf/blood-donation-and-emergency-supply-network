@@ -88,6 +88,90 @@ public async Task<IActionResult> UpdateStatus(Guid id, UpdateAppointmentStatusDt
     return Ok(result);
 }
 
+// Agent-dispatched appointments start life as "pending_confirmation" —
+// these three let the owning donor settle that, distinct from the
+// generic status endpoint above (whose own "donor may only cancel"
+// rule still applies to an already-confirmed appointment).
+
+[HttpPost("{id}/confirm")]
+[Authorize(Roles = "donor")]
+public async Task<IActionResult> Confirm(Guid id)
+{
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    try
+    {
+        var result = await _appointmentService.ConfirmAsync(id, currentUserId);
+        return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+        return NotFound();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Forbid();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+}
+
+[HttpPost("{id}/decline")]
+[Authorize(Roles = "donor")]
+public async Task<IActionResult> Decline(Guid id)
+{
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    try
+    {
+        var result = await _appointmentService.DeclineAsync(id, currentUserId);
+        return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+        return NotFound();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Forbid();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+}
+
+[HttpPut("{id}/reschedule")]
+[Authorize(Roles = "donor")]
+public async Task<IActionResult> Reschedule(Guid id, RescheduleAppointmentDto dto)
+{
+    var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    try
+    {
+        var result = await _appointmentService.RescheduleAsync(id, currentUserId, dto.NewScheduledTime);
+        return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+        return NotFound();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Forbid();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(new { error = ex.Message });
+    }
+}
+
 [HttpGet("donor/{donorId}")]
 public async Task<ActionResult<List<AppointmentResponseDto>>> GetByDonor(Guid donorId)
 {

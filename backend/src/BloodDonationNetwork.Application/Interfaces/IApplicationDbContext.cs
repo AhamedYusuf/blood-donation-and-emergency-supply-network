@@ -21,6 +21,8 @@ DbSet<InventoryTransaction> InventoryTransactions { get; }
 
     DbSet<DonorDevice> DonorDevices { get; }
 
+    DbSet<DonorNotification> DonorNotifications { get; }
+
     DbSet<StaffInvitation> StaffInvitations { get; }
 
     Task<int> SaveChangesAsync(

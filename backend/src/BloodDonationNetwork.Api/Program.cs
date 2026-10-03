@@ -34,7 +34,7 @@ builder.Services.AddExceptionHandler<
 // EXTERNAL CLIENTS
 // =====================================================
 
-builder.Services.AddHttpClient<IGeocodingClient, NominatimClient>(c =>
+builder.Services.AddHttpClient<IGeocodingClient, LocationIqClient>(c =>
     c.DefaultRequestHeaders.Add(
         "User-Agent",
         "BloodDonationNetwork/1.0"));
@@ -172,10 +172,37 @@ builder.Services.AddScoped<
 // DATABASE
 // =====================================================
 
+var connectionString =
+    builder.Configuration.GetConnectionString("Default");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    // Render's Blueprint only hands a managed Postgres instance's
+    // combined connection string to env vars as a postgres:// URI,
+    // which Npgsql's connection-string parser does not accept (it wants
+    // Host=...;Port=...;... keyword=value pairs). Assembling it from the
+    // individual host/port/database/user/password properties Render
+    // also exposes avoids that entirely. Local dev is unaffected —
+    // appsettings.Development.json's ConnectionStrings:Default is
+    // already in the right format, so this path is never reached there.
+    var pgHost = builder.Configuration["Database:Host"];
+
+    if (!string.IsNullOrWhiteSpace(pgHost))
+    {
+        var pgPort = builder.Configuration["Database:Port"] ?? "5432";
+        var pgDatabase = builder.Configuration["Database:Name"];
+        var pgUser = builder.Configuration["Database:User"];
+        var pgPassword = builder.Configuration["Database:Password"];
+
+        connectionString =
+            $"Host={pgHost};Port={pgPort};Database={pgDatabase};" +
+            $"Username={pgUser};Password={pgPassword};" +
+            "SSL Mode=Require;Trust Server Certificate=true";
+    }
+}
+
 var dataSourceBuilder =
-    new Npgsql.NpgsqlDataSourceBuilder(
-        builder.Configuration.GetConnectionString(
-            "Default"));
+    new Npgsql.NpgsqlDataSourceBuilder(connectionString);
 
 dataSourceBuilder.EnableDynamicJson();
 
@@ -292,17 +319,17 @@ app.UseExceptionHandler();
 
 app.UseCors("DevelopmentCors");
 
-if (app.Environment.IsDevelopment())
+// Swagger, migrations and admin-seeding used to be gated behind
+// IsDevelopment() — harmless locally, but fatal for a real deployment:
+// ASPNETCORE_ENVIRONMENT is "Production" there, so none of this would
+// ever run. The deployed database would stay unmigrated (every request
+// failing on missing tables) and the assignment spec's required
+// "working Swagger URL" would 404. Both now run in every environment.
+app.UseSwagger();
+app.UseSwaggerUI();
+
+using (var seedScope = app.Services.CreateScope())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-
-    // Bootstraps the very first admin account.
-    // Public registration creates donors only,
-    // while staff accounts require an admin-issued invitation.
-    using var seedScope =
-        app.Services.CreateScope();
-
     var seedContext =
         seedScope.ServiceProvider
             .GetRequiredService<AppDbContext>();
@@ -315,19 +342,45 @@ if (app.Environment.IsDevelopment())
                 BloodDonationNetwork.Domain.Entities
                     .UserRole.Admin))
     {
-        var adminEmail =
-            (
-                app.Configuration[
-                    "Seed:AdminEmail"]
-                ?? "admin@blooddonation.local"
-            )
-            .Trim()
-            .ToLowerInvariant();
+        string adminEmail;
+        string adminPassword;
 
-        var adminPassword =
-            app.Configuration[
-                "Seed:AdminPassword"]
-            ?? "ChangeMe123!";
+        if (app.Environment.IsDevelopment())
+        {
+            // Convenience defaults for a local dev DB only — never used
+            // outside Development, so never reaches a real deployment.
+            adminEmail =
+                (
+                    app.Configuration["Seed:AdminEmail"]
+                    ?? "admin@blooddonation.local"
+                )
+                .Trim()
+                .ToLowerInvariant();
+
+            adminPassword =
+                app.Configuration["Seed:AdminPassword"]
+                ?? "ChangeMe123!";
+        }
+        else
+        {
+            // A well-known fallback password would let anyone who reads
+            // this source seed themselves an admin account on the real
+            // deployed instance. Refuse to start instead of silently
+            // creating one.
+            adminEmail =
+                app.Configuration["Seed:AdminEmail"]?.Trim().ToLowerInvariant()
+                ?? throw new InvalidOperationException(
+                    "Seed:AdminEmail (env var Seed__AdminEmail) must be " +
+                    "set outside Development — no default admin account " +
+                    "will be created without it.");
+
+            adminPassword =
+                app.Configuration["Seed:AdminPassword"]
+                ?? throw new InvalidOperationException(
+                    "Seed:AdminPassword (env var Seed__AdminPassword) " +
+                    "must be set outside Development — no default admin " +
+                    "account will be created without it.");
+        }
 
         seedContext.Users.Add(
             new BloodDonationNetwork.Domain.Entities.User
@@ -351,12 +404,13 @@ if (app.Environment.IsDevelopment())
 
         app.Logger.LogWarning(
             "Seeded first admin account {Email} — " +
-            "set Seed:AdminEmail/Seed:AdminPassword in " +
-            "appsettings.Development.json to override, " +
+            "set Seed:AdminEmail/Seed:AdminPassword to override, " +
             "and change this password after logging in.",
             adminEmail);
     }
 }
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.UseHttpsRedirection();
 

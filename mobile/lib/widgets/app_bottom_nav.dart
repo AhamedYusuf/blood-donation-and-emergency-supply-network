@@ -10,8 +10,8 @@ class NavTab {
   final String label;
 }
 
-/// Persistent bottom tab bar for the three destinations a signed-in donor
-/// actually has (Home / Donations / Profile). A real tab bar rather than
+/// Persistent bottom tab bar for the four destinations a signed-in donor
+/// actually has (Home / Donations / Requests / Profile). A real tab bar rather than
 /// a push-only stack is what turns "screens that exist" into something
 /// that reads as one coherent app.
 class AppBottomNav extends StatelessWidget {

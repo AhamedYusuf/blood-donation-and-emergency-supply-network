@@ -5,18 +5,16 @@ import type { RootState } from "../../app/store";
 import {
   useGetInventoryQuery,
   useGetLowStockQuery,
+  useGetStockRiskQuery,
+  useGetEmergencyRecommendationMutation,
+  useCheckStockWithCandidatesMutation,
 } from "./inventoryApi";
-import {
-  runEmergencyRecommendationAgent,
-  runStockCheckAgent,
-  runStockRiskAgent,
-} from "./agentApi";
 import type {
   BloodType,
   EmergencyInventoryRecommendation,
   InventoryResponse,
+  StockCheckWithCandidatesResponse,
 } from "./inventoryTypes";
-import type { StockCheckAgentResponse } from "./agentApi";
 import "./inventoryEmergency.css";
 
 const BLOOD_TYPES: BloodType[] = [
@@ -171,50 +169,18 @@ export function InventoryEmergencyPage() {
   const { data: lowStock = [] } =
     useGetLowStockQuery(organizationId ?? "", { skip });
 
-  const [stockRisk, setStockRisk] =
-    useState<import("./inventoryTypes").StockRiskResponse | null>(null);
+  const {
+    data: stockRisk,
+    isFetching: isRiskFetching,
+    isError: isRiskError,
+    refetch: refetchRisk,
+  } = useGetStockRiskQuery(organizationId ?? "", { skip });
 
-  const [isRiskFetching, setIsRiskFetching] =
-    useState(false);
+  const [checkStockWithCandidates, { isLoading: isCheckingStock }] =
+    useCheckStockWithCandidatesMutation();
 
-  const [isRiskError, setIsRiskError] =
-    useState(false);
-
-  const [checkStockState, setCheckStockState] =
-    useState({ isLoading: false });
-
-  const [recommendationState, setRecommendationState] =
-    useState({ isLoading: false });
-
-  const refetchRisk = async () => {
-    if (!organizationId) {
-      return;
-    }
-
-    setIsRiskFetching(true);
-    setIsRiskError(false);
-
-    try {
-      const result =
-        await runStockRiskAgent(organizationId);
-
-      setStockRisk(result);
-    } catch (riskError) {
-      console.error("Stock Risk Agent failed:", riskError);
-      setIsRiskError(true);
-    } finally {
-      setIsRiskFetching(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!organizationId) {
-      setStockRisk(null);
-      return;
-    }
-
-    void refetchRisk();
-  }, [organizationId]);
+  const [getEmergencyRecommendation, { isLoading: isRecommending }] =
+    useGetEmergencyRecommendationMutation();
 
   const [bloodType, setBloodType] =
     useState<BloodType>("OPositive");
@@ -234,7 +200,7 @@ export function InventoryEmergencyPage() {
     useState("");
 
   const [stockCheckResult, setStockCheckResult] =
-    useState<StockCheckAgentResponse | null>(null);
+    useState<StockCheckWithCandidatesResponse | null>(null);
 
   const [recommendation, setRecommendation] =
     useState<EmergencyInventoryRecommendation | null>(null);
@@ -333,45 +299,21 @@ export function InventoryEmergencyPage() {
       return;
     }
 
-    setCheckStockState({ isLoading: true });
-    setRecommendationState({ isLoading: false });
-
     try {
-      // Agent 01: React -> Python Agent Service -> .NET internal API
-     const stockResult =
-  await runStockCheckAgent({
-    workflowId: crypto.randomUUID(),
-    requestingOrgId: organizationId,
-    bloodType:
-      bloodType === "APositive"
-        ? "A+"
-        : bloodType === "ANegative"
-          ? "A-"
-          : bloodType === "BPositive"
-            ? "B+"
-            : bloodType === "BNegative"
-              ? "B-"
-              : bloodType === "ABPositive"
-                ? "AB+"
-                : bloodType === "ABNegative"
-                  ? "AB-"
-                  : bloodType === "OPositive"
-                    ? "O+"
-                    : "O-",
-    unitsNeeded: units,
-  });
+      const stockResult = await checkStockWithCandidates({
+        organizationId,
+        bloodType,
+        requiredUnits: units,
+      }).unwrap();
 
       setStockCheckResult(stockResult);
 
-      // Agent 03: React -> Python Agent Service -> .NET internal API
-      setRecommendationState({ isLoading: true });
-
       const recommendationResult =
-        await runEmergencyRecommendationAgent({
+        await getEmergencyRecommendation({
           bloodType,
           requiredUnits: units,
           urgency,
-        });
+        }).unwrap();
 
       setRecommendation(
         recommendationResult,
@@ -380,18 +322,22 @@ export function InventoryEmergencyPage() {
       setChecked(true);
     } catch (requestError) {
       console.error(
-        "Emergency agents failed:",
+        "Emergency stock check failed:",
         requestError,
       );
 
+      const message =
+        requestError &&
+        typeof requestError === "object" &&
+        "message" in requestError &&
+        typeof (requestError as { message?: unknown }).message === "string"
+          ? (requestError as { message: string }).message
+          : undefined;
+
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "We could not complete the emergency stock analysis. Please check your connection and try again.",
+        message ??
+          "We could not complete the emergency stock analysis. Please check your connection and try again.",
       );
-    } finally {
-      setCheckStockState({ isLoading: false });
-      setRecommendationState({ isLoading: false });
     }
   }
 
@@ -705,11 +651,11 @@ export function InventoryEmergencyPage() {
                 className="emergency-primary-button"
                 onClick={handleCheck}
                 disabled={
-                  checkStockState.isLoading ||
-                  recommendationState.isLoading
+                  isCheckingStock ||
+                  isRecommending
                 }
               >
-                {checkStockState.isLoading || recommendationState.isLoading
+                {isCheckingStock || isRecommending
                   ? "Analyzing..."
                   : "Check Availability"}
               </button>

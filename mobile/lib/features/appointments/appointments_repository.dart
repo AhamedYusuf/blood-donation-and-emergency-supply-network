@@ -47,12 +47,51 @@ class AppointmentsRepository {
     );
   }
 
+  /// POST /api/appointments/{id}/confirm — accepts an agent-dispatched
+  /// (pending_confirmation) appointment at its proposed time.
+  Future<Appointment> confirm(String appointmentId) async {
+    final json = await _api.post(
+      '/api/appointments/$appointmentId/confirm',
+      token: _token,
+    );
+    return Appointment.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// POST /api/appointments/{id}/decline — declines an agent-dispatched
+  /// (pending_confirmation) appointment outright.
+  Future<Appointment> decline(String appointmentId) async {
+    final json = await _api.post(
+      '/api/appointments/$appointmentId/decline',
+      token: _token,
+    );
+    return Appointment.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// PUT /api/appointments/{id}/reschedule — moves a scheduled or
+  /// pending appointment to a new time; settles a pending one as
+  /// confirmed at that new time in the same call.
+  Future<Appointment> reschedule(String appointmentId, DateTime newScheduledTime) async {
+    final json = await _api.put(
+      '/api/appointments/$appointmentId/reschedule',
+      token: _token,
+      body: {'newScheduledTime': newScheduledTime.toUtc().toIso8601String()},
+    );
+    return Appointment.fromJson(json as Map<String, dynamic>);
+  }
+
   /// GET /api/organizations, narrowed to blood banks for the booking picker.
   Future<List<BloodBank>> bloodBanks() async {
     final json = await _api.get('/api/organizations', token: _token);
     final list = (json as List).cast<Map<String, dynamic>>();
+    // The backend serializes OrganizationType as its raw C# enum name
+    // ("BloodBank", "Hospital" — OrganizationService.ToResponse does
+    // `organization.Type.ToString()`), not a snake_case string. This
+    // comparison was checking for 'blood_bank', which never matches —
+    // confirmed live against the real API: every organization is
+    // "BloodBank"/"Hospital", so this picker was silently empty the
+    // whole time, not just when no blood banks existed.
     return list
-        .where((o) => (o['type'] as String?)?.toLowerCase() == 'blood_bank')
+        .where((o) => (o['type'] as String?)?.toLowerCase() == 'bloodbank')
         .map(BloodBank.fromJson)
         .toList();
   }

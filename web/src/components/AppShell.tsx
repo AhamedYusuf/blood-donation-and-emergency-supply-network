@@ -25,7 +25,7 @@ interface NavItem {
   built?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const OPERATIONS_NAV_ITEMS: NavItem[] = [
   { label: "Appointments", icon: "◧", path: "/" },
   { label: "Requests", icon: "◇", path: "/requests" },
   { label: "Inventory", icon: "▤", path: "/inventory", allowedRoles: ["staff", "admin"] },
@@ -41,6 +41,13 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const DONOR_NAV_ITEMS: NavItem[] = [
+  { label: "Home", icon: "⌂", path: "/" },
+  { label: "Donations", icon: "◷", path: "/appointments" },
+  { label: "Requests", icon: "◇", path: "/requests" },
+  { label: "Profile", icon: "◎", path: "/profile" },
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -50,6 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const navItems = role === "donor" ? DONOR_NAV_ITEMS : OPERATIONS_NAV_ITEMS;
 
   const resolveNavPath = (item: NavItem): string | null => {
     // Not built yet — no route exists to send them to.
@@ -104,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           B
         </div>
 
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const targetPath = resolveNavPath(item);
           const active = isActive(item);
           const clickable = targetPath !== null;

@@ -18,6 +18,8 @@ StatusStyle statusStyle(String status) => switch (status) {
       'completed' => const StatusStyle('Completed', AppColors.success, AppColors.successSubtle),
       'no_show' => const StatusStyle('No-show', AppColors.critical, AppColors.criticalSubtle),
       'cancelled' => const StatusStyle('Cancelled', AppColors.neutral, AppColors.neutralSubtle),
+      'pending_confirmation' => const StatusStyle('Awaiting you', AppColors.primary, AppColors.primarySubtle),
+      'declined' => const StatusStyle('Declined', AppColors.neutral, AppColors.neutralSubtle),
       _ => StatusStyle(status, AppColors.neutral, AppColors.neutralSubtle),
     };
 

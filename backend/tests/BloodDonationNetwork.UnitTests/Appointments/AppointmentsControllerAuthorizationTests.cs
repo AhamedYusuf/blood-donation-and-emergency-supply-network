@@ -315,5 +315,20 @@ public class AppointmentsControllerAuthorizationTests
 
         public Task<AppointmentResponseDto> CreateAsync(Guid donorId, CreateAppointmentDto dto)
             => Task.FromResult(new AppointmentResponseDto { Id = Guid.NewGuid(), DonorId = donorId });
+
+        public Task<AppointmentResponseDto> ConfirmAsync(Guid id, Guid donorUserId)
+            => Task.FromResult(new AppointmentResponseDto { Id = id, DonorId = donorUserId, Status = "scheduled" });
+
+        public Task<AppointmentResponseDto> DeclineAsync(Guid id, Guid donorUserId)
+            => Task.FromResult(new AppointmentResponseDto { Id = id, DonorId = donorUserId, Status = "declined" });
+
+        public Task<AppointmentResponseDto> RescheduleAsync(Guid id, Guid donorUserId, DateTime newScheduledTime)
+            => Task.FromResult(new AppointmentResponseDto
+            {
+                Id = id,
+                DonorId = donorUserId,
+                Status = "scheduled",
+                ScheduledTime = newScheduledTime,
+            });
     }
 }

@@ -320,6 +320,39 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                     b.ToTable("DonorDevices");
                 });
 
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonorNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DataJson")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DonorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonorUserId");
+
+                    b.ToTable("DonorNotifications");
+                });
+
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonorProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -628,6 +661,15 @@ namespace BloodDonationNetwork.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonorDevice", b =>
+                {
+                    b.HasOne("BloodDonationNetwork.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("DonorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BloodDonationNetwork.Domain.Entities.DonorNotification", b =>
                 {
                     b.HasOne("BloodDonationNetwork.Domain.Entities.User", null)
                         .WithMany()

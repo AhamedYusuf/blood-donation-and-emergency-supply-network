@@ -17,6 +17,11 @@ import { DonorVerificationQueuePage } from "./features/donors/DonorVerificationQ
 import { DonorSearchPage } from "./features/donors/DonorSearchPage";
 
 import { AppointmentsConsolePage } from "./features/appointments/AppointmentsConsolePage";
+import { DonorAppointmentsPage } from "./features/donor/DonorAppointmentsPage";
+import { DonorHomePage } from "./features/donor/DonorHomePage";
+import { DonorRequestsPage } from "./features/donor/DonorRequestsPage";
+import { DonorAccountPage } from "./features/donor/DonorProfilePage";
+import { BookAppointmentPage } from "./features/donor/BookAppointmentPage";
 import { AppShell } from "./components/AppShell";
 
 import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
@@ -125,6 +130,16 @@ export function RequireDonorProfile({
   return <>{children}</>;
 }
 
+function HomePageByRole() {
+  const role = useSelector((state: RootState) => (state.auth.role ?? "").toLowerCase());
+  return role === "donor" ? <DonorHomePage /> : <AppointmentsConsolePage />;
+}
+
+function RequestsPageByRole() {
+  const role = useSelector((state: RootState) => (state.auth.role ?? "").toLowerCase());
+  return role === "donor" ? <DonorRequestsPage /> : <RequestsPage />;
+}
+
 // =====================================================
 // APP
 // =====================================================
@@ -182,9 +197,22 @@ export function App() {
             <RequireAuth>
               <RequireDonorProfile>
                 <AppShell>
-                  <AppointmentsConsolePage />
+                  <HomePageByRole />
                 </AppShell>
               </RequireDonorProfile>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/appointments/book"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <AppShell>
+                  <BookAppointmentPage />
+                </AppShell>
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -192,6 +220,36 @@ export function App() {
         {/* =================================================
             DONOR MODULE
            ================================================= */}
+
+        <Route
+          path="/appointments"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <RequireDonorProfile>
+                  <AppShell>
+                    <DonorAppointmentsPage />
+                  </AppShell>
+                </RequireDonorProfile>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <RequireDonorProfile>
+                  <AppShell>
+                    <DonorAccountPage />
+                  </AppShell>
+                </RequireDonorProfile>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
 
         <Route
           path="/donors/search"
@@ -328,7 +386,7 @@ export function App() {
             <RequireAuth>
               <RequireDonorProfile>
                 <AppShell>
-                  <RequestsPage />
+                  <RequestsPageByRole />
                 </AppShell>
               </RequireDonorProfile>
             </RequireAuth>

@@ -6,6 +6,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <!-- ExecuteUpdateAsync (used by InventoryService for atomic stock
+         changes) lives in the Relational extensions, not the base
+         package above. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.10" />
   </ItemGroup>
 
   <PropertyGroup>

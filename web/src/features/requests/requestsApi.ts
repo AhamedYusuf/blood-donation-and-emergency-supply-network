@@ -45,6 +45,18 @@ export const requestsApi = baseApi.injectEndpoints({
           );
         }
 
+        if (safeFilters.nearLat !== undefined) {
+          params.append("nearLat", String(safeFilters.nearLat));
+        }
+
+        if (safeFilters.nearLng !== undefined) {
+          params.append("nearLng", String(safeFilters.nearLng));
+        }
+
+        if (safeFilters.radiusKm !== undefined) {
+          params.append("radiusKm", String(safeFilters.radiusKm));
+        }
+
         params.append(
           "page",
           String(safeFilters.page ?? 1)
