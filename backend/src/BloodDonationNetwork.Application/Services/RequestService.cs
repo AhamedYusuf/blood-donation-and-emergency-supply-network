@@ -15,6 +15,7 @@ public class RequestService : IRequestService
     private const double DefaultNearbyRadiusKm = 50;
 
     private readonly IApplicationDbContext _context;
+    private readonly IEligibilityRuleEngine _eligibilityEngine;
 
     private static readonly HashSet<string> ValidRequestStatuses =
         new(StringComparer.OrdinalIgnoreCase)
@@ -29,9 +30,10 @@ public class RequestService : IRequestService
             RequestStatuses.Cancelled
         };
 
-    public RequestService(IApplicationDbContext context)
+    public RequestService(IApplicationDbContext context, IEligibilityRuleEngine? eligibilityEngine = null)
     {
         _context = context;
+        _eligibilityEngine = eligibilityEngine ?? new EligibilityRuleEngine();
     }
 
     // 1. Create a new blood request
@@ -108,7 +110,8 @@ public class RequestService : IRequestService
         bool descending = true,
         double? nearLat = null,
         double? nearLng = null,
-        double? radiusKm = null)
+        double? radiusKm = null,
+        Guid? donorUserId = null)
     {
         var query = _context.BloodRequests
             .AsNoTracking()
@@ -160,6 +163,21 @@ public class RequestService : IRequestService
                 r => r.OrganizationId == organizationId.Value);
         }
 
+        List<BloodRequest>? donorFilteredRequests = null;
+        if (donorUserId is { } donorUser)
+        {
+            var donor = await _context.DonorProfiles
+                .FirstOrDefaultAsync(profile => profile.UserId == donorUser);
+
+            if (donor is null || !_eligibilityEngine.Evaluate(donor, donor.BloodType).IsEligible)
+                return Array.Empty<RequestResponseDto>();
+
+            var candidates = await query.ToListAsync();
+            donorFilteredRequests = candidates
+                .Where(request => BloodCompatibility.CanDonateTo(donor.BloodType, request.BloodType))
+                .ToList();
+        }
+
         // Prevent invalid pagination values
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 10 : pageSize;
@@ -175,7 +193,7 @@ public class RequestService : IRequestService
         {
             var effectiveRadiusKm = radiusKm ?? DefaultNearbyRadiusKm;
 
-            var candidates = await query.ToListAsync();
+            var candidates = donorFilteredRequests ?? await query.ToListAsync();
 
             var withDistance = candidates
                 .Select(r => (
@@ -219,6 +237,30 @@ public class RequestService : IRequestService
 
             return pagedWithDistance.Select(
                 x => MapToResponse(x.Request, x.DistanceKm));
+        }
+
+        if (donorFilteredRequests is not null)
+        {
+            IEnumerable<BloodRequest> sorted = sortBy.ToLowerInvariant() switch
+            {
+                "urgency" => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.Urgency)
+                    : donorFilteredRequests.OrderBy(r => r.Urgency),
+                "bloodtype" => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.BloodType)
+                    : donorFilteredRequests.OrderBy(r => r.BloodType),
+                "unitsrequested" => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.UnitsRequested)
+                    : donorFilteredRequests.OrderBy(r => r.UnitsRequested),
+                _ => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.CreatedAt)
+                    : donorFilteredRequests.OrderBy(r => r.CreatedAt),
+            };
+
+            return sorted
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(request => MapToResponse(request));
         }
 
         // Sorting

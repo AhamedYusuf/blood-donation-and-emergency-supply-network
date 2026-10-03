@@ -33,6 +33,15 @@ public class EligibilityRuleEngineTests
     }
 
     [Fact]
+    public void Fails_immediately_after_donation()
+    {
+        var donor = MakeDonor(lastDonation: DateOnly.FromDateTime(DateTime.UtcNow));
+        var (isEligible, reason) = _engine.Evaluate(donor, "O-");
+        Assert.False(isEligible);
+        Assert.Contains("days remaining", reason);
+    }
+
+    [Fact]
     public void Passes_at_exactly_90_days()
     {
         var donor = MakeDonor(lastDonation: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-90)));

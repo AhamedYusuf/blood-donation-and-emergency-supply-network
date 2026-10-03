@@ -249,7 +249,8 @@ public class RequestsController : ControllerBase
                     descending,
                     nearLat,
                     nearLng,
-                    radiusKm);
+                    radiusKm,
+                    donorUserId);
 
             return Ok(requests);
         }

@@ -75,6 +75,7 @@ public sealed class CompleteAppointmentTransactionTests : IDisposable
         var donor = await verify.DonorProfiles.SingleAsync(d => d.UserId == DonorUserId);
         Assert.NotNull(donor.LastDonationDate);
         Assert.InRange(donor.LastDonationDate!.Value, beforeUtcDate, afterUtcDate);
+        Assert.Equal("not_eligible", donor.EligibilityStatus);
 
         var inventory = await verify.BloodBankInventories.SingleAsync(
             i => i.OrganizationId == OrgId && i.BloodType == DomainBloodType.OPositive);
