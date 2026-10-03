@@ -21,6 +21,7 @@ import { DonorAppointmentsPage } from "./features/donor/DonorAppointmentsPage";
 import { DonorHomePage } from "./features/donor/DonorHomePage";
 import { DonorRequestsPage } from "./features/donor/DonorRequestsPage";
 import { DonorAccountPage } from "./features/donor/DonorProfilePage";
+import { BookAppointmentPage } from "./features/donor/BookAppointmentPage";
 import { AppShell } from "./components/AppShell";
 
 import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
