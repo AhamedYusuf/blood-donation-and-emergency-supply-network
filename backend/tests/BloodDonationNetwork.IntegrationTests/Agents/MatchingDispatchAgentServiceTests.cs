@@ -133,7 +133,10 @@ public sealed class MatchingDispatchAgentServiceTests : IDisposable
         // resolve that itself.
         Assert.Equal(DonorUserId, appointment.DonorId);
         Assert.Equal(OrgId, appointment.OrganizationId);
-        Assert.Equal(AppointmentStatus.Scheduled, appointment.Status);
+        // Agent-dispatched appointments wait for the donor's own
+        // confirm/decline rather than committing their time for them —
+        // see AppointmentService.CreateAsync.
+        Assert.Equal(AppointmentStatus.PendingConfirmation, appointment.Status);
     }
 
     // Real bug found live (2026-09-26): a batch dispatch with one bad

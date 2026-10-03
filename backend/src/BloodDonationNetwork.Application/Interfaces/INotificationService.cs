@@ -1,3 +1,6 @@
+using BloodDonationNetwork.Application.Common;
+using BloodDonationNetwork.Application.DTOs.Notifications;
+
 namespace BloodDonationNetwork.Application.Interfaces;
 
 /// <summary>Aggregate result of notifying one donor across all their devices.</summary>
@@ -40,5 +43,20 @@ public interface INotificationService
     Task UnregisterDeviceAsync(
         Guid donorUserId,
         string fcmToken,
+        CancellationToken cancellationToken = default);
+
+    Task<PagedResult<DonorNotificationDto>> GetForDonorAsync(
+        Guid donorUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<int> GetUnreadCountAsync(
+        Guid donorUserId,
+        CancellationToken cancellationToken = default);
+
+    Task MarkAsReadAsync(
+        Guid id,
+        Guid donorUserId,
         CancellationToken cancellationToken = default);
 }

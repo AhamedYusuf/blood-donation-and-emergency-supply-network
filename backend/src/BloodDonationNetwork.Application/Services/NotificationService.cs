@@ -1,3 +1,6 @@
+using System.Text.Json;
+using BloodDonationNetwork.Application.Common;
+using BloodDonationNetwork.Application.DTOs.Notifications;
 using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -31,60 +34,91 @@ public class NotificationService : INotificationService
         IReadOnlyDictionary<string, string>? data = null,
         CancellationToken cancellationToken = default)
     {
+        // Written unconditionally, before the push attempt — the inbox is
+        // the reliable record of "this donor was notified," independent
+        // of whether a push could actually be delivered (no registered
+        // devices, FCM not configured, every device transiently failing
+        // are all real possibilities this method already tolerates).
+        // Every return path below falls through to one SaveChangesAsync
+        // at the end so this row is never silently dropped on an
+        // early-return branch.
+        _db.DonorNotifications.Add(new DonorNotification
+        {
+            Id = Guid.NewGuid(),
+            DonorUserId = donorUserId,
+            Title = title,
+            Body = body,
+            DataJson = data is { Count: > 0 }
+                ? JsonSerializer.Serialize(data)
+                : null,
+        });
+
         var devices = await _db.DonorDevices
             .Where(d => d.DonorUserId == donorUserId)
             .ToListAsync(cancellationToken);
 
+        NotificationResult result;
+
         if (devices.Count == 0)
         {
-            return NotificationResult.NoDevices(donorUserId);
+            result = NotificationResult.NoDevices(donorUserId);
         }
-
-        var delivered = 0;
-        var deadTokens = new List<DonorDevice>();
-
-        foreach (var device in devices)
+        else
         {
-            var outcome = await SendWithRetryAsync(device.FcmToken, title, body, data, cancellationToken);
+            var delivered = 0;
+            var deadTokens = new List<DonorDevice>();
+            var notConfigured = false;
 
-            switch (outcome)
+            foreach (var device in devices)
             {
-                case FcmSendOutcome.Delivered:
-                    delivered++;
-                    device.LastSeenAt = DateTime.UtcNow;
-                    break;
+                var outcome = await SendWithRetryAsync(device.FcmToken, title, body, data, cancellationToken);
 
-                case FcmSendOutcome.InvalidToken:
-                    deadTokens.Add(device);
-                    break;
+                switch (outcome)
+                {
+                    case FcmSendOutcome.Delivered:
+                        delivered++;
+                        device.LastSeenAt = DateTime.UtcNow;
+                        break;
 
-                case FcmSendOutcome.NotConfigured:
-                    return NotificationResult.NotConfigured(donorUserId);
+                    case FcmSendOutcome.InvalidToken:
+                        deadTokens.Add(device);
+                        break;
 
-                case FcmSendOutcome.TransientFailure:
-                    // Exhausted retries for this device; recorded in the
-                    // aggregate result below.
+                    case FcmSendOutcome.NotConfigured:
+                        notConfigured = true;
+                        break;
+
+                    case FcmSendOutcome.TransientFailure:
+                        // Exhausted retries for this device; recorded in
+                        // the aggregate result below.
+                        break;
+                }
+
+                if (notConfigured)
+                {
                     break;
+                }
             }
+
+            if (deadTokens.Count > 0)
+            {
+                _db.DonorDevices.RemoveRange(deadTokens);
+            }
+
+            result = notConfigured
+                ? NotificationResult.NotConfigured(donorUserId)
+                : new NotificationResult(
+                    DonorUserId: donorUserId,
+                    DevicesTried: devices.Count,
+                    Delivered: delivered,
+                    InvalidTokensPruned: deadTokens.Count,
+                    AnyDelivered: delivered > 0,
+                    FailureReason: delivered == 0 ? "No device accepted the notification" : null);
         }
 
-        if (deadTokens.Count > 0)
-        {
-            _db.DonorDevices.RemoveRange(deadTokens);
-        }
+        await _db.SaveChangesAsync(cancellationToken);
 
-        if (delivered > 0 || deadTokens.Count > 0)
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-
-        return new NotificationResult(
-            DonorUserId: donorUserId,
-            DevicesTried: devices.Count,
-            Delivered: delivered,
-            InvalidTokensPruned: deadTokens.Count,
-            AnyDelivered: delivered > 0,
-            FailureReason: delivered == 0 ? "No device accepted the notification" : null);
+        return result;
     }
 
     private async Task<FcmSendOutcome> SendWithRetryAsync(
@@ -170,6 +204,75 @@ public class NotificationService : INotificationService
             await _db.SaveChangesAsync(cancellationToken);
         }
     }
+
+    public async Task<PagedResult<DonorNotificationDto>> GetForDonorAsync(
+        Guid donorUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = _db.DonorNotifications
+            .AsNoTracking()
+            .Where(n => n.DonorUserId == donorUserId)
+            .OrderByDescending(n => n.CreatedAt);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<DonorNotificationDto>
+        {
+            Items = items.Select(ToDto).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+        };
+    }
+
+    public Task<int> GetUnreadCountAsync(
+        Guid donorUserId,
+        CancellationToken cancellationToken = default) =>
+        _db.DonorNotifications
+            .Where(n => n.DonorUserId == donorUserId && n.ReadAt == null)
+            .CountAsync(cancellationToken);
+
+    public async Task MarkAsReadAsync(
+        Guid id,
+        Guid donorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var notification = await _db.DonorNotifications
+            .FirstOrDefaultAsync(n => n.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Notification {id} not found.");
+
+        if (notification.DonorUserId != donorUserId)
+        {
+            throw new UnauthorizedAccessException(
+                "You may only mark your own notifications as read.");
+        }
+
+        // Idempotent — marking an already-read notification again just
+        // keeps its original ReadAt rather than bumping it forward.
+        notification.ReadAt ??= DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static DonorNotificationDto ToDto(DonorNotification n) => new(
+        n.Id,
+        n.Title,
+        n.Body,
+        n.DataJson is null
+            ? null
+            : JsonSerializer.Deserialize<Dictionary<string, string>>(n.DataJson),
+        n.CreatedAt,
+        n.ReadAt);
 
     private static string NormalisePlatform(string platform)
     {

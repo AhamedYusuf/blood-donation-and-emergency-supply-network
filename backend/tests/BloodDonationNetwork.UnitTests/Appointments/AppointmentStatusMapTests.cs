@@ -14,6 +14,8 @@ public class AppointmentStatusMapTests
         [AppointmentStatus.Completed, "completed"],
         [AppointmentStatus.NoShow, "no_show"],
         [AppointmentStatus.Cancelled, "cancelled"],
+        [AppointmentStatus.PendingConfirmation, "pending_confirmation"],
+        [AppointmentStatus.Declined, "declined"],
     ];
 
     // ---------------------------------------------------------------

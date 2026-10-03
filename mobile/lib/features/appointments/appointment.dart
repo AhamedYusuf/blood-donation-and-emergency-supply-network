@@ -16,17 +16,36 @@ class Appointment {
   final String organizationId;
   final String? relatedWorkflowId;
   final DateTime scheduledTime;
-  final String status; // scheduled | completed | no_show | cancelled
+
+  // scheduled | pending_confirmation | completed | no_show | cancelled | declined
+  //
+  // An appointment the Matching & Dispatch Agent books on the donor's
+  // behalf starts as pending_confirmation rather than scheduled — the
+  // donor didn't request this slot themselves, so it waits for an
+  // explicit confirm/decline. A self-booked appointment still goes
+  // straight to scheduled, same as before.
+  final String status;
   final String? donorBloodType;
   final int? unitsDonated;
 
   bool get isAgentMatched => relatedWorkflowId != null;
 
-  /// "Active" = still on the books and in the future.
-  bool get isUpcoming =>
-      status == 'scheduled' && scheduledTime.isAfter(DateTime.now());
+  bool get isPendingConfirmation => status == 'pending_confirmation';
 
-  bool get canCancel => status == 'scheduled' && scheduledTime.isAfter(DateTime.now());
+  bool get _isFuture => scheduledTime.isAfter(DateTime.now());
+
+  /// "Active" = still on the books and in the future — pending,
+  /// unconfirmed agent-dispatched appointments belong here too, since
+  /// they need the donor's attention, not just confirmed ones.
+  bool get isUpcoming =>
+      (status == 'scheduled' || status == 'pending_confirmation') && _isFuture;
+
+  bool get canCancel => status == 'scheduled' && _isFuture;
+
+  bool get canConfirmOrDecline => isPendingConfirmation && _isFuture;
+
+  bool get canReschedule =>
+      (status == 'scheduled' || status == 'pending_confirmation') && _isFuture;
 
   factory Appointment.fromJson(Map<String, dynamic> json) => Appointment(
         id: json['id'] as String,

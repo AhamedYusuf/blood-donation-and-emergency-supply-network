@@ -11,6 +11,7 @@ import '../../widgets/states.dart';
 import '../appointments/appointment.dart';
 import '../appointments/appointments_repository.dart';
 import '../auth/auth_controller.dart';
+import '../notifications/notification_inbox_repository.dart';
 
 /// Donor home. Plain iOS-style large title — no colour block, no
 /// gradient — with the donor's own avatar as the way into Profile. The
@@ -50,6 +51,8 @@ class HomeScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                const _NotificationBell(),
+                const SizedBox(width: AppSpacing.xs),
                 InkWell(
                   onTap: () => context.go('/profile'),
                   customBorder: const CircleBorder(),
@@ -257,6 +260,45 @@ class _ActionRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bell icon with an unread-count badge, opening the notification inbox.
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadNotificationCountProvider).valueOrNull ?? 0;
+
+    return InkWell(
+      onTap: () => context.push('/notifications'),
+      customBorder: const CircleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxs),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.notifications_none, size: 24, color: AppColors.ink),
+            if (unread > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  constraints: const BoxConstraints(minWidth: 16),
+                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  child: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: AppText.caption.copyWith(color: Colors.white, fontSize: 9),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

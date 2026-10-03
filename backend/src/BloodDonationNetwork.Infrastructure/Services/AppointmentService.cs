@@ -31,7 +31,14 @@ public class AppointmentService : IAppointmentService
             OrganizationId = dto.OrganizationId,
             RelatedWorkflowId = dto.RelatedWorkflowId,
             ScheduledTime = dto.ScheduledTime,
-            Status = AppointmentStatus.Scheduled,
+            // A donor booking their own slot IS the confirmation. An
+            // appointment the Matching & Dispatch Agent creates on the
+            // donor's behalf (RelatedWorkflowId set) is a reservation
+            // nobody asked them to accept yet — it waits for an explicit
+            // confirm/decline instead of silently committing their time.
+            Status = dto.RelatedWorkflowId.HasValue
+                ? AppointmentStatus.PendingConfirmation
+                : AppointmentStatus.Scheduled,
             UnitsDonated = null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -91,6 +98,88 @@ public class AppointmentService : IAppointmentService
         return MapToDto(appointment, await GetDonorBloodTypeAsync(appointment.DonorId));
     }
 
+    public async Task<AppointmentResponseDto> ConfirmAsync(Guid id, Guid donorUserId)
+    {
+        var appointment = await GetOwnedPendingAppointmentAsync(id, donorUserId, "confirmed");
+
+        appointment.Status = AppointmentStatus.Scheduled;
+        appointment.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(appointment, await GetDonorBloodTypeAsync(appointment.DonorId));
+    }
+
+    public async Task<AppointmentResponseDto> DeclineAsync(Guid id, Guid donorUserId)
+    {
+        var appointment = await GetOwnedPendingAppointmentAsync(id, donorUserId, "declined");
+
+        appointment.Status = AppointmentStatus.Declined;
+        appointment.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(appointment, await GetDonorBloodTypeAsync(appointment.DonorId));
+    }
+
+    public async Task<AppointmentResponseDto> RescheduleAsync(Guid id, Guid donorUserId, DateTime newScheduledTime)
+    {
+        var appointment = await _context.DonationAppointments
+            .FirstOrDefaultAsync(a => a.Id == id)
+            ?? throw new KeyNotFoundException($"Appointment {id} not found.");
+
+        if (appointment.DonorId != donorUserId)
+        {
+            throw new UnauthorizedAccessException("You may only reschedule your own appointments.");
+        }
+
+        if (appointment.Status is not (AppointmentStatus.Scheduled or AppointmentStatus.PendingConfirmation))
+        {
+            throw new InvalidOperationException(
+                "Only a scheduled or pending appointment can be rescheduled.");
+        }
+
+        if (newScheduledTime <= DateTime.UtcNow)
+        {
+            throw new ArgumentException("The new scheduled time must be in the future.");
+        }
+
+        appointment.ScheduledTime = newScheduledTime;
+
+        // Picking a new time is itself an acceptance — rescheduling a
+        // still-pending, agent-dispatched appointment settles it at the
+        // new time rather than leaving a separate confirm step after.
+        appointment.Status = AppointmentStatus.Scheduled;
+        appointment.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(appointment, await GetDonorBloodTypeAsync(appointment.DonorId));
+    }
+
+    // Shared ownership/state guard for Confirm/Decline — both only ever
+    // act on the caller's own, still-pending appointment.
+    private async Task<DonationAppointment> GetOwnedPendingAppointmentAsync(
+        Guid id, Guid donorUserId, string action)
+    {
+        var appointment = await _context.DonationAppointments
+            .FirstOrDefaultAsync(a => a.Id == id)
+            ?? throw new KeyNotFoundException($"Appointment {id} not found.");
+
+        if (appointment.DonorId != donorUserId)
+        {
+            throw new UnauthorizedAccessException($"You may only respond to your own appointments.");
+        }
+
+        if (appointment.Status != AppointmentStatus.PendingConfirmation)
+        {
+            throw new InvalidOperationException(
+                $"Only a pending appointment can be {action}.");
+        }
+
+        return appointment;
+    }
+
     public async Task<List<AppointmentResponseDto>> GetByDonorAsync(Guid donorId)
     {
         var appointments = await _context.DonationAppointments
@@ -122,7 +211,8 @@ public class AppointmentService : IAppointmentService
         var query = _context.DonationAppointments
             .Where(a => a.OrganizationId == organizationId
                      && a.ScheduledTime > DateTime.UtcNow
-                     && a.Status != AppointmentStatus.Cancelled)
+                     && a.Status != AppointmentStatus.Cancelled
+                     && a.Status != AppointmentStatus.Declined)
             .OrderBy(a => a.ScheduledTime);
 
         var totalCount = await query.CountAsync();

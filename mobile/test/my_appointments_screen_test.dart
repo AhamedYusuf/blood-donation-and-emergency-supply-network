@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:blood_donation_network/core/api_client.dart';
 import 'package:blood_donation_network/features/appointments/appointment.dart';
 import 'package:blood_donation_network/features/appointments/appointments_repository.dart';
 import 'package:blood_donation_network/features/appointments/my_appointments_screen.dart';
+import 'package:blood_donation_network/features/auth/auth_controller.dart';
 import 'package:blood_donation_network/theme/app_theme.dart';
 import 'package:blood_donation_network/widgets/states.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 Appointment _appt({
   required String id,
@@ -60,7 +64,8 @@ void main() {
     expect(find.text('Scheduled'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Agent match'), findsOneWidget); // agent tag on the hero
-    expect(find.text('Cancel appointment'), findsOneWidget); // only on the cancellable hero
+    expect(find.text('Cancel'), findsOneWidget); // only on the cancellable hero
+    expect(find.text('Reschedule'), findsOneWidget);
   });
 
   testWidgets('when nothing is upcoming, the hero slot invites a booking', (tester) async {
@@ -74,7 +79,7 @@ void main() {
 
     expect(find.text('Nothing booked'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Book a donation'), findsOneWidget);
-    expect(find.text('Cancel appointment'), findsNothing);
+    expect(find.text('Cancel'), findsNothing);
   });
 
   testWidgets('empty state offers a first booking', (tester) async {
@@ -85,6 +90,65 @@ void main() {
 
     expect(find.text('No donations booked'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Book a donation'), findsOneWidget);
+  });
+
+  testWidgets('a pending appointment offers Accept/Reschedule, not Cancel', (tester) async {
+    final now = DateTime.now();
+    await tester.pumpWidget(_host([
+      myAppointmentsProvider.overrideWith((ref) async => [
+            _appt(
+                id: 'pending1',
+                status: 'pending_confirmation',
+                when: now.add(const Duration(days: 1)),
+                workflowId: 'w1'),
+          ]),
+    ]));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Awaiting you'), findsOneWidget);
+    expect(find.text('Accept'), findsOneWidget);
+    expect(find.text('Reschedule'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing);
+  });
+
+  testWidgets('accepting a pending appointment calls confirm and shows a confirmation', (tester) async {
+    final now = DateTime.now();
+    final mock = MockClient((req) async {
+      expect(req.method, 'POST');
+      expect(req.url.path, '/api/appointments/pending1/confirm');
+      return http.Response(
+        jsonEncode({
+          'id': 'pending1',
+          'donorId': 'd1',
+          'organizationId': 'o1',
+          'relatedWorkflowId': 'w1',
+          'scheduledTime': now.add(const Duration(days: 1)).toUtc().toIso8601String(),
+          'status': 'scheduled',
+          'donorBloodType': 'O+',
+          'unitsDonated': null,
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await tester.pumpWidget(_host([
+      myAppointmentsProvider.overrideWith((ref) async => [
+            _appt(
+                id: 'pending1',
+                status: 'pending_confirmation',
+                when: now.add(const Duration(days: 1)),
+                workflowId: 'w1'),
+          ]),
+      apiClientProvider.overrideWithValue(ApiClient(httpClient: mock)),
+      authTokenProvider.overrideWithValue('test-token'),
+    ]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Accept'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Appointment confirmed'), findsOneWidget);
   });
 
   testWidgets('error state shows the message and a retry', (tester) async {

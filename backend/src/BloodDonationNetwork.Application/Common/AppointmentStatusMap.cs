@@ -18,6 +18,8 @@ public static class AppointmentStatusMap
         AppointmentStatus.Completed => "completed",
         AppointmentStatus.NoShow => "no_show",
         AppointmentStatus.Cancelled => "cancelled",
+        AppointmentStatus.PendingConfirmation => "pending_confirmation",
+        AppointmentStatus.Declined => "declined",
         _ => throw new ArgumentOutOfRangeException(
             nameof(status), status, "Unknown appointment status")
     };
@@ -28,6 +30,8 @@ public static class AppointmentStatusMap
         "completed" => AppointmentStatus.Completed,
         "no_show" => AppointmentStatus.NoShow,
         "cancelled" => AppointmentStatus.Cancelled,
+        "pending_confirmation" => AppointmentStatus.PendingConfirmation,
+        "declined" => AppointmentStatus.Declined,
         _ => throw new ArgumentException($"Invalid appointment status: '{status}'")
     };
 }

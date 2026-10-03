@@ -88,6 +88,62 @@ public sealed class NotificationServiceTests : IDisposable
         Assert.Equal("Donor has no registered devices", result.FailureReason);
     }
 
+    // The inbox row is the reliable record — it must exist even when no
+    // push could actually be delivered, which is exactly the case a real
+    // donor with the app freshly installed (no device registered yet) or
+    // mid-outage (FCM not configured) would hit.
+
+    [Fact]
+    public async Task SendToDonor_WithNoDevices_StillWritesTheInboxRow()
+    {
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm())
+                .SendToDonorAsync(Donor, "Urgent request", "Body text");
+        }
+
+        await using var verify = NewCtx();
+        var notification = await verify.DonorNotifications.SingleAsync(n => n.DonorUserId == Donor);
+        Assert.Equal("Urgent request", notification.Title);
+        Assert.Null(notification.ReadAt);
+    }
+
+    [Fact]
+    public async Task SendToDonor_WhenSenderNotConfigured_StillWritesTheInboxRow()
+    {
+        await using (var seed = NewCtx())
+        {
+            seed.DonorDevices.Add(Device(Donor, "a"));
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var ctx = NewCtx())
+        {
+            var fcm = new FakeFcm { Default = FcmSendOutcome.NotConfigured };
+            await new NotificationService(ctx, fcm).SendToDonorAsync(Donor, "t", "b");
+        }
+
+        await using var verify = NewCtx();
+        Assert.True(await verify.DonorNotifications.AnyAsync(n => n.DonorUserId == Donor));
+    }
+
+    [Fact]
+    public async Task SendToDonor_PersistsTheDataPayloadAsJson()
+    {
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm()).SendToDonorAsync(
+                Donor, "t", "b", new Dictionary<string, string> { ["appointmentId"] = "abc-123" });
+        }
+
+        await using var verify = NewCtx();
+        var result = await new NotificationService(verify, new FakeFcm())
+            .GetForDonorAsync(Donor, page: 1, pageSize: 10);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal("abc-123", item.Data?["appointmentId"]);
+    }
+
     [Fact]
     public async Task SendToDonor_DeliversToEveryDeviceAndBumpsLastSeen()
     {
@@ -219,5 +275,129 @@ public sealed class NotificationServiceTests : IDisposable
         await using var verify = NewCtx();
         Assert.False(await verify.DonorDevices.AnyAsync(d => d.FcmToken == "mine"));
         Assert.True(await verify.DonorDevices.AnyAsync(d => d.FcmToken == "theirs"));
+    }
+
+    // ---------------------------------------------------------------
+    // Inbox: list / unread count / mark as read
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task GetForDonor_ReturnsNewestFirst_OnlyTheCallersOwn()
+    {
+        await using (var ctx = NewCtx())
+        {
+            var svc = new NotificationService(ctx, new FakeFcm());
+            await svc.SendToDonorAsync(Donor, "first", "b");
+            await svc.SendToDonorAsync(Donor, "second", "b");
+            await svc.SendToDonorAsync(OtherDonor, "not mine", "b");
+        }
+
+        await using var verify = NewCtx();
+        var result = await new NotificationService(verify, new FakeFcm())
+            .GetForDonorAsync(Donor, page: 1, pageSize: 20);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(["second", "first"], result.Items.Select(i => i.Title));
+    }
+
+    [Fact]
+    public async Task GetForDonor_Paginates()
+    {
+        await using (var ctx = NewCtx())
+        {
+            var svc = new NotificationService(ctx, new FakeFcm());
+            for (var i = 0; i < 5; i++)
+            {
+                await svc.SendToDonorAsync(Donor, $"n{i}", "b");
+            }
+        }
+
+        await using var verify = NewCtx();
+        var page1 = await new NotificationService(verify, new FakeFcm())
+            .GetForDonorAsync(Donor, page: 1, pageSize: 2);
+
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetUnreadCount_CountsOnlyUnread_ForThatDonor()
+    {
+        Guid firstId;
+        await using (var ctx = NewCtx())
+        {
+            var svc = new NotificationService(ctx, new FakeFcm());
+            await svc.SendToDonorAsync(Donor, "a", "b");
+            await svc.SendToDonorAsync(Donor, "b", "b");
+            await svc.SendToDonorAsync(OtherDonor, "not mine", "b");
+            firstId = (await ctx.DonorNotifications
+                .Where(n => n.DonorUserId == Donor)
+                .OrderBy(n => n.CreatedAt)
+                .FirstAsync()).Id;
+        }
+
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm()).MarkAsReadAsync(firstId, Donor);
+        }
+
+        await using var verify = NewCtx();
+        var unread = await new NotificationService(verify, new FakeFcm())
+            .GetUnreadCountAsync(Donor);
+
+        Assert.Equal(1, unread);
+    }
+
+    [Fact]
+    public async Task MarkAsRead_IsIdempotent_KeepsTheOriginalReadAt()
+    {
+        Guid id;
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm()).SendToDonorAsync(Donor, "t", "b");
+            id = (await ctx.DonorNotifications.SingleAsync()).Id;
+        }
+
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm()).MarkAsReadAsync(id, Donor);
+        }
+
+        DateTime firstReadAt;
+        await using (var verify = NewCtx())
+        {
+            firstReadAt = (await verify.DonorNotifications.SingleAsync()).ReadAt!.Value;
+        }
+
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm()).MarkAsReadAsync(id, Donor);
+        }
+
+        await using var final = NewCtx();
+        Assert.Equal(firstReadAt, (await final.DonorNotifications.SingleAsync()).ReadAt);
+    }
+
+    [Fact]
+    public async Task MarkAsRead_NotTheOwningDonor_Throws()
+    {
+        Guid id;
+        await using (var ctx = NewCtx())
+        {
+            await new NotificationService(ctx, new FakeFcm()).SendToDonorAsync(Donor, "t", "b");
+            id = (await ctx.DonorNotifications.SingleAsync()).Id;
+        }
+
+        await using var attempt = NewCtx();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => new NotificationService(attempt, new FakeFcm()).MarkAsReadAsync(id, OtherDonor));
+    }
+
+    [Fact]
+    public async Task MarkAsRead_UnknownNotification_ThrowsNotFound()
+    {
+        await using var ctx = NewCtx();
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => new NotificationService(ctx, new FakeFcm()).MarkAsReadAsync(Guid.NewGuid(), Donor));
     }
 }
