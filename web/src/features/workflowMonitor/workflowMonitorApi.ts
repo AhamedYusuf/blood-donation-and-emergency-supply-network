@@ -29,6 +29,17 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
       providesTags: ["Workflow"],
     }),
 
+    startWorkflowForBloodRequest: builder.mutation<
+      AgentWorkflow,
+      string
+    >({
+      query: (bloodRequestId) => ({
+        url: `/agent/workflows/request/${bloodRequestId}/start`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Workflow", "Request"],
+    }),
+
     getWorkflowSteps: builder.query<
       AgentStep[],
       string
@@ -131,6 +142,7 @@ export const workflowMonitorApi = baseApi.injectEndpoints({
 export const {
   useGetWorkflowQuery,
   useGetLatestWorkflowByBloodRequestQuery,
+  useStartWorkflowForBloodRequestMutation,
   useGetWorkflowStepsQuery,
   useGetWorkflowSummaryQuery,
   useApproveWorkflowMutation,

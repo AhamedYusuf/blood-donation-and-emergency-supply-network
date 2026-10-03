@@ -108,7 +108,7 @@ export const requestsApi = baseApi.injectEndpoints({
         body,
       }),
 
-      invalidatesTags: ["Request"],
+      invalidatesTags: ["Request", "Workflow"],
     }),
 
     updateRequestStatus: builder.mutation<
