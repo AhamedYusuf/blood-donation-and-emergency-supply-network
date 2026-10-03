@@ -46,6 +46,9 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<DonorDevice> DonorDevices =>
         Set<DonorDevice>();
 
+    public DbSet<DonorNotification> DonorNotifications =>
+        Set<DonorNotification>();
+
     public DbSet<StaffInvitation> StaffInvitations =>
         Set<StaffInvitation>();
 
@@ -77,6 +80,12 @@ public class AppDbContext : DbContext, IApplicationDbContext
             .HasOne<User>()
             .WithMany()
             .HasForeignKey(d => d.DonorUserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DonorNotification>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(n => n.DonorUserId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // =====================================================

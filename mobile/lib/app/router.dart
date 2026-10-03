@@ -8,6 +8,7 @@ import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/notifications/notification_inbox_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/donor_profile/screens/donor_registration_screen.dart';
 import '../features/donor_profile/screens/donor_profile_screen.dart';
@@ -156,6 +157,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             _rootNavigatorKey,
         builder: (_, _) =>
             const BookAppointmentScreen(),
+      ),
+
+      GoRoute(
+        path: '/notifications',
+        parentNavigatorKey:
+            _rootNavigatorKey,
+        builder: (_, _) =>
+            const NotificationInboxScreen(),
       ),
 
       GoRoute(

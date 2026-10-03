@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BloodDonationNetwork.Api.Controllers;
+using BloodDonationNetwork.Application.Common;
 using BloodDonationNetwork.Application.DTOs.Notifications;
 using BloodDonationNetwork.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
@@ -41,6 +42,16 @@ public class DevicesControllerTests
             SentTitle = title;
             return Task.FromResult(new NotificationResult(donorUserId, 1, 1, 0, true));
         }
+
+        public Task<PagedResult<DonorNotificationDto>> GetForDonorAsync(
+            Guid donorUserId, int page, int pageSize, CancellationToken ct = default) =>
+            Task.FromResult(new PagedResult<DonorNotificationDto>());
+
+        public Task<int> GetUnreadCountAsync(Guid donorUserId, CancellationToken ct = default) =>
+            Task.FromResult(0);
+
+        public Task MarkAsReadAsync(Guid id, Guid donorUserId, CancellationToken ct = default) =>
+            Task.CompletedTask;
     }
 
     private static DevicesController Build(INotificationService svc)
