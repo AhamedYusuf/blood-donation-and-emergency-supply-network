@@ -17,6 +17,13 @@ public interface IRequestService
 
     Task<RequestResponseDto?> GetByIdAsync(Guid id);
 
+    /// <summary>
+    /// When <paramref name="nearLat"/>/<paramref name="nearLng"/> are both
+    /// supplied, results are restricted to requests within
+    /// <paramref name="radiusKm"/> (default 50km) of that point — this is
+    /// how the donor-facing browse view limits itself to nearby requests
+    /// instead of returning every request network-wide.
+    /// </summary>
     Task<IEnumerable<RequestResponseDto>> GetAllAsync(
         BloodType? bloodType = null,
         RequestUrgency? urgency = null,
@@ -25,7 +32,10 @@ public interface IRequestService
         int page = 1,
         int pageSize = 10,
         string sortBy = "createdAt",
-        bool descending = true);
+        bool descending = true,
+        double? nearLat = null,
+        double? nearLng = null,
+        double? radiusKm = null);
 
     /// <summary>
     /// Throws <see cref="UnauthorizedAccessException"/> if the caller is

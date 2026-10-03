@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useGetOrganizationsQuery } from "../organizations/organizationsApi";
 import { useBookAppointmentMutation } from "../appointments/appointmentsApi";
 import { FormField } from "../../components/FormField";
@@ -11,8 +11,17 @@ import "./donor.css";
 // Styled to match the rest of the donor shell (donor.css) rather than
 // standing apart from DonorHomePage/DonorAppointmentsPage.
 
+interface BookingNavState {
+  organizationId?: string;
+  hospitalName?: string;
+}
+
 export function BookAppointmentPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Set when arriving from a blood request's "I can donate" button
+  // (RequestDetailsPage) — pre-fills the blood bank when it is one.
+  const navState = (location.state ?? {}) as BookingNavState;
 
   const { data: organizations = [], isLoading: isLoadingOrgs } = useGetOrganizationsQuery();
   // The backend serializes OrganizationType as its raw C# enum name
@@ -22,7 +31,18 @@ export function BookAppointmentPage() {
   // identical bug (checking for 'blood_bank'), fixed alongside this.
   const bloodBanks = organizations.filter((o) => o.type.toLowerCase() === "bloodbank");
 
-  const [organizationId, setOrganizationId] = useState("");
+  const [organizationId, setOrganizationId] = useState(navState.organizationId ?? "");
+
+  // A blood request's organizationId isn't necessarily a blood bank (a
+  // hospital can also create one) — only pre-select once we can confirm
+  // it's actually in the bookable list, otherwise leave it for the donor
+  // to pick themselves.
+  useEffect(() => {
+    if (navState.organizationId && bloodBanks.some((b) => b.id === navState.organizationId)) {
+      setOrganizationId(navState.organizationId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloodBanks.length]);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [touched, setTouched] = useState(false);
@@ -72,6 +92,20 @@ export function BookAppointmentPage() {
 
       <section className="donor-profile-card" style={{ marginTop: 28, maxWidth: 480, padding: 28 }}>
         <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {navState.hospitalName && (
+            <div
+              style={{
+                background: "var(--color-primary-subtle)",
+                borderRadius: "var(--radius-sm)",
+                padding: "10px 14px",
+                color: "var(--color-primary)",
+                fontSize: 13,
+              }}
+            >
+              Responding to a request from {navState.hospitalName}.
+            </div>
+          )}
+
           {apiError && (
             <div
               role="alert"
