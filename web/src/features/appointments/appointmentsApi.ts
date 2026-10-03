@@ -32,6 +32,7 @@ interface PagedResult<T> {
 
 type UpcomingResult = PagedResult<Appointment>;
 type UpcomingArgs = { orgId: string; page?: number; pageSize?: number };
+type DonorAppointmentsArgs = { donorId: string };
 type CompleteArgs = { id: string; unitsDonated: number };
 type UpdateStatusArgs = { id: string; newStatus: string };
 type BookArgs = { organizationId: string; scheduledTime: string; relatedWorkflowId?: string | null };
@@ -42,6 +43,10 @@ export const appointmentsApi = baseApi.injectEndpoints({
     getUpcomingByOrganization: builder.query<UpcomingResult, UpcomingArgs>({
       query: ({ orgId, page = 1, pageSize = 20 }) =>
         `/appointments/bloodbank/${orgId}/upcoming?page=${page}&pageSize=${pageSize}`,
+      providesTags: ["Appointment"],
+    }),
+    getMyAppointments: builder.query<Appointment[], DonorAppointmentsArgs>({
+      query: ({ donorId }) => `/appointments/donor/${donorId}`,
       providesTags: ["Appointment"],
     }),
     completeAppointment: builder.mutation<Appointment, CompleteArgs>({
@@ -96,6 +101,7 @@ export const appointmentsApi = baseApi.injectEndpoints({
 
 export const {
   useGetUpcomingByOrganizationQuery,
+  useGetMyAppointmentsQuery,
   useCompleteAppointmentMutation,
   useUpdateAppointmentStatusMutation,
   useGetByDonorQuery,

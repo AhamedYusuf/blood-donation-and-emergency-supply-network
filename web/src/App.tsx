@@ -17,8 +17,10 @@ import { DonorVerificationQueuePage } from "./features/donors/DonorVerificationQ
 import { DonorSearchPage } from "./features/donors/DonorSearchPage";
 
 import { AppointmentsConsolePage } from "./features/appointments/AppointmentsConsolePage";
-import { MyAppointmentsPage } from "./features/appointments/MyAppointmentsPage";
-import { BookAppointmentPage } from "./features/appointments/BookAppointmentPage";
+import { DonorAppointmentsPage } from "./features/donor/DonorAppointmentsPage";
+import { DonorHomePage } from "./features/donor/DonorHomePage";
+import { DonorRequestsPage } from "./features/donor/DonorRequestsPage";
+import { DonorAccountPage } from "./features/donor/DonorProfilePage";
 import { AppShell } from "./components/AppShell";
 
 import { OrganizationsPage } from "./features/organizations/OrganizationsPage";
@@ -127,18 +129,14 @@ export function RequireDonorProfile({
   return <>{children}</>;
 }
 
-/**
- * `/` used to always render the staff-facing AppointmentsConsolePage,
- * regardless of role — a donor landing there got a dead-end "your
- * account isn't linked to an organization" message, with no way to
- * book or see their own appointments at all (the console's own data
- * query is staff/admin-only). This mirrors mobile's app, where "my
- * appointments" is the donor's home experience; staff/admin keep the
- * console they already had.
- */
-function AppointmentsHome() {
+function HomePageByRole() {
   const role = useSelector((state: RootState) => (state.auth.role ?? "").toLowerCase());
-  return role === "donor" ? <MyAppointmentsPage /> : <AppointmentsConsolePage />;
+  return role === "donor" ? <DonorHomePage /> : <AppointmentsConsolePage />;
+}
+
+function RequestsPageByRole() {
+  const role = useSelector((state: RootState) => (state.auth.role ?? "").toLowerCase());
+  return role === "donor" ? <DonorRequestsPage /> : <RequestsPage />;
 }
 
 // =====================================================
@@ -198,7 +196,7 @@ export function App() {
             <RequireAuth>
               <RequireDonorProfile>
                 <AppShell>
-                  <AppointmentsHome />
+                  <HomePageByRole />
                 </AppShell>
               </RequireDonorProfile>
             </RequireAuth>
@@ -221,6 +219,36 @@ export function App() {
         {/* =================================================
             DONOR MODULE
            ================================================= */}
+
+        <Route
+          path="/appointments"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <RequireDonorProfile>
+                  <AppShell>
+                    <DonorAppointmentsPage />
+                  </AppShell>
+                </RequireDonorProfile>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <RequireDonorProfile>
+                  <AppShell>
+                    <DonorAccountPage />
+                  </AppShell>
+                </RequireDonorProfile>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
 
         <Route
           path="/donors/search"
@@ -357,7 +385,7 @@ export function App() {
             <RequireAuth>
               <RequireDonorProfile>
                 <AppShell>
-                  <RequestsPage />
+                  <RequestsPageByRole />
                 </AppShell>
               </RequireDonorProfile>
             </RequireAuth>
