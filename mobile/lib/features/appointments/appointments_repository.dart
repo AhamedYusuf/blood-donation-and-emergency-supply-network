@@ -83,8 +83,15 @@ class AppointmentsRepository {
   Future<List<BloodBank>> bloodBanks() async {
     final json = await _api.get('/api/organizations', token: _token);
     final list = (json as List).cast<Map<String, dynamic>>();
+    // The backend serializes OrganizationType as its raw C# enum name
+    // ("BloodBank", "Hospital" — OrganizationService.ToResponse does
+    // `organization.Type.ToString()`), not a snake_case string. This
+    // comparison was checking for 'blood_bank', which never matches —
+    // confirmed live against the real API: every organization is
+    // "BloodBank"/"Hospital", so this picker was silently empty the
+    // whole time, not just when no blood banks existed.
     return list
-        .where((o) => (o['type'] as String?)?.toLowerCase() == 'blood_bank')
+        .where((o) => (o['type'] as String?)?.toLowerCase() == 'bloodbank')
         .map(BloodBank.fromJson)
         .toList();
   }

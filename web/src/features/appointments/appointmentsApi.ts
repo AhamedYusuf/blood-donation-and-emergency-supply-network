@@ -35,6 +35,8 @@ type UpcomingArgs = { orgId: string; page?: number; pageSize?: number };
 type DonorAppointmentsArgs = { donorId: string };
 type CompleteArgs = { id: string; unitsDonated: number };
 type UpdateStatusArgs = { id: string; newStatus: string };
+type BookArgs = { organizationId: string; scheduledTime: string; relatedWorkflowId?: string | null };
+type RescheduleArgs = { id: string; newScheduledTime: string };
 
 export const appointmentsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -63,6 +65,37 @@ export const appointmentsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Appointment"],
     }),
+
+    // ── Donor-facing (mirrors the mobile app's appointments_repository.dart) ──
+
+    getByDonor: builder.query<Appointment[], string>({
+      query: (donorId) => `/appointments/donor/${donorId}`,
+      providesTags: ["Appointment"],
+    }),
+    bookAppointment: builder.mutation<Appointment, BookArgs>({
+      query: ({ organizationId, scheduledTime, relatedWorkflowId = null }) => ({
+        url: "/appointments",
+        method: "POST",
+        body: { organizationId, scheduledTime, relatedWorkflowId },
+      }),
+      invalidatesTags: ["Appointment"],
+    }),
+    confirmAppointment: builder.mutation<Appointment, string>({
+      query: (id) => ({ url: `/appointments/${id}/confirm`, method: "POST" }),
+      invalidatesTags: ["Appointment"],
+    }),
+    declineAppointment: builder.mutation<Appointment, string>({
+      query: (id) => ({ url: `/appointments/${id}/decline`, method: "POST" }),
+      invalidatesTags: ["Appointment"],
+    }),
+    rescheduleAppointment: builder.mutation<Appointment, RescheduleArgs>({
+      query: ({ id, newScheduledTime }) => ({
+        url: `/appointments/${id}/reschedule`,
+        method: "PUT",
+        body: { newScheduledTime },
+      }),
+      invalidatesTags: ["Appointment"],
+    }),
   }),
 });
 
@@ -71,4 +104,9 @@ export const {
   useGetMyAppointmentsQuery,
   useCompleteAppointmentMutation,
   useUpdateAppointmentStatusMutation,
+  useGetByDonorQuery,
+  useBookAppointmentMutation,
+  useConfirmAppointmentMutation,
+  useDeclineAppointmentMutation,
+  useRescheduleAppointmentMutation,
 } = appointmentsApi;

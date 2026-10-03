@@ -174,11 +174,18 @@ void main() {
     expect(result.status, 'scheduled');
   });
 
-  test('bloodBanks keeps only blood_bank organizations', () async {
+  test('bloodBanks keeps only BloodBank organizations (the real API format)', () async {
+    // The backend serializes OrganizationType as its raw C# enum name —
+    // "BloodBank" / "Hospital" (OrganizationService.ToResponse does
+    // `organization.Type.ToString()`) — confirmed live against the real
+    // API, not the snake_case 'blood_bank' this test used to mock
+    // (which masked the filter being broken against real data: it
+    // matched the test's own wrong assumption instead of the backend's
+    // actual contract).
     final h = _harness((_) => _json([
-          {'id': 'o1', 'name': 'City Blood Bank', 'address': 'A', 'type': 'blood_bank'},
-          {'id': 'o2', 'name': 'General Hospital', 'address': 'B', 'type': 'hospital'},
-          {'id': 'o3', 'name': 'Red Cross', 'address': 'C', 'type': 'Blood_Bank'},
+          {'id': 'o1', 'name': 'City Blood Bank', 'address': 'A', 'type': 'BloodBank'},
+          {'id': 'o2', 'name': 'General Hospital', 'address': 'B', 'type': 'Hospital'},
+          {'id': 'o3', 'name': 'Red Cross', 'address': 'C', 'type': 'bloodbank'},
         ]));
 
     final banks = await h.repo.bloodBanks();

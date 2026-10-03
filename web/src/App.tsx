@@ -203,6 +203,19 @@ export function App() {
           }
         />
 
+        <Route
+          path="/appointments/book"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["donor"]}>
+                <AppShell>
+                  <BookAppointmentPage />
+                </AppShell>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+
         {/* =================================================
             DONOR MODULE
            ================================================= */}
