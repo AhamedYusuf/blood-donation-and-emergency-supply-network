@@ -134,7 +134,7 @@ export function BookAppointmentPage() {
             options={bloodBanks.map((b) => ({ value: b.id, label: b.name }))}
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="donor-datetime-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField
               id="book-date"
               label="Date"

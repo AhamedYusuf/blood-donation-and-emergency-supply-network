@@ -1562,3 +1562,38 @@
     animation: none !important;
   }
 }
+
+/* =========================================================
+   MOBILE FIX — same root cause as the Manage page: .emergency-header
+   keeps display:flex/justify-content:space-between from its original
+   rule block, but a later pass pinned it to a fixed height and gave
+   .emergency-brand's h1 a 42px clamp() floor, with no breakpoint
+   below 760px letting the row wrap. Reproduced live at a 390px
+   viewport: the document was 551px wide and the Dashboard link was
+   pushed off-screen.
+   ========================================================= */
+@media (max-width: 480px) {
+  .emergency-header {
+    height: auto !important;
+    min-height: 0 !important;
+    flex-wrap: wrap;
+    row-gap: 14px;
+    padding: 20px 20px 24px !important;
+  }
+
+  .emergency-brand {
+    max-width: 100%;
+  }
+
+  .emergency-brand h1 {
+    font-size: clamp(24px, 8vw, 32px);
+  }
+
+  .emergency-dashboard-link {
+    order: 1;
+  }
+
+  .emergency-hero-visual {
+    display: none;
+  }
+}

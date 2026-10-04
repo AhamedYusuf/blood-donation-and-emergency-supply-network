@@ -1838,3 +1838,41 @@
     animation: none !important;
   }
 }
+
+/* =========================================================
+   MOBILE FIX — .manage-header keeps display:flex/justify-content:
+   space-between from its original (v1) rule block, but a later pass
+   fixed it to a 345px height, pinned horizontal padding, and gave
+   .manage-brand a 58% max-width with an h1 whose clamp() floor is
+   42px — none of that was ever given a breakpoint below 760px, so on
+   a phone the header's content (a 42px-minimum heading plus the
+   Dashboard link) doesn't fit in the row and isn't allowed to wrap,
+   overflowing the page horizontally. Reproduced live at a 390px
+   viewport: the document was 546px wide and the Dashboard link was
+   pushed off-screen.
+   ========================================================= */
+@media (max-width: 480px) {
+  .manage-header {
+    height: auto !important;
+    min-height: 0 !important;
+    flex-wrap: wrap;
+    row-gap: 14px;
+    padding: 20px 20px 24px !important;
+  }
+
+  .manage-brand {
+    max-width: 100%;
+  }
+
+  .manage-brand h1 {
+    font-size: clamp(24px, 8vw, 32px);
+  }
+
+  .manage-dashboard-link {
+    order: 1;
+  }
+
+  .manage-hero-visual {
+    display: none;
+  }
+}

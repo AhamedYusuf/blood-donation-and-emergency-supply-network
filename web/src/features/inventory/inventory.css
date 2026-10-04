@@ -2977,3 +2977,24 @@
     animation: none !important;
   }
 }
+
+/* =========================================================
+   MOBILE FIX — the unconditional ".inventory-header .brand-area"
+   rule added by the "FINAL HERO V2" pass (max-width: 54%, no media
+   query) has higher specificity than the original responsive
+   ".brand-area { max-width: 100% }" mobile rule, so it silently wins
+   at every viewport and clips the "Inventory Management" title on
+   phones. Re-asserting the same compound selector here, after it in
+   source order, restores the intended mobile layout without touching
+   the desktop-only rule itself.
+   ========================================================= */
+@media (max-width: 480px) {
+  .inventory-header .brand-area {
+    max-width: 100%;
+  }
+
+  .inventory-header .brand-area h1 {
+    max-width: 100%;
+    font-size: clamp(26px, 8vw, 34px);
+  }
+}
