@@ -20,6 +20,23 @@ public class AuthService : IAuthService
         _jwtTokenService = jwtTokenService;
     }
 
+    public async Task<CurrentUserResponse?> GetCurrentUserAsync(
+        Guid userId)
+    {
+        var user = await _dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.Id == userId);
+
+        return user is null
+            ? null
+            : new CurrentUserResponse
+            {
+                UserId = user.Id,
+                Role = user.Role.ToString(),
+                OrganizationId = user.OrganizationId
+            };
+    }
+
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();

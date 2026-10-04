@@ -5,7 +5,6 @@ export interface RequestValidationErrors {
   bloodType?: string;
   unitsRequested?: string;
   urgency?: string;
-  hospitalName?: string;
   latitude?: string;
   longitude?: string;
   notes?: string;
@@ -29,13 +28,6 @@ export const validateCreateRequest = (
   if (values.unitsRequested > 100) {
     errors.unitsRequested =
       "Units requested cannot exceed 100.";
-  }
-
-  if (!values.hospitalName.trim()) {
-    errors.hospitalName = "Hospital name is required.";
-  } else if (values.hospitalName.trim().length > 200) {
-    errors.hospitalName =
-      "Hospital name cannot exceed 200 characters.";
   }
 
   if (
@@ -62,9 +54,9 @@ export const validateCreateRequest = (
     values.longitude === 0
   ) {
     errors.latitude =
-      "Please enter the hospital location.";
+      "The organization location is not valid.";
     errors.longitude =
-      "Please enter the hospital location.";
+      "The organization location is not valid.";
   }
 
   if (values.notes.length > 1000) {
