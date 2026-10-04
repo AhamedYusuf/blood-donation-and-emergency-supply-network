@@ -4,6 +4,7 @@ using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace BloodDonationNetwork.Application.Services;
 
@@ -15,6 +16,8 @@ public class RequestService : IRequestService
     private const double DefaultNearbyRadiusKm = 50;
 
     private readonly IApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<RequestService> _logger;
     private readonly IEligibilityRuleEngine _eligibilityEngine;
 
     private static readonly HashSet<string> ValidRequestStatuses =
@@ -30,9 +33,15 @@ public class RequestService : IRequestService
             RequestStatuses.Cancelled
         };
 
-    public RequestService(IApplicationDbContext context, IEligibilityRuleEngine? eligibilityEngine = null)
+    public RequestService(
+        IApplicationDbContext context,
+        INotificationService notificationService,
+        ILogger<RequestService> logger,
+        IEligibilityRuleEngine? eligibilityEngine = null)
     {
         _context = context;
+        _notificationService = notificationService;
+        _logger = logger;
         _eligibilityEngine = eligibilityEngine ?? new EligibilityRuleEngine();
     }
 
@@ -78,8 +87,119 @@ public class RequestService : IRequestService
         await _context.BloodRequests.AddAsync(request);
         await _context.SaveChangesAsync();
 
+        await NotifyNearbyDonorsAsync(request);
+
         return MapToResponse(request);
     }
+
+    private async Task NotifyNearbyDonorsAsync(BloodRequest request)
+    {
+        if (!IsValidCoordinates(request.Latitude, request.Longitude))
+        {
+            _logger.LogWarning(
+                "Blood request {BloodRequestId} has invalid coordinates; nearby donors were not notified.",
+                request.Id);
+            return;
+        }
+
+        List<DonorProfile> donors;
+        try
+        {
+            donors = await _context.DonorProfiles
+                .Where(donor =>
+                    donor.Latitude.HasValue &&
+                    donor.Longitude.HasValue)
+                .ToListAsync();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Blood request {BloodRequestId} was created, but nearby donor profiles could not be loaded.",
+                request.Id);
+            return;
+        }
+
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = "new_blood_request",
+            ["bloodRequestId"] = request.Id.ToString()
+        };
+        var title = "New Blood Request Near You";
+        var body =
+            $"A new {GetBloodTypeLabel(request.BloodType)} blood request is available near you.";
+
+        foreach (var donor in donors)
+        {
+            if (donor.Latitude is not { } donorLatitude ||
+                donor.Longitude is not { } donorLongitude ||
+                !IsValidCoordinates(donorLatitude, donorLongitude))
+            {
+                continue;
+            }
+
+            var distanceKm = GeoUtils.DistanceKm(
+                request.Latitude,
+                request.Longitude,
+                donorLatitude,
+                donorLongitude);
+
+            if (!double.IsFinite(distanceKm) ||
+                distanceKm > DefaultNearbyRadiusKm)
+            {
+                continue;
+            }
+
+            try
+            {
+                var result = await _notificationService.SendToDonorAsync(
+                    donor.UserId,
+                    title,
+                    body,
+                    data);
+
+                if (!result.AnyDelivered)
+                {
+                    _logger.LogWarning(
+                        "Nearby blood request notification for request {BloodRequestId} was not delivered to donor {DonorUserId}: {FailureReason}",
+                        request.Id,
+                        donor.UserId,
+                        result.FailureReason ?? "No device accepted the notification.");
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Nearby blood request notification for request {BloodRequestId} failed for donor {DonorUserId}.",
+                    request.Id,
+                    donor.UserId);
+            }
+        }
+    }
+
+    private static bool IsValidCoordinates(double latitude, double longitude) =>
+        double.IsFinite(latitude) &&
+        latitude is >= -90 and <= 90 &&
+        double.IsFinite(longitude) &&
+        longitude is >= -180 and <= 180;
+
+    private static string GetBloodTypeLabel(BloodType bloodType) =>
+        bloodType switch
+        {
+            BloodType.APositive => BloodTypes.APositive,
+            BloodType.ANegative => BloodTypes.ANegative,
+            BloodType.BPositive => BloodTypes.BPositive,
+            BloodType.BNegative => BloodTypes.BNegative,
+            BloodType.ABPositive => BloodTypes.ABPositive,
+            BloodType.ABNegative => BloodTypes.ABNegative,
+            BloodType.OPositive => BloodTypes.OPositive,
+            BloodType.ONegative => BloodTypes.ONegative,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(bloodType),
+                bloodType,
+                "Unknown blood type.")
+        };
 
     // 2. Get one request by ID
     public async Task<RequestResponseDto?> GetByIdAsync(Guid id)

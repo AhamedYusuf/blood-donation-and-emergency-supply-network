@@ -235,6 +235,11 @@ public class RequestsController : ControllerBase
                 return Forbid();
             }
 
+            Guid? donorUserId =
+                requestingUserRole == UserRole.Donor
+                    ? requestingUserId
+                    : null;
+
             var requests =
                 await _requestService.GetAllAsync(
                     requestingUserId,
