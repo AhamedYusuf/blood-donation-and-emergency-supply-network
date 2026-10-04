@@ -157,7 +157,7 @@ class _BloodDonationAppState extends ConsumerState<BloodDonationApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Blood Donation Network',
+      title: 'PulsePoint',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       scaffoldMessengerKey: appScaffoldMessengerKey,

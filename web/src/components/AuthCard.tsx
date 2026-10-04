@@ -74,7 +74,7 @@ export function AuthCard({
               letterSpacing: "-0.5px",
             }}
           >
-            B
+            P
           </div>
 
           {/* Title + subtitle */}

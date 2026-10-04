@@ -87,8 +87,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="app-brand__plus" />
           </div>
           <div>
-            <strong>Blood Donation</strong>
-            <span>Network</span>
+            <strong>PulsePoint</strong>
+            <span>Blood Donation Network</span>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {/* TODO: organization name needs a lookup — the JWT/auth response
                 only carries organizationId, not the name. */}
             <span className="text-subheading" style={{ color: "var(--color-ink)" }}>
-              Blood Donation Network
+              PulsePoint
             </span>
             <span className="app-header__role">{role || "USER"}</span>
           </div>
