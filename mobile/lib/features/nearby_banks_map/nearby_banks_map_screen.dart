@@ -122,8 +122,8 @@ class _NearbyBanksMapScreenState
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           distanceFilter: 0,
+          timeLimit: Duration(seconds: 10),
         ),
-        timeLimit: const Duration(seconds: 10),
       );
 
       if (!mounted) return;
