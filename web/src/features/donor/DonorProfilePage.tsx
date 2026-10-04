@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
-import { logout } from "../auth/authSlice";
 import { getApiErrorMessage } from "../../api/getApiErrorMessage";
 import {
   useGetDonorEligibilityQuery,
@@ -28,7 +27,6 @@ function formatDate(value?: string | null) {
 }
 
 export function DonorAccountPage() {
-  const dispatch = useDispatch();
   const auth = useSelector((state: RootState) => state.auth);
   const donorId = auth.donorId;
   const { data: profile, isLoading, isError, refetch } = useGetDonorProfileQuery(

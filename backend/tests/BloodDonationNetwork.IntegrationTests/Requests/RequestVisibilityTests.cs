@@ -5,6 +5,7 @@ using BloodDonationNetwork.Infrastructure.Persistence;
 using BloodDonationNetwork.IntegrationTests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BloodDonationNetwork.IntegrationTests.Requests;
 
@@ -36,7 +37,10 @@ public sealed class RequestVisibilityTests : IDisposable
         _context.Database.ExecuteSqlRaw(
             "PRAGMA foreign_keys = OFF;");
 
-        _service = new RequestService(_context);
+        _service = new RequestService(
+            _context,
+            new NoOpNotificationService(),
+            NullLogger<RequestService>.Instance);
     }
 
     [Fact]

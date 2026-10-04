@@ -6,6 +6,7 @@ using BloodDonationNetwork.Infrastructure.Persistence;
 using BloodDonationNetwork.IntegrationTests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BloodDonationNetwork.IntegrationTests.Workflows;
 
@@ -317,7 +318,10 @@ public class AgentWorkflowServiceTests : IDisposable
             persistedRequest.Status);
 
         var requestService =
-            new RequestService(_context);
+            new RequestService(
+                _context,
+                new NoOpNotificationService(),
+                NullLogger<RequestService>.Instance);
 
         var requestResponse =
             await requestService.GetByIdAsync(
@@ -380,7 +384,10 @@ public class AgentWorkflowServiceTests : IDisposable
                 .AsNoTracking()
                 .FirstAsync(item => item.Id == request.Id);
         var requestResponse =
-            await new RequestService(_context)
+            await new RequestService(
+                _context,
+                new NoOpNotificationService(),
+                NullLogger<RequestService>.Instance)
                 .GetByIdAsync(request.Id);
 
         Assert.Equal(
