@@ -12,6 +12,8 @@ class MobileShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
+  static const _tabToBranchIndex = [0, 1, 3, 2];
+
   static const _tabs = [
     NavTab(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
     NavTab(icon: Icons.event_available_outlined, activeIcon: Icons.event_available_rounded, label: 'Donations'),
@@ -19,15 +21,55 @@ class MobileShell extends StatelessWidget {
     NavTab(icon: Icons.person_outline, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
 
+  static int selectedIndexForLocation(
+    String location, {
+    required int fallbackIndex,
+  }) {
+    final path = Uri.parse(location).path;
+
+    if (path == '/' || path == '/home') return 0;
+    if (path == '/donations' ||
+        path == '/appointments' ||
+        path.startsWith('/appointments/')) {
+      return 1;
+    }
+    if (path == '/blood-requests' ||
+        path.startsWith('/blood-requests/')) {
+      return 2;
+    }
+    if (path == '/profile' || path.startsWith('/profile/')) return 3;
+
+    return fallbackIndex;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: AppBottomNav(
-        tabs: _tabs,
-        currentIndex: navigationShell.currentIndex,
-        onTap: (i) => navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
-      ),
+    final router = GoRouter.of(context);
+
+    return AnimatedBuilder(
+      animation: router.routerDelegate,
+      builder: (context, _) {
+        final selectedIndex = selectedIndexForLocation(
+          router.state.uri.path,
+          fallbackIndex: navigationShell.currentIndex,
+        );
+
+        return Scaffold(
+          body: navigationShell,
+          bottomNavigationBar: AppBottomNav(
+            tabs: _tabs,
+            currentIndex: selectedIndex,
+            onTap: (index) {
+              final branchIndex = _tabToBranchIndex[index];
+              navigationShell.goBranch(
+                branchIndex,
+                initialLocation:
+                    branchIndex == navigationShell.currentIndex,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

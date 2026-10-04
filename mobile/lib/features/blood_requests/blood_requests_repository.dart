@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/api_client.dart';
 import '../auth/auth_controller.dart';
+import '../donor_profile/providers/donor_profile_provider.dart';
 import 'blood_request.dart';
 
 class BloodRequestsRepository {
@@ -18,10 +19,35 @@ class BloodRequestsRepository {
 
   /// GET /api/requests
   ///
-  /// Loads all blood requests from the backend.
+  /// Loads requests, applying the stored donor location for donor accounts.
   Future<List<BloodRequest>> getRequests() async {
+    var path = '/api/requests';
+    final auth = _ref.read(authControllerProvider);
+
+    if (auth.role?.toLowerCase() == 'donor') {
+      final donorProfile = await _ref.read(donorProfileProvider.future);
+      final latitude = donorProfile?.latitude;
+      final longitude = donorProfile?.longitude;
+
+      if (latitude == null || longitude == null) {
+        throw ApiException(
+          'Your donor location is unavailable. Add latitude and longitude '
+          'to your donor profile to view nearby blood requests.',
+        );
+      }
+
+      path = Uri(
+        path: path,
+        queryParameters: {
+          'nearLat': latitude.toString(),
+          'nearLng': longitude.toString(),
+          'radiusKm': '50',
+        },
+      ).toString();
+    }
+
     final json = await _api.get(
-      '/api/requests',
+      path,
       token: _token,
     );
 
