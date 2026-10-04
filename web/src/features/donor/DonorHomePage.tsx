@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { useGetMyAppointmentsQuery } from "../appointments/appointmentsApi";
+import { PulsePointMark } from "../../components/PulsePointMark";
 import "./donor.css";
 
 function formatDate(value: string) {
@@ -35,7 +36,9 @@ export function DonorHomePage() {
           <h1>Good to see you, {name?.split(" ")[0] || "Donor"}.</h1>
           <p>Your donations help move the right blood to the people who need it most.</p>
         </div>
-        <div className="donor-welcome__drop" aria-hidden="true">+</div>
+        <div className="donor-welcome__drop" aria-hidden="true">
+          <PulsePointMark size={64} background="var(--color-on-primary)" foreground="var(--color-primary)" />
+        </div>
       </section>
 
       <section className="donor-stat-grid" aria-label="Donation summary">

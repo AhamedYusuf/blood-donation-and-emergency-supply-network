@@ -4,8 +4,13 @@
 .donor-welcome h1, .donor-page-heading h1 { margin: 6px 0 10px; font-size: clamp(30px, 4vw, 46px); line-height: 1.08; letter-spacing: -.03em; }
 .donor-welcome p, .donor-page-heading p { margin: 0; color: var(--color-ink-secondary); line-height: 1.6; }
 .donor-welcome p { max-width: 520px; color: rgba(255,255,255,.82); }
-.donor-welcome__drop { display: grid; width: 132px; height: 156px; flex: 0 0 auto; place-items: center; border-radius: 55% 55% 65% 65% / 45% 45% 72% 72%; background: rgba(255,255,255,.92); color: var(--color-primary); font-size: 54px; transform: rotate(45deg); }
-.donor-welcome__drop::first-letter { transform: rotate(-45deg); }
+/* Previously a rotated "+" character with a ::first-letter
+   counter-rotation to cancel the parent's 45deg transform and keep
+   the plus upright — ::first-letter doesn't reliably support
+   transform across browsers, confirmed live: it rendered as a
+   static "X", never actually counter-rotating. Now just centers the
+   real PulsePoint mark, no rotation hack needed. */
+.donor-welcome__drop { display: grid; width: 132px; height: 156px; flex: 0 0 auto; place-items: center; border-radius: 55% 55% 65% 65% / 45% 45% 72% 72%; background: rgba(255,255,255,.92); }
 .donor-eyebrow { display: block; color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .donor-welcome .donor-eyebrow { color: #fbe7ed; }
 .donor-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }

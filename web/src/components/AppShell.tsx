@@ -1,8 +1,21 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
+import {
+  Building2,
+  CalendarCheck,
+  CircleUserRound,
+  Droplet,
+  Boxes,
+  HeartPulse,
+  Home as HomeIcon,
+  UserPlus,
+  Users,
+  type LucideProps,
+} from "lucide-react";
 import type { RootState } from "../app/store";
 import { logout } from "../features/auth/authSlice";
+import { PulsePointMark } from "./PulsePointMark";
 import "./app-shell.css";
 
 // ── Nav item definitions ──────────────────────────────────────────────────────
@@ -11,7 +24,7 @@ import "./app-shell.css";
 
 interface NavItem {
   label: string;
-  icon: string;
+  icon: ComponentType<LucideProps>;
   path: string;
   /** If defined, admin users go here instead of `path`. */
   adminPath?: string;
@@ -27,14 +40,14 @@ interface NavItem {
 }
 
 const OPERATIONS_NAV_ITEMS: NavItem[] = [
-  { label: "Appointments", icon: "◧", path: "/" },
-  { label: "Requests", icon: "◇", path: "/requests" },
-  { label: "Inventory", icon: "▤", path: "/inventory", allowedRoles: ["staff", "admin"] },
-  { label: "Organizations", icon: "▦", path: "/organizations", allowedRoles: ["admin"] },
-  { label: "Invite staff", icon: "✉", path: "/staff-invitations", allowedRoles: ["admin"] },
+  { label: "Appointments", icon: CalendarCheck, path: "/" },
+  { label: "Requests", icon: Droplet, path: "/requests" },
+  { label: "Inventory", icon: Boxes, path: "/inventory", allowedRoles: ["staff", "admin"] },
+  { label: "Organizations", icon: Building2, path: "/organizations", allowedRoles: ["admin"] },
+  { label: "Invite staff", icon: UserPlus, path: "/staff-invitations", allowedRoles: ["admin"] },
   {
     label: "Donors",
-    icon: "◎",
+    icon: Users,
     path: "/donors/search",
     adminPath: "/donors/verification-queue",
     staffPath: "/donors/verification-queue",
@@ -43,10 +56,10 @@ const OPERATIONS_NAV_ITEMS: NavItem[] = [
 ];
 
 const DONOR_NAV_ITEMS: NavItem[] = [
-  { label: "Home", icon: "⌂", path: "/" },
-  { label: "Donations", icon: "◷", path: "/appointments" },
-  { label: "Requests", icon: "◇", path: "/requests" },
-  { label: "Profile", icon: "◎", path: "/profile" },
+  { label: "Home", icon: HomeIcon, path: "/" },
+  { label: "Donations", icon: HeartPulse, path: "/appointments" },
+  { label: "Requests", icon: Droplet, path: "/requests" },
+  { label: "Profile", icon: CircleUserRound, path: "/profile" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -83,9 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <nav className="app-sidebar" aria-label="Main navigation">
         <div className="app-brand">
-          <div className="app-brand__mark" aria-hidden="true">
-            <span className="app-brand__plus" />
-          </div>
+          <PulsePointMark size={34} className="app-brand__mark" />
           <div>
             <strong>PulsePoint</strong>
             <span>Blood Donation Network</span>
@@ -114,7 +125,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => clickable && navigate(targetPath!)}
                 disabled={!clickable}
               >
-                <span className="app-nav-item__icon" aria-hidden="true">{item.icon}</span>
+                <span className="app-nav-item__icon" aria-hidden="true">
+                  <item.icon size={18} strokeWidth={2} />
+                </span>
                 <span>{item.label}</span>
               </button>
             );
@@ -147,7 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+        <div className="app-shell__scroll">{children}</div>
       </div>
     </div>
   );

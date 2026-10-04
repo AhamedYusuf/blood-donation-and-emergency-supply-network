@@ -2,6 +2,19 @@
   display: flex;
   height: 100vh;
   min-width: 0;
+  /* The sidebar and header were never actually pinned — they're normal
+     flex children sized to match .app-shell's own 100vh height, and
+     nothing here ever stopped a tall page from growing the real
+     document past that height. On a short page (Appointments) that
+     never showed, since the page never needed to scroll; reproduced
+     live on /requests (1229px) and /inventory (2124px) at a 900px
+     viewport: the whole body grew, and the sidebar — fixed at 900px
+     tall, not actually full-height — scrolled away with it, leaving
+     blank space where it used to be. overflow:hidden here plus
+     overflow-y:auto on the content pane below makes the content the
+     one thing that scrolls, so the shell itself never grows.
+   */
+  overflow: hidden;
   font-family: var(--font-sans);
 }
 
@@ -23,41 +36,8 @@
 }
 
 .app-brand__mark {
-  position: relative;
-  display: grid;
-  width: 34px;
-  height: 42px;
   flex: 0 0 auto;
-  place-items: center;
 }
-
-.app-brand__mark::before {
-  content: "";
-  position: absolute;
-  width: 29px;
-  height: 36px;
-  border-radius: 55% 55% 65% 65% / 45% 45% 72% 72%;
-  background: var(--color-primary);
-  transform: rotate(45deg);
-}
-
-.app-brand__plus {
-  position: relative;
-  z-index: 1;
-  width: 14px;
-  height: 14px;
-  transform: rotate(45deg);
-}
-
-.app-brand__plus::before,
-.app-brand__plus::after {
-  content: "";
-  position: absolute;
-  background: #fff;
-}
-
-.app-brand__plus::before { left: 5px; width: 4px; height: 14px; }
-.app-brand__plus::after { top: 5px; width: 14px; height: 4px; }
 
 .app-brand strong,
 .app-brand span { display: block; }
@@ -89,13 +69,20 @@
 .app-nav-item:hover:not(:disabled) { background: rgba(255,255,255,.08); color: #fff; transform: translateX(2px); }
 .app-nav-item--active { background: rgba(255,255,255,.13); color: #fff; box-shadow: inset 3px 0 0 var(--color-primary); }
 .app-nav-item--disabled { color: rgba(255,255,255,.22); cursor: not-allowed; }
-.app-nav-item__icon { display: grid; width: 22px; place-items: center; color: currentColor; font-size: 18px; font-weight: 400; }
+.app-nav-item__icon { display: grid; width: 22px; height: 22px; place-items: center; color: currentColor; }
 
 .app-sidebar__footer { display: grid; gap: 6px; margin-top: auto; border-top: 1px solid rgba(255,255,255,.1); padding: 16px 12px 0; }
 .app-sidebar__role { color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .app-sidebar__footer-copy { color: rgba(255,255,255,.38); font-size: 11px; }
 
-.app-shell__content { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.app-shell__content { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
+
+/* The one element that actually scrolls. Everything above it
+   (.app-shell, .app-shell__content) is height-bound to the viewport
+   and clips — so the sidebar and header never move, and a long page
+   scrolls inside this pane instead of growing the real document. */
+.app-shell__scroll { flex: 1; min-height: 0; overflow-y: auto; }
+
 .app-header { display: flex; height: 58px; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--color-hairline); padding: 0 var(--space-lg); background: var(--color-surface); }
 .app-header__title, .app-header__account { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .app-header__title .text-subheading { white-space: nowrap; }
@@ -116,16 +103,12 @@
    markup is unchanged, so desktop/tablet (>760px) keeps the original
    vertical rail untouched. */
 @media (max-width: 760px) {
-  /* This app scrolls at the document level — .app-shell__content has
-     no overflow/height constraint of its own, so tall pages grow the
-     real page height rather than scrolling inside a fixed-height
-     panel (confirmed live: body.scrollHeight grows well past the
-     viewport). A bar placed via flex order would therefore scroll
-     away with the content instead of staying reachable. Pinning it
-     with position:fixed keeps it anchored to the actual viewport
-     regardless of page scroll — the standard way to build a mobile
-     bottom tab bar — and .app-shell__content reserves matching
-     bottom padding so content never sits underneath it. */
+  /* .app-shell switches to height:auto here on purpose, which turns
+     off the fixed-viewport/internal-scroll behavior above and falls
+     back to normal document-level scroll — deliberately, because a
+     bottom tab bar needs position:fixed to stay reachable (below),
+     and pairing position:fixed with an internally-scrolling ancestor
+     is unnecessary complexity once the page scrolls normally again. */
   .app-shell {
     flex-direction: column;
     height: auto;
@@ -181,7 +164,7 @@
 
   .app-nav-item__icon {
     width: auto;
-    font-size: 19px;
+    height: auto;
   }
 
   .app-nav-item > span:last-child {

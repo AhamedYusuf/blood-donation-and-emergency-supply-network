@@ -24,7 +24,11 @@
   gap: 32px;
   min-height: 310px;
   padding: 48px;
-  border-radius: 28px;
+  /* Was 28px — every other hero in the product (Appointments,
+     Organizations, Inventory) uses the standard --radius-lg (18px)
+     card radius; this was the one outlier once they were compared
+     side by side. */
+  border-radius: var(--radius-lg, 18px);
   background:
     radial-gradient(
       circle at 85% 20%,
@@ -1379,4 +1383,12 @@
     padding: 20px;
     border-radius: var(--radius-md);
   }
+}
+
+/* Shared hero height across the operations console (see
+   appointments.css for the full measurement/reasoning). Scoped to
+   desktop/tablet — this page has its own mobile hero sizing below
+   721px, which this must not fight. */
+@media (min-width: 761px) {
+  .requests-hero { min-height: 460px; }
 }

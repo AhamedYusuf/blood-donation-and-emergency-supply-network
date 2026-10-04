@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PulsePointMark } from "./PulsePointMark";
 
 interface AuthCardProps {
   children: ReactNode;
@@ -17,7 +18,7 @@ interface AuthCardProps {
  * Structure:
  *   canvas bg
  *   └─ centred column
- *      ├─ "B" logo mark
+ *      ├─ PulsePoint logo mark
  *      ├─ title + subtitle
  *      ├─ optional step indicator
  *      └─ white surface card (the form)
@@ -59,23 +60,7 @@ export function AuthCard({
             gap: "var(--space-md)",
           }}
         >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-primary)",
-              color: "var(--color-on-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 700,
-              fontSize: 20,
-              letterSpacing: "-0.5px",
-            }}
-          >
-            P
-          </div>
+          <PulsePointMark size={44} />
 
           {/* Title + subtitle */}
           <div style={{ textAlign: "center" }}>

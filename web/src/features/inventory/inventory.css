@@ -2998,3 +2998,47 @@
     font-size: clamp(26px, 8vw, 34px);
   }
 }
+
+/* Shared hero height across the operations console (see
+   appointments.css for the full measurement/reasoning). This file
+   has four separate ".inventory-header" redesign passes layered on
+   top of each other; the active one (confirmed live) pins
+   min-height AND height to 300px with !important, so this needs the
+   same to actually win. Scoped to desktop/tablet — this file has its
+   own mobile hero sizing below 761px (500px tall, !important), which
+   this must not fight.
+
+   Also closes a real layout gap, not just a height one: this hero
+   ran full-bleed with square corners while .inventory-content right
+   below it (and every other hero in the product — Appointments,
+   Requests, Organizations) is an inset rounded card with a page
+   gutter. The header used padding math
+   (max(24px, calc((100% - 1240px) / 2))) to fake an aligned content
+   column against a full-bleed background instead of actually being
+   that column — same root pattern as the Organizations hero, fixed
+   the same way: the box itself is now the inset column, so its
+   padding math and .inventory-hero-visual's own position (which was
+   calculated against the old full-bleed width) both simplify to
+   plain values. The wave (::after) only ever made sense against a
+   full-bleed edge; .welcome-section already overlaps the header's
+   bottom edge by itself (-28px margin-top) and fully covers where it
+   used to sit, same as the Organizations fix. */
+@media (min-width: 761px) {
+  .inventory-header {
+    min-height: 460px !important;
+    height: auto !important;
+    width: min(1400px, calc(100% - 48px));
+    margin: 0 auto;
+    border-radius: var(--radius-lg, 18px);
+    padding: 36px 40px 54px !important;
+  }
+
+  .inventory-header::after {
+    display: none;
+  }
+
+  .inventory-hero-visual {
+    right: 40px !important;
+    top: 40px !important;
+  }
+}

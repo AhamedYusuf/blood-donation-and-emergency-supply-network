@@ -1597,3 +1597,41 @@
     display: none;
   }
 }
+
+/* Shared hero height across the operations console (see
+   appointments.css for the full measurement/reasoning). Scoped to
+   desktop/tablet — this file has its own mobile hero sizing below
+   761px (650px tall, !important), which this must not fight.
+
+   Also closes a real layout gap, not just a height one — same fix as
+   inventory.css's .inventory-header and inventoryManage.css's
+   .manage-header (see either's comment for the full reasoning): this
+   ran full-bleed with square corners and padding math faking an
+   aligned content column, instead of being .emergency-content's
+   inset column itself, like every other hero in the product. The
+   header's own box is now that column, so its padding and
+   .emergency-hero-visual's position (previously calculated against
+   the old full-bleed width) both simplify to plain values, and the
+   wave (::after), which only made sense against a full-bleed edge,
+   is removed — .emergency-content already overlaps the header's
+   bottom edge by itself (-54px margin-top) and fully covers where it
+   used to sit. */
+@media (min-width: 761px) {
+  .emergency-header {
+    min-height: 460px !important;
+    height: auto !important;
+    width: min(1400px, calc(100% - 48px));
+    margin: 0 auto;
+    border-radius: var(--radius-lg, 18px);
+    padding: 36px 40px 54px !important;
+  }
+
+  .emergency-header::after {
+    display: none;
+  }
+
+  .emergency-hero-visual {
+    right: 40px !important;
+    top: 36px !important;
+  }
+}
