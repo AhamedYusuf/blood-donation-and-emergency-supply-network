@@ -106,12 +106,98 @@
 .app-header__logout { border: 1px solid var(--color-hairline-strong); border-radius: var(--radius-sm); padding: 6px 11px; background: var(--color-surface); color: var(--color-ink-secondary); font: inherit; font-size: 12px; cursor: pointer; transition: background var(--duration-fast) var(--ease-standard); }
 .app-header__logout:hover { background: var(--color-surface-sunken); }
 
+/* Below 760px, a fixed-width vertical rail (even shrunk to an
+   icon-only 68px strip) permanently eats a large share of a phone's
+   width from every page — reproduced live at a 390px viewport,
+   ~17% of the screen gone to icons with no labels. Converting it to
+   a bottom tab bar (the same pattern the Flutter app already uses)
+   gives pages the full width and keeps navigation reachable with a
+   thumb. This only changes layout via the cascade below — AppShell's
+   markup is unchanged, so desktop/tablet (>760px) keeps the original
+   vertical rail untouched. */
 @media (max-width: 760px) {
-  .app-sidebar { width: 68px; flex-basis: 68px; align-items: center; padding: 16px 8px; }
-  .app-brand { padding: 0 0 20px; }
-  .app-brand > div:last-child, .app-sidebar__section-label, .app-nav-item > span:last-child, .app-sidebar__footer-copy { display: none; }
-  .app-nav-item { justify-content: center; padding: 0; }
-  .app-sidebar__footer { width: 100%; padding: 14px 0 0; text-align: center; }
+  /* This app scrolls at the document level — .app-shell__content has
+     no overflow/height constraint of its own, so tall pages grow the
+     real page height rather than scrolling inside a fixed-height
+     panel (confirmed live: body.scrollHeight grows well past the
+     viewport). A bar placed via flex order would therefore scroll
+     away with the content instead of staying reachable. Pinning it
+     with position:fixed keeps it anchored to the actual viewport
+     regardless of page scroll — the standard way to build a mobile
+     bottom tab bar — and .app-shell__content reserves matching
+     bottom padding so content never sits underneath it. */
+  .app-shell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: 100%;
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: stretch;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .app-brand,
+  .app-sidebar__section-label,
+  .app-sidebar__footer {
+    display: none;
+  }
+
+  .app-sidebar__nav {
+    display: flex;
+    width: 100%;
+    gap: 0;
+  }
+
+  .app-nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 52px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  .app-nav-item--active {
+    box-shadow: inset 0 3px 0 0 var(--color-primary);
+  }
+
+  .app-nav-item:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .app-nav-item__icon {
+    width: auto;
+    font-size: 19px;
+  }
+
+  .app-nav-item > span:last-child {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    font-size: 9.5px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .app-shell__content {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+
   .app-header { padding: 0 var(--space-md); }
   .app-header__title .text-subheading { display: none; }
   .app-header__email { max-width: 150px; }
