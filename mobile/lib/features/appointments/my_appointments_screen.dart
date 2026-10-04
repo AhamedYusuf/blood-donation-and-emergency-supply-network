@@ -45,7 +45,7 @@ class MyAppointmentsScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: async.maybeWhen(
-        data: (list) => list.isEmpty
+        data: (list) => list.any((appointment) => appointment.isUpcoming) == false
             ? null
             : FloatingActionButton.extended(
                 onPressed: () => _book(context, ref),
@@ -89,11 +89,14 @@ class MyAppointmentsScreen extends ConsumerWidget {
             );
           }
 
-          final upcoming = appointments.where((a) => a.isUpcoming).toList()
+          final pending = appointments.where((a) => a.isUpcoming).toList()
             ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
-          final history = appointments.where((a) => !a.isUpcoming).toList();
-          final next = upcoming.isNotEmpty ? upcoming.first : null;
-          final laterUpcoming = upcoming.skip(1).toList();
+          final completed = appointments.where((a) => a.status == 'completed').toList()
+            ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+          final other = appointments.where((a) => !a.isUpcoming && a.status != 'completed').toList()
+            ..sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+          final next = pending.isNotEmpty ? pending.first : null;
+          final laterPending = pending.skip(1).toList();
 
           return RefreshIndicator(
             color: AppColors.primary,
@@ -114,10 +117,10 @@ class MyAppointmentsScreen extends ConsumerWidget {
                 else
                   _BookPrompt(onBook: () => _book(context, ref)),
 
-                if (laterUpcoming.isNotEmpty) ...[
+                if (laterPending.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  const SectionLabel('Also upcoming'),
-                  for (final (i, a) in laterUpcoming.indexed)
+                  const SectionLabel('Pending donations'),
+                  for (final (i, a) in laterPending.indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                       child: FadeSlideIn(
@@ -133,11 +136,22 @@ class MyAppointmentsScreen extends ConsumerWidget {
                     ),
                 ],
 
-                if (history.isNotEmpty) ...[
+                if (completed.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  SectionLabel('History',
-                      trailing: Text('${history.length}', style: AppText.caption)),
-                  for (final (i, a) in history.indexed)
+                  SectionLabel('Completed donations',
+                      trailing: Text('${completed.length}', style: AppText.caption)),
+                  for (final (i, a) in completed.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: FadeSlideIn(index: i, child: _Row(appointment: a, onCancel: null)),
+                    ),
+                ],
+
+                if (other.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  SectionLabel('Other appointments',
+                      trailing: Text('${other.length}', style: AppText.caption)),
+                  for (final (i, a) in other.indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                       child: FadeSlideIn(index: i, child: _Row(appointment: a, onCancel: null)),

@@ -384,6 +384,11 @@ public class AppointmentService : IAppointmentService
                     requestingUserId);
 
                 donorProfile.LastDonationDate = DateOnly.FromDateTime(DateTime.UtcNow);
+                var eligibility = new Application.Services.EligibilityRuleEngine()
+                    .Evaluate(donorProfile, donorProfile.BloodType);
+                donorProfile.EligibilityStatus = eligibility.IsEligible
+                    ? "eligible"
+                    : "not_eligible";
                 donorProfile.UpdatedAt = DateTime.UtcNow;
             }
 

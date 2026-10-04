@@ -24,10 +24,6 @@ public class CreateRequestDto : IValidatableObject
     [JsonConverter(typeof(RequestUrgencyJsonConverter))]
     public RequestUrgency Urgency { get; set; }
 
-    [Required]
-    [MaxLength(200)]
-    public string HospitalName { get; set; } = string.Empty;
-
     [Range(-90, 90)]
     public double Latitude { get; set; }
 

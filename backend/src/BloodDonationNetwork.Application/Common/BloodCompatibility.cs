@@ -1,5 +1,7 @@
 namespace BloodDonationNetwork.Application.Common;
 
+using BloodDonationNetwork.Domain.Enums;
+
 // Standard red-cell donor→recipient compatibility table (ABO + Rh).
 // O- donors are universal (compatible with every recipient); AB+
 // recipients can accept from every donor type.
@@ -38,4 +40,34 @@ public static class BloodCompatibility
 
         return donors;
     }
+
+    /// <summary>Returns whether the specified donor blood type can be given
+    /// to the specified recipient blood type. Unknown values fail closed.</summary>
+    public static bool CanDonateTo(string donorBloodType, string recipientBloodType)
+    {
+        try
+        {
+            return GetCompatibleDonorTypes(recipientBloodType).Contains(donorBloodType);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    public static bool CanDonateTo(string donorBloodType, BloodType recipientBloodType) =>
+        CanDonateTo(donorBloodType, ToLabel(recipientBloodType));
+
+    private static string ToLabel(BloodType bloodType) => bloodType switch
+    {
+        BloodType.APositive => BloodTypes.APositive,
+        BloodType.ANegative => BloodTypes.ANegative,
+        BloodType.BPositive => BloodTypes.BPositive,
+        BloodType.BNegative => BloodTypes.BNegative,
+        BloodType.ABPositive => BloodTypes.ABPositive,
+        BloodType.ABNegative => BloodTypes.ABNegative,
+        BloodType.OPositive => BloodTypes.OPositive,
+        BloodType.ONegative => BloodTypes.ONegative,
+        _ => throw new ArgumentOutOfRangeException(nameof(bloodType), bloodType, "Unknown blood type")
+    };
 }

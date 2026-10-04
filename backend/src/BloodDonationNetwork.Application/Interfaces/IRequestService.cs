@@ -1,4 +1,5 @@
 using BloodDonationNetwork.Application.DTOs.Requests;
+using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 
 namespace BloodDonationNetwork.Application.Interfaces;
@@ -25,6 +26,8 @@ public interface IRequestService
     /// instead of returning every request network-wide.
     /// </summary>
     Task<IEnumerable<RequestResponseDto>> GetAllAsync(
+        Guid requestingUserId,
+        UserRole requestingUserRole,
         BloodType? bloodType = null,
         RequestUrgency? urgency = null,
         string? status = null,
@@ -35,7 +38,8 @@ public interface IRequestService
         bool descending = true,
         double? nearLat = null,
         double? nearLng = null,
-        double? radiusKm = null);
+        double? radiusKm = null,
+        Guid? donorUserId = null);
 
     /// <summary>
     /// Throws <see cref="UnauthorizedAccessException"/> if the caller is

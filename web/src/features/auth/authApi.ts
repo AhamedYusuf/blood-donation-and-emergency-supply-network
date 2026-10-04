@@ -31,10 +31,20 @@ export interface AuthResponse {
   organizationId: string | null;
 }
 
+export interface CurrentUserResponse {
+  userId: string;
+  role: string;
+  organizationId: string | null;
+}
+
 // ── API slice ─────────────────────────────────────────────────────────────────
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getCurrentUser: builder.query<CurrentUserResponse, void>({
+      query: () => "/auth/me",
+    }),
+
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
         url: "/auth/login",
@@ -73,6 +83,7 @@ export const authApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetCurrentUserQuery,
   useLoginMutation,
   useRegisterMutation,
   useRegisterStaffMutation,

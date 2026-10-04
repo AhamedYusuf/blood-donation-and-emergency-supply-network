@@ -326,6 +326,20 @@ def run_workflow(
 
         workflow_id = workflow["id"]
 
+        config = {
+            "configurable": {
+                "thread_id": workflow_id
+            }
+        }
+
+        if workflow.get("alreadyExists"):
+            snapshot = coordinator_graph.get_state(config)
+            if snapshot.values:
+                return {
+                    "workflowId": workflow_id,
+                    "status": "already_running",
+                    "state": snapshot.values,
+                }
 
         # -------------------------------------------------
         # 2. Fetch BloodRequest data
@@ -441,14 +455,6 @@ def run_workflow(
         # -------------------------------------------------
         # 5. LangGraph configuration
         # -------------------------------------------------
-
-        config = {
-            "configurable": {
-                "thread_id":
-                    workflow_id
-            }
-        }
-
 
         # -------------------------------------------------
         # 6. Start Coordinator Agent

@@ -1,10 +1,12 @@
 using BloodDonationNetwork.Application.Services;
+using BloodDonationNetwork.Api.Controllers.Internal;
 using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using BloodDonationNetwork.Infrastructure.Persistence;
 using BloodDonationNetwork.IntegrationTests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BloodDonationNetwork.IntegrationTests.Workflows;
 
@@ -38,12 +40,13 @@ public class AgentWorkflowServiceTests : IDisposable
 
     private async Task<AgentWorkflow> CreateWorkflowAsync(
         string status = WorkflowStatuses.AwaitingApproval,
-        int revisionCount = 0)
+        int revisionCount = 0,
+        Guid? bloodRequestId = null)
     {
         var workflow = new AgentWorkflow
         {
             Id = Guid.NewGuid(),
-            BloodRequestId = Guid.NewGuid(),
+            BloodRequestId = bloodRequestId ?? Guid.NewGuid(),
             Status = status,
             RevisionCount = revisionCount,
             StartedAt = DateTime.UtcNow,
@@ -54,6 +57,31 @@ public class AgentWorkflowServiceTests : IDisposable
         await _context.SaveChangesAsync();
 
         return workflow;
+    }
+
+    private async Task<(BloodRequest Request, AgentWorkflow Workflow)>
+        CreateWorkflowWithRequestAsync(
+            string requestStatus = RequestStatuses.AwaitingApproval,
+            string workflowStatus = WorkflowStatuses.AwaitingApproval,
+            int revisionCount = 0)
+    {
+        var request = new BloodRequest
+        {
+            Id = Guid.NewGuid(),
+            RequesterId = Guid.NewGuid(),
+            OrganizationId = Guid.NewGuid(),
+            Status = requestStatus,
+            Notes = string.Empty,
+        };
+        _context.BloodRequests.Add(request);
+        await _context.SaveChangesAsync();
+
+        var workflow = await CreateWorkflowAsync(
+            workflowStatus,
+            revisionCount,
+            request.Id);
+
+        return (request, workflow);
     }
 
     [Fact]
@@ -82,6 +110,22 @@ public class AgentWorkflowServiceTests : IDisposable
             ApprovalDecisions.Approved,
             decision.Decision);
         Assert.Equal(userId, decision.DecidedByUserId);
+    }
+
+    [Fact]
+    public async Task ApproveAsync_MovesAwaitingRequestToMatching()
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync();
+
+        await _service.ApproveAsync(
+            workflow.Id,
+            Guid.NewGuid(),
+            null);
+
+        Assert.Equal(
+            RequestStatuses.Matching,
+            request.Status);
     }
 
     [Fact]
@@ -114,9 +158,44 @@ public class AgentWorkflowServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RejectAsync_CancelsAwaitingRequest()
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync();
+
+        await _service.RejectAsync(
+            workflow.Id,
+            Guid.NewGuid(),
+            null);
+
+        Assert.Equal(
+            RequestStatuses.Cancelled,
+            request.Status);
+        Assert.NotNull(request.ClosedAt);
+    }
+
+    [Fact]
+    public async Task RejectAsync_DoesNotOverwriteManuallyChangedRequestStatus()
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync(
+                requestStatus: RequestStatuses.Fulfilled);
+
+        await _service.RejectAsync(
+            workflow.Id,
+            Guid.NewGuid(),
+            null);
+
+        Assert.Equal(
+            RequestStatuses.Fulfilled,
+            request.Status);
+    }
+
+    [Fact]
     public async Task ReviseAsync_IncreasesRevisionCount()
     {
-        var workflow = await CreateWorkflowAsync();
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync();
         var userId = Guid.NewGuid();
 
         var result = await _service.ReviseAsync(
@@ -142,6 +221,9 @@ public class AgentWorkflowServiceTests : IDisposable
         Assert.Equal(
             ApprovalDecisions.RevisionRequested,
             decision.Decision);
+        Assert.Equal(
+            RequestStatuses.Matching,
+            request.Status);
     }
 
     [Fact]
@@ -171,9 +253,9 @@ public class AgentWorkflowServiceTests : IDisposable
     [Fact]
     public async Task ReviseAsync_FourthRevisionFailsWorkflow()
     {
-        var workflow = await CreateWorkflowAsync(
-            WorkflowStatuses.AwaitingApproval,
-            revisionCount: 3);
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync(
+                revisionCount: 3);
 
         var result = await _service.ReviseAsync(
             workflow.Id,
@@ -193,6 +275,184 @@ public class AgentWorkflowServiceTests : IDisposable
             result.FailureReason);
 
         Assert.NotNull(result.CompletedAt);
+        Assert.Equal(
+            RequestStatuses.Open,
+            request.Status);
+    }
+
+    [Fact]
+    public async Task UpdateStatus_WhenWorkflowCompletes_MarksOpenRequestAsDonorsNotified()
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync(
+                requestStatus: RequestStatuses.Open,
+                workflowStatus: WorkflowStatuses.Approved);
+        var controller =
+            new WorkflowInternalController(
+                _context,
+                Microsoft.Extensions.Logging.Abstractions
+                    .NullLogger<WorkflowInternalController>.Instance);
+
+        var result = await controller.UpdateStatus(
+            workflow.Id,
+            new UpdateWorkflowStatusInternalRequest
+            {
+                Status = WorkflowStatuses.Completed,
+            });
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result);
+        Assert.Equal(
+            RequestStatuses.DonorsNotified,
+            request.Status);
+
+        _context.Entry(request).State =
+            EntityState.Detached;
+
+        var persistedRequest =
+            await _context.BloodRequests
+                .AsNoTracking()
+                .FirstAsync(item => item.Id == request.Id);
+
+        Assert.Equal(
+            RequestStatuses.DonorsNotified,
+            persistedRequest.Status);
+
+        var requestService =
+            new RequestService(
+                _context,
+                new NoOpNotificationService(),
+                NullLogger<RequestService>.Instance);
+
+        var requestResponse =
+            await requestService.GetByIdAsync(
+                request.Id);
+        var dashboardRequests =
+            await requestService.GetAllAsync(
+                request.RequesterId,
+                UserRole.Admin,
+                pageSize: 100);
+
+        Assert.NotNull(requestResponse);
+        Assert.Equal(
+            RequestStatuses.DonorsNotified,
+            requestResponse.Status);
+        Assert.Contains(
+            dashboardRequests,
+            item => item.Id == request.Id &&
+                    item.Status ==
+                        RequestStatuses.DonorsNotified);
+    }
+
+    [Fact]
+    public async Task ApproveAndCompleteWorkflow_PersistsBloodRequestStatusReturnedByRequestApi()
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync(
+                requestStatus: RequestStatuses.Open);
+
+        var approval = await _service.ApproveAsync(
+            workflow.Id,
+            Guid.NewGuid(),
+            "Approved for dispatch");
+
+        Assert.NotNull(approval);
+        Assert.Equal(
+            RequestStatuses.Matching,
+            request.Status);
+
+        var internalController =
+            new WorkflowInternalController(
+                _context,
+                Microsoft.Extensions.Logging.Abstractions
+                    .NullLogger<WorkflowInternalController>.Instance);
+        var completionResult =
+            await internalController.UpdateStatus(
+                workflow.Id,
+                new UpdateWorkflowStatusInternalRequest
+                {
+                    Status = WorkflowStatuses.Completed,
+                });
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(
+            completionResult);
+
+        _context.Entry(request).State =
+            EntityState.Detached;
+
+        var persistedRequest =
+            await _context.BloodRequests
+                .AsNoTracking()
+                .FirstAsync(item => item.Id == request.Id);
+        var requestResponse =
+            await new RequestService(
+                _context,
+                new NoOpNotificationService(),
+                NullLogger<RequestService>.Instance)
+                .GetByIdAsync(request.Id);
+
+        Assert.Equal(
+            RequestStatuses.DonorsNotified,
+            persistedRequest.Status);
+        Assert.NotNull(requestResponse);
+        Assert.Equal(
+            RequestStatuses.DonorsNotified,
+            requestResponse.Status);
+    }
+
+    [Theory]
+    [InlineData(RequestStatuses.Matching)]
+    [InlineData(RequestStatuses.AwaitingApproval)]
+    public async Task UpdateStatus_WhenWorkflowCompletes_AdvancesActiveRequestStatus(
+        string requestStatus)
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync(
+                requestStatus: requestStatus,
+                workflowStatus: WorkflowStatuses.Approved);
+        var controller =
+            new WorkflowInternalController(
+                _context,
+                Microsoft.Extensions.Logging.Abstractions
+                    .NullLogger<WorkflowInternalController>.Instance);
+
+        await controller.UpdateStatus(
+            workflow.Id,
+            new UpdateWorkflowStatusInternalRequest
+            {
+                Status = WorkflowStatuses.Completed,
+            });
+
+        Assert.Equal(
+            RequestStatuses.DonorsNotified,
+            request.Status);
+    }
+
+    [Theory]
+    [InlineData(RequestStatuses.Fulfilled)]
+    [InlineData(RequestStatuses.Cancelled)]
+    public async Task UpdateStatus_WhenWorkflowCompletes_DoesNotOverwriteManualTerminalStatus(
+        string requestStatus)
+    {
+        var (request, workflow) =
+            await CreateWorkflowWithRequestAsync(
+                requestStatus: requestStatus,
+                workflowStatus: WorkflowStatuses.Approved);
+        var controller =
+            new WorkflowInternalController(
+                _context,
+                Microsoft.Extensions.Logging.Abstractions
+                    .NullLogger<WorkflowInternalController>.Instance);
+
+        await controller.UpdateStatus(
+            workflow.Id,
+            new UpdateWorkflowStatusInternalRequest
+            {
+                Status = WorkflowStatuses.Completed,
+            });
+
+        Assert.Equal(
+            requestStatus,
+            request.Status);
     }
 
     [Fact]
@@ -244,6 +504,38 @@ public class AgentWorkflowServiceTests : IDisposable
         Assert.Equal(
             WorkflowStatuses.AwaitingApproval,
             result.Status);
+    }
+
+    [Fact]
+    public async Task GetLatestByBloodRequestIdAsync_ReturnsNull_WhenRequestHasNoWorkflow()
+    {
+        var result =
+            await _service.GetLatestByBloodRequestIdAsync(
+                Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetLatestByBloodRequestIdAsync_ReturnsNewestWorkflowForRequest()
+    {
+        var bloodRequestId = Guid.NewGuid();
+        var olderWorkflow = await CreateWorkflowAsync(
+            bloodRequestId: bloodRequestId);
+        olderWorkflow.StartedAt =
+            DateTime.UtcNow.AddMinutes(-1);
+        await _context.SaveChangesAsync();
+
+        var latestWorkflow = await CreateWorkflowAsync(
+            bloodRequestId: bloodRequestId);
+
+        var result =
+            await _service.GetLatestByBloodRequestIdAsync(
+                bloodRequestId);
+
+        Assert.NotNull(result);
+        Assert.Equal(latestWorkflow.Id, result.Id);
+        Assert.NotEqual(olderWorkflow.Id, result.Id);
     }
 
     [Fact]

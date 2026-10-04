@@ -10,6 +10,7 @@ import {
   useUpdateAppointmentStatusMutation,
   type Appointment,
 } from "../appointments/appointmentsApi";
+import { splitDonorAppointments } from "../appointments/appointmentBuckets";
 import "./donor.css";
 
 // Previously this page only ever displayed appointments — no way to
@@ -45,10 +46,7 @@ export function DonorAppointmentsPage() {
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
 
-  const upcoming = data
-    .filter((item) => new Date(item.scheduledTime) >= new Date() && item.status !== "cancelled" && item.status !== "declined")
-    .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-  const history = data.filter((item) => !upcoming.includes(item));
+  const { pending, completed, other } = splitDonorAppointments(data);
 
   const openReschedule = (appointment: Appointment) => {
     const d = new Date(appointment.scheduledTime);
@@ -108,7 +106,7 @@ export function DonorAppointmentsPage() {
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button className="donor-button" type="button" onClick={() => refetch()}>Refresh</button>
-          <Link className="donor-button" to="/appointments/book">+ Book a donation</Link>
+          {data.length > 0 && <Link className="donor-button" to="/appointments/book">+ Book a donation</Link>}
         </div>
       </header>
 
@@ -121,11 +119,11 @@ export function DonorAppointmentsPage() {
         </div>
       )}
 
-      {upcoming.length > 0 && (
+      {pending.length > 0 && (
         <section className="donor-section">
-          <div className="donor-section__heading"><h2>Upcoming</h2><span>{upcoming.length}</span></div>
+          <div className="donor-section__heading"><h2>Pending donations</h2><span>{pending.length}</span></div>
           <div className="donor-list">
-            {upcoming.map((item) => (
+            {pending.map((item) => (
               <AppointmentRow
                 key={item.id}
                 appointment={item}
@@ -139,17 +137,35 @@ export function DonorAppointmentsPage() {
         </section>
       )}
 
-      {history.length > 0 && (
+      {completed.length > 0 && (
         <section className="donor-section">
-          <div className="donor-section__heading"><h2>History</h2><span>{history.length}</span></div>
+          <div className="donor-section__heading"><h2>Completed donations</h2><span>{completed.length}</span></div>
           <div className="donor-list">
-            {history.map((item) => (
+            {completed.map((item) => (
               <article className="donor-list-row donor-list-row--muted" key={item.id}>
                 <div className="donor-list-row__icon">+</div>
                 <div>
                   <span className="donor-card-label">{item.status.replace("_", " ")}</span>
                   <h3>{formatDate(item.scheduledTime)}</h3>
                   <p>{item.unitsDonated ? `${item.unitsDonated} unit${item.unitsDonated === 1 ? "" : "s"} donated` : "Donation appointment"}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {other.length > 0 && (
+        <section className="donor-section">
+          <div className="donor-section__heading"><h2>Other appointments</h2><span>{other.length}</span></div>
+          <div className="donor-list">
+            {other.map((item) => (
+              <article className="donor-list-row donor-list-row--muted" key={item.id}>
+                <div className="donor-list-row__icon">+</div>
+                <div>
+                  <span className="donor-card-label">{item.status.replace("_", " ")}</span>
+                  <h3>{formatDate(item.scheduledTime)}</h3>
+                  <p>Appointment outcome</p>
                 </div>
               </article>
             ))}

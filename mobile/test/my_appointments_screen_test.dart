@@ -49,7 +49,7 @@ void main() {
     pending.complete(const []);
   });
 
-  testWidgets('renders the hero (next donation) and history sections', (tester) async {
+  testWidgets('renders the pending and completed donation sections', (tester) async {
     final now = DateTime.now();
     await tester.pumpWidget(_host([
       myAppointmentsProvider.overrideWith((ref) async => [
@@ -60,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('NEXT DONATION'), findsOneWidget);
-    expect(find.text('HISTORY'), findsOneWidget);
+    expect(find.text('COMPLETED DONATIONS'), findsOneWidget);
     expect(find.text('Scheduled'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Agent match'), findsOneWidget); // agent tag on the hero
@@ -90,6 +90,7 @@ void main() {
 
     expect(find.text('No donations booked'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Book a donation'), findsOneWidget);
+    expect(find.text('Book'), findsNothing);
   });
 
   testWidgets('a pending appointment offers Accept/Reschedule, not Cancel', (tester) async {

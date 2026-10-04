@@ -4,6 +4,7 @@ using BloodDonationNetwork.Application.Interfaces;
 using BloodDonationNetwork.Domain.Entities;
 using BloodDonationNetwork.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace BloodDonationNetwork.Application.Services;
 
@@ -15,6 +16,9 @@ public class RequestService : IRequestService
     private const double DefaultNearbyRadiusKm = 50;
 
     private readonly IApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<RequestService> _logger;
+    private readonly IEligibilityRuleEngine _eligibilityEngine;
 
     private static readonly HashSet<string> ValidRequestStatuses =
         new(StringComparer.OrdinalIgnoreCase)
@@ -29,9 +33,16 @@ public class RequestService : IRequestService
             RequestStatuses.Cancelled
         };
 
-    public RequestService(IApplicationDbContext context)
+    public RequestService(
+        IApplicationDbContext context,
+        INotificationService notificationService,
+        ILogger<RequestService> logger,
+        IEligibilityRuleEngine? eligibilityEngine = null)
     {
         _context = context;
+        _notificationService = notificationService;
+        _logger = logger;
+        _eligibilityEngine = eligibilityEngine ?? new EligibilityRuleEngine();
     }
 
     // 1. Create a new blood request
@@ -46,6 +57,17 @@ public class RequestService : IRequestService
             isAdmin,
             dto.OrganizationId);
 
+        var organization = await _context.Organizations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                item => item.Id == dto.OrganizationId);
+
+        if (organization == null)
+        {
+            throw new ArgumentException(
+                "The selected organization was not found.");
+        }
+
         var request = new BloodRequest
         {
             Id = Guid.NewGuid(),
@@ -55,9 +77,9 @@ public class RequestService : IRequestService
             UnitsRequested = dto.UnitsRequested,
             Urgency = dto.Urgency,
             Status = RequestStatuses.Open,
-            HospitalName = dto.HospitalName,
-            Latitude = dto.Latitude,
-            Longitude = dto.Longitude,
+            HospitalName = string.Empty,
+            Latitude = organization.Latitude,
+            Longitude = organization.Longitude,
             Notes = dto.Notes,
             CreatedAt = DateTime.UtcNow
         };
@@ -65,8 +87,119 @@ public class RequestService : IRequestService
         await _context.BloodRequests.AddAsync(request);
         await _context.SaveChangesAsync();
 
+        await NotifyNearbyDonorsAsync(request);
+
         return MapToResponse(request);
     }
+
+    private async Task NotifyNearbyDonorsAsync(BloodRequest request)
+    {
+        if (!IsValidCoordinates(request.Latitude, request.Longitude))
+        {
+            _logger.LogWarning(
+                "Blood request {BloodRequestId} has invalid coordinates; nearby donors were not notified.",
+                request.Id);
+            return;
+        }
+
+        List<DonorProfile> donors;
+        try
+        {
+            donors = await _context.DonorProfiles
+                .Where(donor =>
+                    donor.Latitude.HasValue &&
+                    donor.Longitude.HasValue)
+                .ToListAsync();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Blood request {BloodRequestId} was created, but nearby donor profiles could not be loaded.",
+                request.Id);
+            return;
+        }
+
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = "new_blood_request",
+            ["bloodRequestId"] = request.Id.ToString()
+        };
+        var title = "New Blood Request Near You";
+        var body =
+            $"A new {GetBloodTypeLabel(request.BloodType)} blood request is available near you.";
+
+        foreach (var donor in donors)
+        {
+            if (donor.Latitude is not { } donorLatitude ||
+                donor.Longitude is not { } donorLongitude ||
+                !IsValidCoordinates(donorLatitude, donorLongitude))
+            {
+                continue;
+            }
+
+            var distanceKm = GeoUtils.DistanceKm(
+                request.Latitude,
+                request.Longitude,
+                donorLatitude,
+                donorLongitude);
+
+            if (!double.IsFinite(distanceKm) ||
+                distanceKm > DefaultNearbyRadiusKm)
+            {
+                continue;
+            }
+
+            try
+            {
+                var result = await _notificationService.SendToDonorAsync(
+                    donor.UserId,
+                    title,
+                    body,
+                    data);
+
+                if (!result.AnyDelivered)
+                {
+                    _logger.LogWarning(
+                        "Nearby blood request notification for request {BloodRequestId} was not delivered to donor {DonorUserId}: {FailureReason}",
+                        request.Id,
+                        donor.UserId,
+                        result.FailureReason ?? "No device accepted the notification.");
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Nearby blood request notification for request {BloodRequestId} failed for donor {DonorUserId}.",
+                    request.Id,
+                    donor.UserId);
+            }
+        }
+    }
+
+    private static bool IsValidCoordinates(double latitude, double longitude) =>
+        double.IsFinite(latitude) &&
+        latitude is >= -90 and <= 90 &&
+        double.IsFinite(longitude) &&
+        longitude is >= -180 and <= 180;
+
+    private static string GetBloodTypeLabel(BloodType bloodType) =>
+        bloodType switch
+        {
+            BloodType.APositive => BloodTypes.APositive,
+            BloodType.ANegative => BloodTypes.ANegative,
+            BloodType.BPositive => BloodTypes.BPositive,
+            BloodType.BNegative => BloodTypes.BNegative,
+            BloodType.ABPositive => BloodTypes.ABPositive,
+            BloodType.ABNegative => BloodTypes.ABNegative,
+            BloodType.OPositive => BloodTypes.OPositive,
+            BloodType.ONegative => BloodTypes.ONegative,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(bloodType),
+                bloodType,
+                "Unknown blood type.")
+        };
 
     // 2. Get one request by ID
     public async Task<RequestResponseDto?> GetByIdAsync(Guid id)
@@ -85,6 +218,8 @@ public class RequestService : IRequestService
 
     // 3. List requests with filters, sorting and pagination
     public async Task<IEnumerable<RequestResponseDto>> GetAllAsync(
+        Guid requestingUserId,
+        UserRole requestingUserRole,
         BloodType? bloodType = null,
         RequestUrgency? urgency = null,
         string? status = null,
@@ -95,11 +230,30 @@ public class RequestService : IRequestService
         bool descending = true,
         double? nearLat = null,
         double? nearLng = null,
-        double? radiusKm = null)
+        double? radiusKm = null,
+        Guid? donorUserId = null)
     {
         var query = _context.BloodRequests
             .AsNoTracking()
             .AsQueryable();
+
+        if (requestingUserRole == UserRole.Staff)
+        {
+            var staffOrganizationId =
+                await _context.Users
+                    .AsNoTracking()
+                    .Where(user =>
+                        user.Id == requestingUserId &&
+                        user.Role == UserRole.Staff)
+                    .Select(user => user.OrganizationId)
+                    .FirstOrDefaultAsync();
+
+            query = staffOrganizationId.HasValue
+                ? query.Where(request =>
+                    request.OrganizationId ==
+                    staffOrganizationId.Value)
+                : query.Where(_ => false);
+        }
 
         // Filters
         if (bloodType.HasValue)
@@ -129,6 +283,21 @@ public class RequestService : IRequestService
                 r => r.OrganizationId == organizationId.Value);
         }
 
+        List<BloodRequest>? donorFilteredRequests = null;
+        if (donorUserId is { } donorUser)
+        {
+            var donor = await _context.DonorProfiles
+                .FirstOrDefaultAsync(profile => profile.UserId == donorUser);
+
+            if (donor is null || !_eligibilityEngine.Evaluate(donor, donor.BloodType).IsEligible)
+                return Array.Empty<RequestResponseDto>();
+
+            var candidates = await query.ToListAsync();
+            donorFilteredRequests = candidates
+                .Where(request => BloodCompatibility.CanDonateTo(donor.BloodType, request.BloodType))
+                .ToList();
+        }
+
         // Prevent invalid pagination values
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 10 : pageSize;
@@ -144,7 +313,7 @@ public class RequestService : IRequestService
         {
             var effectiveRadiusKm = radiusKm ?? DefaultNearbyRadiusKm;
 
-            var candidates = await query.ToListAsync();
+            var candidates = donorFilteredRequests ?? await query.ToListAsync();
 
             var withDistance = candidates
                 .Select(r => (
@@ -188,6 +357,30 @@ public class RequestService : IRequestService
 
             return pagedWithDistance.Select(
                 x => MapToResponse(x.Request, x.DistanceKm));
+        }
+
+        if (donorFilteredRequests is not null)
+        {
+            IEnumerable<BloodRequest> sorted = sortBy.ToLowerInvariant() switch
+            {
+                "urgency" => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.Urgency)
+                    : donorFilteredRequests.OrderBy(r => r.Urgency),
+                "bloodtype" => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.BloodType)
+                    : donorFilteredRequests.OrderBy(r => r.BloodType),
+                "unitsrequested" => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.UnitsRequested)
+                    : donorFilteredRequests.OrderBy(r => r.UnitsRequested),
+                _ => descending
+                    ? donorFilteredRequests.OrderByDescending(r => r.CreatedAt)
+                    : donorFilteredRequests.OrderBy(r => r.CreatedAt),
+            };
+
+            return sorted
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(request => MapToResponse(request));
         }
 
         // Sorting
