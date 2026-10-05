@@ -71,7 +71,12 @@ builder.Services.AddHttpClient("AgentService", client =>
     client.DefaultRequestHeaders.Add(
         "X-Internal-Secret",
         internalAgentSecret.Trim());
-});
+
+    // Room for a free-tier wake-up (~50s) plus a full workflow run.
+    client.Timeout = TimeSpan.FromMinutes(3);
+})
+.AddHttpMessageHandler(() =>
+    new BloodDonationNetwork.Api.Http.AgentServiceWakeUpHandler());
 
 // =====================================================
 // PUSH NOTIFICATIONS (Firebase Cloud Messaging)
