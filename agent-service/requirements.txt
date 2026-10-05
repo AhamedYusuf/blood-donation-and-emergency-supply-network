@@ -5,6 +5,10 @@
 langgraph
 langchain-core
 langchain-ollama
+# Persistent checkpoints in the cloud (used when CHECKPOINT_DATABASE_URL is set)
+langgraph-checkpoint-postgres==3.1.2
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
 
 fastapi==0.115.6
 uvicorn[standard]==0.34.0

@@ -118,9 +118,11 @@ Both confirmed reachable: `/health` → `{"status":"ok"}`, `/swagger` →
   automatically on the next deploy anyway (Program.cs calls
   `MigrateAsync()` on every startup) and the admin account will
   reseed itself.
-- **Agent-service stays local**: any live agent-workflow demonstration
-  runs against your local stack (local backend + local agent-service +
-  local Ollama), not the deployed backend. The deployed backend's own
-  `/api/internal/agent/*` routes exist and are reachable in principle,
-  but nothing is configured to call them from the cloud in this setup —
-  by design, per Section 14's explicit allowance.
+- **Agent service**: `blood-donation-agent` runs on Render next to the
+  API. After the Blueprint creates it, copy its URL from the dashboard
+  into the API's `AgentService__BaseUrl` environment variable and
+  redeploy the API. Until that is set, blood requests are saved but no
+  agent workflow starts. The agent service also sleeps when idle, so the
+  first request after a pause can take up to a minute. Paused workflows
+  are checkpointed in PostgreSQL (`CHECKPOINT_DATABASE_URL`), so an
+  approval still works after the service has slept and restarted.

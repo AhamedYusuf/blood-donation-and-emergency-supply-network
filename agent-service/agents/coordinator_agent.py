@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any, TypedDict
 
@@ -1138,11 +1139,33 @@ def build_coordinator_graph() -> StateGraph:
 # LANGGRAPH CHECKPOINT
 # ============================================================
 
-memory = MemorySaver()
+def build_checkpointer():
+    # Paused workflows must survive a restart in the cloud: Render's free tier
+    # stops the service after ~15 idle minutes, which wipes an in-memory saver
+    # and makes every later approve/reject/revise fail with "not found".
+    database_url = os.getenv("CHECKPOINT_DATABASE_URL")
+    if not database_url:
+        return MemorySaver()
+
+    from langgraph.checkpoint.postgres import PostgresSaver
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+
+    pool = ConnectionPool(
+        conninfo=database_url,
+        max_size=5,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        check=ConnectionPool.check_connection,
+        open=True,
+    )
+    saver = PostgresSaver(pool)
+    saver.setup()
+    return saver
+
 
 coordinator_graph = (
     build_coordinator_graph()
     .compile(
-        checkpointer=memory
+        checkpointer=build_checkpointer()
     )
 )
