@@ -9,6 +9,7 @@ class BloodRequest {
     required this.urgency,
     required this.status,
     required this.hospitalName,
+    this.distanceKm,
     required this.latitude,
     required this.longitude,
     required this.notes,
@@ -25,6 +26,9 @@ class BloodRequest {
   final String urgency;
   final String status;
   final String hospitalName;
+
+  /// Distance from the donor, sent only on the donor's nearby list.
+  final double? distanceKm;
   final double latitude;
   final double longitude;
   final String notes;
@@ -40,7 +44,8 @@ class BloodRequest {
         unitsRequested: (json['unitsRequested'] as num).toInt(),
         urgency: json['urgency'] as String,
         status: json['status'] as String,
-        hospitalName: json['hospitalName'] as String,
+        hospitalName: json['hospitalName'] as String? ?? '',
+        distanceKm: (json['distanceKm'] as num?)?.toDouble(),
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
         notes: json['notes'] as String,

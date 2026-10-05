@@ -11,12 +11,15 @@ import '../../widgets/states.dart';
 import '../appointments/appointment.dart';
 import '../appointments/appointments_repository.dart';
 import '../auth/auth_controller.dart';
+import '../blood_requests/blood_request_ui.dart';
+import '../blood_requests/blood_requests_repository.dart';
+import '../donor_profile/eligibility_text.dart';
+import '../donor_profile/providers/donor_profile_provider.dart';
 import '../notifications/notification_inbox_repository.dart';
 
-/// Donor home. Plain iOS-style large title — no colour block, no
-/// gradient — with the donor's own avatar as the way into Profile. The
-/// action list mirrors the web console's nav rail; screens teammates own
-/// appear as "soon" so the product reads as a whole.
+/// Home tab. Donors see their donations and what they can do next; staff
+/// and admins see their organization's blood requests. Every row on this
+/// screen opens a working feature.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -30,137 +33,222 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
-    final appointments = ref.watch(myAppointmentsProvider);
+    final isDonor = (auth.role ?? 'donor') == 'donor';
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.gutter,
-            AppSpacing.xs,
-            AppSpacing.gutter,
-            AppSpacing.xl,
-          ),
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_greeting(), style: AppText.bodySmall),
-                      Text(
-                        auth.firstName ?? 'Donor',
-                        style: AppText.largeTitle,
-                      ),
-                    ],
-                  ),
-                ),
-                const _NotificationBell(),
-                const SizedBox(width: AppSpacing.xs),
-                InkWell(
-                  onTap: () => context.go('/profile'),
-                  customBorder: const CircleBorder(),
-                  child: InitialsAvatar(
-                    initials: auth.initials,
-                    size: 40,
-                  ),
-                ),
-              ],
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            // Eligibility hangs off the donor profile, so refreshing the
+            // profile also picks up an admin verifying the donor.
+            ref.invalidate(myAppointmentsProvider);
+            ref.invalidate(donorProfileProvider);
+            ref.invalidate(unreadNotificationCountProvider);
+            ref.invalidate(bloodRequestsProvider);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.gutter,
+              AppSpacing.xs,
+              AppSpacing.gutter,
+              AppSpacing.xl,
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _StatsRow(appointments: appointments),
-            const SizedBox(height: AppSpacing.xl),
-            const SectionLabel('Appointments'),
-            AppCard(
-              padding: EdgeInsets.zero,
-              child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  FadeSlideIn(
-                    index: 0,
-                    child: _ActionRow(
-                      icon: Icons.event_available_outlined,
-                      iconColor: AppColors.primary,
-                      iconBg: AppColors.primarySubtle,
-                      title: 'My donations',
-                      subtitle:
-                          'View, book and manage your appointments',
-                      onTap: () => context.go('/appointments'),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_greeting(), style: AppText.bodySmall),
+                        Text(
+                          auth.firstName ?? (isDonor ? 'Donor' : 'Staff'),
+                          style: AppText.largeTitle,
+                        ),
+                      ],
                     ),
                   ),
-                  const Divider(
-                    height: 1,
-                    indent: AppSpacing.md + 40 + AppSpacing.sm,
-                  ),
-                  FadeSlideIn(
-                    index: 1,
-                    child: _ActionRow(
-                      icon: Icons.add_circle_outline,
-                      iconColor: AppColors.primary,
-                      iconBg: AppColors.primarySubtle,
-                      title: 'Book a donation',
-                      subtitle: 'Pick a blood bank and a time',
-                      onTap: () => context.push('/appointments/book'),
-                    ),
+                  if (isDonor) ...[
+                    const _NotificationBell(),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                  InkWell(
+                    onTap: () => context.go('/profile'),
+                    customBorder: const CircleBorder(),
+                    child: InitialsAvatar(initials: auth.initials, size: 40),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const SectionLabel('Coming soon'),
-            AppCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  FadeSlideIn(
-                    index: 2,
-                    child: const _ActionRow(
-                      icon: Icons.notifications_none,
-                      iconColor: AppColors.inkMuted,
-                      iconBg: AppColors.surfaceSunken,
-                      title: 'Urgent alerts',
-                      subtitle: 'Requests matched to your blood type',
-                    ),
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: AppSpacing.md + 40 + AppSpacing.sm,
-                  ),
-                  FadeSlideIn(
-                    index: 3,
-                    child: const _ActionRow(
-                      icon: Icons.verified_outlined,
-                      iconColor: AppColors.inkMuted,
-                      iconBg: AppColors.surfaceSunken,
-                      title: 'My eligibility',
-                      subtitle: 'When you can next donate',
-                    ),
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: AppSpacing.md + 40 + AppSpacing.sm,
-                  ),
+              const SizedBox(height: AppSpacing.lg),
+              if (isDonor) const _DonorHome() else const _StaffHome(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                  // Nearby Blood Banks is now active.
-                  FadeSlideIn(
-                    index: 4,
-                    child: _ActionRow(
-                      icon: Icons.map_outlined,
-                      iconColor: AppColors.primary,
-                      iconBg: AppColors.primarySubtle,
-                      title: 'Nearby blood banks',
-                      subtitle: 'Find a place to donate',
-                      onTap: () => context.push('/nearby-banks'),
-                    ),
-                  ),
-                ],
+class _DonorHome extends ConsumerWidget {
+  const _DonorHome();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appointments = ref.watch(myAppointmentsProvider);
+    final eligibility = ref.watch(eligibilityProvider).valueOrNull;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _StatsRow(appointments: appointments),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Appointments'),
+        _ActionGroup(
+          rows: [
+            _ActionRow(
+              icon: Icons.event_available_outlined,
+              title: 'My donations',
+              subtitle: 'View, book and manage your appointments',
+              onTap: () => context.go('/appointments'),
+            ),
+            _ActionRow(
+              icon: Icons.add_circle_outline,
+              title: 'Book a donation',
+              subtitle: 'Pick a blood bank and a time',
+              onTap: () => context.push('/appointments/book'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('For you'),
+        _ActionGroup(
+          rows: [
+            _ActionRow(
+              icon: Icons.bloodtype_outlined,
+              title: 'Requests near you',
+              subtitle: 'Hospitals within 50 km that need your blood type',
+              onTap: () => context.go('/blood-requests'),
+            ),
+            _ActionRow(
+              icon: Icons.verified_outlined,
+              title: 'My eligibility',
+              subtitle: eligibilitySummary(eligibility),
+              onTap: () => context.push('/eligibility'),
+            ),
+            _ActionRow(
+              icon: Icons.map_outlined,
+              title: 'Nearby blood banks',
+              subtitle: 'Find a place to donate',
+              onTap: () => context.push('/nearby-banks'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StaffHome extends ConsumerWidget {
+  const _StaffHome();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requests = ref.watch(bloodRequestsProvider);
+    int count(String status) =>
+        requests.valueOrNull
+            ?.where((r) => normalizeBloodLabel(r.status) == status)
+            .length ??
+        0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                icon: Icons.bloodtype_outlined,
+                iconColor: AppColors.primary,
+                label: 'Open',
+                value: count('open'),
+                loading: requests.isLoading,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _StatCard(
+                icon: Icons.how_to_reg_outlined,
+                iconColor: AppColors.scheduled,
+                label: 'To approve',
+                value: count('awaiting_approval'),
+                loading: requests.isLoading,
               ),
             ),
           ],
         ),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Blood requests'),
+        _ActionGroup(
+          rows: [
+            _ActionRow(
+              icon: Icons.list_alt_outlined,
+              title: 'All requests',
+              subtitle: 'Track requests and their coordinator workflows',
+              onTap: () => context.go('/blood-requests'),
+            ),
+            _ActionRow(
+              icon: Icons.add_circle_outline,
+              title: 'New blood request',
+              subtitle: 'Start the agents on a new request',
+              onTap: () async {
+                final created = await context.push<bool>('/blood-requests/new');
+                if (created == true) ref.invalidate(bloodRequestsProvider);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionLabel('Network'),
+        _ActionGroup(
+          rows: [
+            _ActionRow(
+              icon: Icons.map_outlined,
+              title: 'Nearby blood banks',
+              subtitle: 'Blood banks and hospitals on the map',
+              onTap: () => context.push('/nearby-banks'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionGroup extends StatelessWidget {
+  const _ActionGroup({required this.rows});
+
+  final List<_ActionRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              const Divider(
+                height: 1,
+                indent: AppSpacing.md + 32 + AppSpacing.sm,
+              ),
+            FadeSlideIn(index: i, child: rows[i]),
+          ],
+        ],
       ),
     );
   }
@@ -175,13 +263,13 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final upcoming =
-        appointments.valueOrNull?.where((a) => a.isUpcoming).length;
+    final upcoming = appointments.valueOrNull
+        ?.where((a) => a.isUpcoming)
+        .length;
 
-    final completed =
-        appointments.valueOrNull
-            ?.where((a) => a.status == 'completed')
-            .length;
+    final completed = appointments.valueOrNull
+        ?.where((a) => a.status == 'completed')
+        .length;
 
     return Row(
       children: [
@@ -230,11 +318,7 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: iconColor,
-          ),
+          Icon(icon, size: 18, color: iconColor),
           const SizedBox(width: AppSpacing.xs),
           Text(
             loading || value == null ? '—' : '$value',
@@ -259,78 +343,56 @@ class _StatCard extends StatelessWidget {
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.icon,
-    required this.iconColor,
-    required this.iconBg,
     required this.title,
     required this.subtitle,
-    this.onTap,
+    required this.onTap,
   });
 
   final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
   final String title;
   final String subtitle;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: Opacity(
-          opacity: enabled ? 1 : 0.5,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(
-                      AppRadii.sm - 2,
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 17,
-                    color: iconColor,
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySubtle,
+                  borderRadius: BorderRadius.circular(AppRadii.sm - 2),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: AppText.bodyStrong,
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle,
-                        style: AppText.caption,
-                      ),
-                    ],
-                  ),
+                child: Icon(icon, size: 17, color: AppColors.primary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppText.bodyStrong),
+                    const SizedBox(height: 1),
+                    Text(subtitle, style: AppText.caption),
+                  ],
                 ),
-                if (enabled)
-                  const Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: AppColors.inkFaint,
-                  ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: AppColors.inkFaint,
+              ),
+            ],
           ),
         ),
       ),
@@ -354,18 +416,31 @@ class _NotificationBell extends ConsumerWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            const Icon(Icons.notifications_none, size: 24, color: AppColors.ink),
+            const Icon(
+              Icons.notifications_none,
+              size: 24,
+              color: AppColors.ink,
+            ),
             if (unread > 0)
               Positioned(
                 right: -2,
                 top: -2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
                   constraints: const BoxConstraints(minWidth: 16),
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
                   child: Text(
                     unread > 9 ? '9+' : '$unread',
-                    style: AppText.caption.copyWith(color: Colors.white, fontSize: 9),
+                    style: AppText.caption.copyWith(
+                      color: Colors.white,
+                      fontSize: 9,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),

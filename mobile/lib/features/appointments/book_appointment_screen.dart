@@ -73,6 +73,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
     try {
       await ref.read(appointmentsRepositoryProvider)
           .book(organizationId: _bank!.id, scheduledTime: slot);
+      // Booking can start from Home, a request or the eligibility screen,
+      // so refresh the list here rather than relying on the caller.
+      ref.invalidate(myAppointmentsProvider);
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       setState(() => _error = e.message);

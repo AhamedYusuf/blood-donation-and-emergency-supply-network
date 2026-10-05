@@ -39,5 +39,20 @@ void main() {
         3,
       );
     });
+
+    test('staff have no Donations tab: Requests is index 1, Profile index 2', () {
+      expect(
+        MobileShell.selectedIndexForLocation('/blood-requests', fallbackIndex: 0, isStaff: true),
+        1,
+      );
+      expect(
+        MobileShell.selectedIndexForLocation('/profile', fallbackIndex: 0, isStaff: true),
+        2,
+      );
+      expect(
+        MobileShell.selectedIndexForLocation('/appointments', fallbackIndex: 0, isStaff: true),
+        0,
+      );
+    });
   });
 }

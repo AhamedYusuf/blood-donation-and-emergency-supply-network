@@ -10,6 +10,8 @@ import '../../widgets/app_card.dart';
 import '../../widgets/states.dart';
 import '../../widgets/status_pill.dart';
 import '../auth/auth_controller.dart';
+import '../donor_profile/eligibility_text.dart';
+import '../donor_profile/providers/donor_profile_provider.dart';
 import 'blood_request.dart';
 import 'blood_request_ui.dart';
 import 'blood_requests_repository.dart';
@@ -18,6 +20,9 @@ class BloodRequestsScreen extends ConsumerWidget {
   const BloodRequestsScreen({super.key});
 
   Future<void> _refresh(WidgetRef ref) async {
+    // The donor profile carries verification and eligibility, which decide
+    // both the list and the empty state.
+    ref.invalidate(donorProfileProvider);
     ref.invalidate(bloodRequestsProvider);
     await ref.read(bloodRequestsProvider.future);
   }
@@ -27,9 +32,12 @@ class BloodRequestsScreen extends ConsumerWidget {
     final requestsAsync = ref.watch(bloodRequestsProvider);
     final role = ref.watch(authControllerProvider).role;
     final canCreate = role == 'staff' || role == 'admin';
+    final isDonor = role == 'donor';
 
     return Scaffold(
-      appBar: AppBar(title: Text('Blood Requests', style: AppText.title)),
+      appBar: AppBar(
+        title: Text(isDonor ? 'Requests near you' : 'Blood Requests', style: AppText.title),
+      ),
       floatingActionButton: canCreate
           ? FloatingActionButton(
               onPressed: () async {
@@ -63,11 +71,13 @@ class BloodRequestsScreen extends ConsumerWidget {
                     constraints: BoxConstraints(
                       minHeight: constraints.maxHeight,
                     ),
-                    child: const EmptyState(
-                      icon: Icons.bloodtype_outlined,
-                      title: 'No blood requests',
-                      message: 'There are no blood requests to show right now.',
-                    ),
+                    child: isDonor
+                        ? const _DonorEmptyState()
+                        : const EmptyState(
+                            icon: Icons.bloodtype_outlined,
+                            title: 'No blood requests',
+                            message: 'Requests your organization raises will appear here.',
+                          ),
                   ),
                 ),
               ),
@@ -89,11 +99,14 @@ class BloodRequestsScreen extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  return _RequestOverview(requests: requests);
+                  return isDonor
+                      ? const _DonorHeader()
+                      : _RequestOverview(requests: requests);
                 }
                 final request = requests[index - 1];
                 return _RequestCard(
                   request: request,
+                  forDonor: isDonor,
                   onTap: () async {
                     await context.push<bool>('/blood-requests/${request.id}');
                     ref.invalidate(bloodRequestsProvider);
@@ -109,10 +122,11 @@ class BloodRequestsScreen extends ConsumerWidget {
 }
 
 class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.request, required this.onTap});
+  const _RequestCard({required this.request, required this.onTap, this.forDonor = false});
 
   final BloodRequest request;
   final VoidCallback onTap;
+  final bool forDonor;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +156,7 @@ class _RequestCard extends StatelessWidget {
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: [
-              BloodRequestStatusPill(request.status),
+              if (!forDonor) BloodRequestStatusPill(request.status),
               BloodRequestUrgencyPill(request.urgency),
             ],
           ),
@@ -155,7 +169,12 @@ class _RequestCard extends StatelessWidget {
                 value: '${request.unitsRequested}',
               ),
               const Spacer(),
-              Text(isoDate(request.createdAt), style: AppText.caption),
+              Text(
+                forDonor && request.distanceKm != null
+                    ? '${request.distanceKm!.toStringAsFixed(1)} km away'
+                    : isoDate(request.createdAt),
+                style: AppText.caption,
+              ),
             ],
           ),
         ],
@@ -291,6 +310,50 @@ class _RequestValue extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DonorHeader extends StatelessWidget {
+  const _DonorHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Text(
+        'Hospitals within 50 km whose patients your blood type can help.',
+        style: AppText.bodySmall,
+      ),
+    );
+  }
+}
+
+/// Explains an empty list: a donor who can't donate yet sees why, instead
+/// of a list that looks broken.
+class _DonorEmptyState extends ConsumerWidget {
+  const _DonorEmptyState();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final eligibility = ref.watch(eligibilityProvider).valueOrNull;
+    if (eligibility != null && !eligibility.isEligible) {
+      return EmptyState(
+        icon: Icons.schedule_rounded,
+        title: 'You can’t donate right now',
+        message: '${eligibilityExplanation(eligibility.reason)} '
+            'Requests near you will show here once you can donate.',
+        action: OutlinedButton(
+          onPressed: () => context.push('/eligibility'),
+          child: const Text('See my eligibility'),
+        ),
+      );
+    }
+    return const EmptyState(
+      icon: Icons.bloodtype_outlined,
+      title: 'No requests near you',
+      message: 'When a hospital within 50 km needs your blood type, it will '
+          'appear here and you will get a notification.',
     );
   }
 }

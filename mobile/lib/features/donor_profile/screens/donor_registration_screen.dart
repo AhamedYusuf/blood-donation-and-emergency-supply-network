@@ -93,6 +93,7 @@ class _DonorRegistrationScreenState extends ConsumerState<DonorRegistrationScree
       _submitting = true;
       _error = null;
     });
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final token = ref.read(authTokenProvider);
       if (token == null) throw ApiException('Your session has expired. Please sign in again.');
@@ -105,7 +106,11 @@ class _DonorRegistrationScreenState extends ConsumerState<DonorRegistrationScree
             'medicalFlags': _medicalFlags,
           }, token: token);
       await ref.read(authControllerProvider.notifier).setDonorProfileId(profile.id);
-      if (mounted) context.go('/donor-profile');
+      if (!mounted) return;
+      context.go('/');
+      messenger.showSnackBar(const SnackBar(
+        content: Text('You’re registered. An administrator will verify your profile soon.'),
+      ));
     } on ApiException catch (error) {
       // The backend (DonorsController.Register) returns 400 with a clear,
       // actionable message for both "already registered" and "address
