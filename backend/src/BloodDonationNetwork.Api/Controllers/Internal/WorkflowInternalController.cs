@@ -67,9 +67,18 @@ public class WorkflowInternalController : ControllerBase
         var bloodType =
             MapBloodType(bloodRequest.BloodType);
 
+        var hospitalName = bloodRequest.HospitalName;
+        if (string.IsNullOrWhiteSpace(hospitalName))
+        {
+            hospitalName = await _context.Organizations
+                .Where(organization => organization.Id == bloodRequest.OrganizationId)
+                .Select(organization => organization.Name)
+                .FirstOrDefaultAsync() ?? "the requesting hospital";
+        }
+
         var objective =
             $"Fulfill {bloodRequest.UnitsRequested} unit(s) of " +
-            $"{bloodType} blood for {bloodRequest.HospitalName}.";
+            $"{bloodType} blood for {hospitalName}.";
 
         var workflow = new AgentWorkflow
         {

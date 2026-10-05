@@ -33,6 +33,10 @@ public class CreateRequestDto : IValidatableObject
     [MaxLength(1000)]
     public string Notes { get; set; } = string.Empty;
 
+    // Optional: when left empty the requesting organization's name is used.
+    [MaxLength(200)]
+    public string? HospitalName { get; set; }
+
     public IEnumerable<ValidationResult> Validate(
         ValidationContext validationContext)
     {
