@@ -1,6 +1,6 @@
 # Agentic AI Evaluation Report
 
-**Run at:** 2026-10-05T00:29:03.560350+00:00
+**Run at:** 2026-10-05T16:17:54.342373+00:00
 
 Evaluation method per Assignment 1 §12: rule-based assertions and schema/state checks against the real, running system's actual execution trace. No LLM judges its own output here — the Coordinator's planning, routing and validation logic is deterministic Python (the local LLM is only used for human-readable narrative text), so each golden case's expected outcome is a concrete, checkable fact.
 
@@ -50,5 +50,5 @@ Evaluation method per Assignment 1 §12: rule-based assertions and schema/state 
 
 ## ❌ Golden Case 6: eligibility enforces a real business rule (recent illness), not just blood-type match
 
-- donor profile id cb2d84c9-e47a-49de-b96d-86ec56e56f68 appears in eligibility's Excluded list = False
+- donor profile id a30a3458-8b4f-4921-a461-e3fda8b3440d appears in eligibility's Excluded list = False
 - **Failure:** assertion failed

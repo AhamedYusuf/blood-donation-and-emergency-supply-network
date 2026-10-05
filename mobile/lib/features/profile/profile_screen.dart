@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -7,6 +8,8 @@ import '../../widgets/app_card.dart';
 import '../../widgets/avatar.dart';
 import '../../widgets/states.dart';
 import '../auth/auth_controller.dart';
+import '../donor_profile/eligibility_text.dart';
+import '../donor_profile/providers/donor_profile_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -14,6 +17,7 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
+    final isDonor = (auth.role ?? 'donor') == 'donor';
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -53,6 +57,37 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            if (isDonor) ...[
+              const SizedBox(height: AppSpacing.xl),
+              const SectionLabel('Donor'),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _LinkRow(
+                      icon: Icons.badge_outlined,
+                      title: 'Donor profile',
+                      subtitle: 'Blood type, address and health details',
+                      onTap: () => context.push('/donor-profile'),
+                    ),
+                    const Divider(height: 1, indent: AppSpacing.md + 32 + AppSpacing.sm),
+                    _LinkRow(
+                      icon: Icons.verified_outlined,
+                      title: 'My eligibility',
+                      subtitle: eligibilitySummary(ref.watch(eligibilityProvider).valueOrNull),
+                      onTap: () => context.push('/eligibility'),
+                    ),
+                    const Divider(height: 1, indent: AppSpacing.md + 32 + AppSpacing.sm),
+                    _LinkRow(
+                      icon: Icons.notifications_none,
+                      title: 'Notifications',
+                      subtitle: 'Requests and appointment updates',
+                      onTap: () => context.push('/notifications'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.xl),
             const SectionLabel('About'),
             AppCard(
@@ -63,9 +98,14 @@ class ProfileScreen extends ConsumerWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
-                      'Every donation you book here is routed through the Matching & '
-                      'Dispatch agent, which finds and prioritises the request that '
-                      'needs your blood type most.',
+                      isDonor
+                          ? 'When a hospital near you needs your blood type, PulsePoint’s '
+                              'agents can match you to the request. A staff member approves '
+                              'every match before you are contacted, and you confirm or '
+                              'decline the appointment here.'
+                          : 'Raise blood requests for your organization and follow each '
+                              'one through the coordinator workflow: stock check, donor '
+                              'matching, eligibility and your approval.',
                       style: AppText.bodySmall,
                     ),
                   ),
@@ -111,6 +151,53 @@ class ProfileScreen extends ConsumerWidget {
     if (ok == true) {
       await ref.read(authControllerProvider.notifier).logout();
     }
+  }
+}
+
+class _LinkRow extends StatelessWidget {
+  const _LinkRow({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySubtle,
+                  borderRadius: BorderRadius.circular(AppRadii.sm - 2),
+                ),
+                child: Icon(icon, size: 17, color: AppColors.primary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppText.bodyStrong),
+                    const SizedBox(height: 1),
+                    Text(subtitle, style: AppText.caption),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: AppColors.inkFaint),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

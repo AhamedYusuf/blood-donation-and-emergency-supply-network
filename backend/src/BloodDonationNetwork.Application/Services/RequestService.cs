@@ -77,7 +77,9 @@ public class RequestService : IRequestService
             UnitsRequested = dto.UnitsRequested,
             Urgency = dto.Urgency,
             Status = RequestStatuses.Open,
-            HospitalName = string.Empty,
+            HospitalName = string.IsNullOrWhiteSpace(dto.HospitalName)
+                ? organization.Name
+                : dto.HospitalName.Trim(),
             Latitude = organization.Latitude,
             Longitude = organization.Longitude,
             Notes = dto.Notes,
@@ -145,7 +147,8 @@ public class RequestService : IRequestService
                 donorLongitude);
 
             if (!double.IsFinite(distanceKm) ||
-                distanceKm > DefaultNearbyRadiusKm)
+                distanceKm > DefaultNearbyRadiusKm ||
+                !DonorCanRespondTo(donor, request))
             {
                 continue;
             }
@@ -177,6 +180,19 @@ public class RequestService : IRequestService
             }
         }
     }
+
+    // One rule decides both who is notified about a request and whose
+    // "requests near you" list shows it, so the two can never disagree.
+    private bool DonorCanRespondTo(DonorProfile donor, BloodRequest request) =>
+        _eligibilityEngine.Evaluate(donor, donor.BloodType).IsEligible &&
+        BloodCompatibility.CanDonateTo(donor.BloodType, request.BloodType);
+
+    private static readonly HashSet<string> ClosedStatuses = new()
+    {
+        RequestStatuses.Fulfilled,
+        RequestStatuses.Expired,
+        RequestStatuses.Cancelled
+    };
 
     private static bool IsValidCoordinates(double latitude, double longitude) =>
         double.IsFinite(latitude) &&
@@ -289,12 +305,14 @@ public class RequestService : IRequestService
             var donor = await _context.DonorProfiles
                 .FirstOrDefaultAsync(profile => profile.UserId == donorUser);
 
-            if (donor is null || !_eligibilityEngine.Evaluate(donor, donor.BloodType).IsEligible)
+            if (donor is null)
                 return Array.Empty<RequestResponseDto>();
 
             var candidates = await query.ToListAsync();
             donorFilteredRequests = candidates
-                .Where(request => BloodCompatibility.CanDonateTo(donor.BloodType, request.BloodType))
+                .Where(request =>
+                    !ClosedStatuses.Contains(request.Status) &&
+                    DonorCanRespondTo(donor, request))
                 .ToList();
         }
 

@@ -144,6 +144,44 @@ public sealed class RequestCreationNotificationTests : IDisposable
         Assert.Empty(_notifications.Sent);
     }
 
+    [Fact]
+    public async Task Create_DoesNotNotifyNearbyDonorWithIncompatibleBloodType()
+    {
+        await AddDonorsAsync(
+            CreateDonor(Guid.NewGuid(), 0, 0.1, bloodType: BloodTypes.BPositive));
+
+        await CreateRequestAsync();
+
+        Assert.Empty(_notifications.Sent);
+    }
+
+    [Fact]
+    public async Task Create_DoesNotNotifyNearbyDonorWhoIsNotEligibleYet()
+    {
+        await AddDonorsAsync(
+            CreateDonor(Guid.NewGuid(), 0, 0.1, verified: false));
+
+        await CreateRequestAsync();
+
+        Assert.Empty(_notifications.Sent);
+    }
+
+    [Fact]
+    public async Task Create_UsesOrganizationNameWhenNoHospitalNameIsGiven()
+    {
+        var request = await CreateRequestAsync();
+
+        Assert.Equal("Test Hospital", request.HospitalName);
+    }
+
+    [Fact]
+    public async Task Create_KeepsTheHospitalNameThatWasGiven()
+    {
+        var request = await CreateRequestAsync(hospitalName: "  Ward 7, Test Hospital ");
+
+        Assert.Equal("Ward 7, Test Hospital", request.HospitalName);
+    }
+
     private async Task AddDonorsAsync(params DonorProfile[] donors)
     {
         _context.DonorProfiles.AddRange(donors);
@@ -151,7 +189,7 @@ public sealed class RequestCreationNotificationTests : IDisposable
     }
 
     private async Task<BloodDonationNetwork.Application.DTOs.Requests.RequestResponseDto>
-        CreateRequestAsync()
+        CreateRequestAsync(string? hospitalName = null)
     {
         _context.Organizations.Add(new Organization
         {
@@ -177,20 +215,26 @@ public sealed class RequestCreationNotificationTests : IDisposable
                 BloodType = BloodType.APositive,
                 UnitsRequested = 1,
                 Urgency = RequestUrgency.Normal,
-                Notes = string.Empty
+                Notes = string.Empty,
+                HospitalName = hospitalName
             });
     }
 
+    // Defaults describe a donor who can respond to the A+ test request:
+    // verified, adult, no recent donation, compatible blood type.
     private static DonorProfile CreateDonor(
         Guid userId,
         double? latitude,
-        double? longitude) =>
+        double? longitude,
+        string bloodType = BloodTypes.ONegative,
+        bool verified = true) =>
         new()
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            BloodType = BloodTypes.ONegative,
+            BloodType = bloodType,
             DateOfBirth = new DateOnly(1990, 1, 1),
+            VerifiedByAdmin = verified,
             Latitude = latitude,
             Longitude = longitude
         };

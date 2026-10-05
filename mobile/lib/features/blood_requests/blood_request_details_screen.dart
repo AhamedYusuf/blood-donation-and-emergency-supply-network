@@ -271,7 +271,23 @@ class _BloodRequestDetailsScreenState
                 AppSpacing.lg,
               ),
               children: [
-                _RequestDetails(request: request),
+                _RequestDetails(request: request, showStatus: canManage),
+
+                if (!canManage) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const SectionLabel('How you can help'),
+                  Text(
+                    'Book a donation at a blood bank near you. Donated blood '
+                    'replenishes the stock hospitals draw on for requests like this one.',
+                    style: AppText.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                    onPressed: () => context.push('/appointments/book'),
+                    icon: const Icon(Icons.event_available_outlined),
+                    label: const Text('Book a donation'),
+                  ),
+                ],
 
                 if (canManage) ...[
                   const SizedBox(height: AppSpacing.lg),
@@ -411,9 +427,12 @@ class _BloodRequestDetailsScreenState
 }
 
 class _RequestDetails extends StatelessWidget {
-  const _RequestDetails({required this.request});
+  const _RequestDetails({required this.request, required this.showStatus});
 
   final BloodRequest request;
+  // The workflow status is staff-facing; donors only need to know the
+  // request is open and how urgent it is.
+  final bool showStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -434,7 +453,7 @@ class _RequestDetails extends StatelessWidget {
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
-                  BloodRequestStatusPill(request.status),
+                  if (showStatus) BloodRequestStatusPill(request.status),
                   BloodRequestUrgencyPill(request.urgency),
                 ],
               ),

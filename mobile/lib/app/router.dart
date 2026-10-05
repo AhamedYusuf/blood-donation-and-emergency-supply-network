@@ -77,6 +77,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             return '/donor-registration';
           }
 
+          // Donations, booking, the donor profile and eligibility belong to
+          // donors; staff and admins have none of their own.
+          final isStaff = auth.role == 'staff' || auth.role == 'admin';
+          final location = state.matchedLocation;
+          if (isStaff &&
+              (location.startsWith('/appointments') ||
+                  location == '/donor-profile' ||
+                  location == '/eligibility' ||
+                  location == '/notifications')) {
+            return '/';
+          }
+
           // Blood request creation is only available
           // to staff and admin users.
           if (state.matchedLocation ==
