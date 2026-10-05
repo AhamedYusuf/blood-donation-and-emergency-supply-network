@@ -128,9 +128,16 @@
 
 .organizations-hero h1 {
   margin: 0;
-  font-size: clamp(42px, 5vw, 70px);
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  /* Was clamp(42px, 5vw, 70px), tuned for the old full-bleed width.
+     Now that the hero is an inset card matching the other pages'
+     width (see the width override further down), that size wrapped
+     this headline to 4 lines and overflowed the fixed hero height —
+     confirmed live. Scaled down to roughly the same proportion
+     Appointments/Requests use at their own (near-identical) card
+     width. */
+  font-size: clamp(30px, 3.4vw, 46px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
   font-weight: 800;
 }
 
@@ -308,31 +315,15 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* Hero wave */
-
-.organizations-hero__wave {
-  position: absolute;
-  left: -2%;
-  right: -2%;
-  bottom: -1px;
-  height: 70px;
-  z-index: 3;
-}
-
-.organizations-hero__wave div {
-  position: absolute;
-  inset: auto 0 0;
-  height: 65px;
-  background: var(--canvas);
-  clip-path: ellipse(62% 55% at 50% 100%);
-}
-
-.organizations-hero__wave div:last-child {
-  height: 45px;
-  opacity: 0.45;
-  background: #f4d7de;
-  clip-path: ellipse(50% 50% at 50% 100%);
-}
+/* Hero wave — removed. It clipped an ellipse "bite" the width of the
+   full viewport out of the hero's bottom edge, which only reads as a
+   wave when the hero itself runs edge-to-edge. Now that the hero is
+   an inset rounded card (see the width/radius override above), the
+   same clip-path drew a broken-looking notch inside the card instead
+   of a transition — confirmed live. The stat row below already
+   overlaps the hero's bottom edge on its own (.organization-stat-grid's
+   existing -28px margin-top), which is the same overlap technique the
+   Appointments hero uses with no wave needed. */
 
 /* ================================
    CONTENT
@@ -1607,5 +1598,38 @@
 @media (prefers-reduced-motion: reduce) {
   .organizations-content::before {
     animation: none !important;
+  }
+}
+
+/* Shared hero height across the operations console (see
+   appointments/appointments.css for the full measurement/reasoning).
+   This one was the outlier at 510px — min-height only (no fixed
+   height), so dropping the floor to 460px just means the box is free
+   to size to its content like the others, never clipped.
+   .organizations-hero__content carries its OWN separate 510px floor
+   (line 103) that keeps the outer hero tall even once its own
+   min-height drops — both have to move together. Scoped to
+   desktop/tablet — this page has its own mobile hero sizing below
+   761px (680px tall), which this must not fight.
+
+   Also closes a real layout gap, not just a height one: every other
+   hero in the product (Appointments, Requests, Inventory) is an inset
+   rounded card with a page gutter either side; this one was the only
+   one still running flush edge-to-edge with square corners, even
+   though .organizations-content directly below it already uses the
+   exact same inset width (min(1240px, calc(100% - 48px))) — so the
+   hero was the one piece out of step with its own page, not a
+   deliberate different style. Matching that width + radius here is
+   what actually fixes it, not just the height. */
+@media (min-width: 761px) {
+  .organizations-hero {
+    width: min(1240px, calc(100% - 48px));
+    margin: 0 auto;
+    border-radius: var(--radius-lg, 18px);
+    min-height: 460px;
+  }
+
+  .organizations-hero__content {
+    min-height: 460px;
   }
 }

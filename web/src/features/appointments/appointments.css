@@ -758,3 +758,15 @@
     min-width: calc(50% - var(--space-sm) / 2);
   }
 }
+
+/* Every operations-console page hero (Appointments, Requests,
+   Inventory, Manage, Emergency, Organizations) was built in a
+   separate pass with its own height — measured live at 1440px:
+   352 / 306 / 300 / 345 / 365 / 510px. 460px is the shared target
+   across all six (see each file's matching override), tall enough
+   for Organizations' 3-line title without clipping. Scoped to
+   desktop/tablet — each page already has its own carefully-tuned
+   mobile hero sizing below 761px, which this must not fight. */
+@media (min-width: 761px) {
+  .appointments-hero { min-height: 460px; }
+}

@@ -76,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    Text('Blood Donation Network', style: AppText.title, textAlign: TextAlign.center),
+                    Text('PulsePoint', style: AppText.title, textAlign: TextAlign.center),
                     const SizedBox(height: AppSpacing.xxs),
                     Text('Sign in to manage your donations', style: AppText.body, textAlign: TextAlign.center),
                     const SizedBox(height: AppSpacing.xxl),

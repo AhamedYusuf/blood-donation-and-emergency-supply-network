@@ -10,7 +10,7 @@
         android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
-        android:label="blood_donation_network"
+        android:label="PulsePoint"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

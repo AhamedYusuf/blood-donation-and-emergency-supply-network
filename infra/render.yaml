@@ -1,11 +1,9 @@
 # Render Blueprint — deploys the ASP.NET Core API, PostgreSQL database,
-# and React static site required by Assignment 1 Section 14.
+# agent service and React static site required by Assignment 1 Section 14.
 #
-# The Python agent-service is intentionally NOT deployed here — Section
-# 14's table explicitly allows it to "deploy or run locally as
-# appropriate," and it depends on a local Ollama model anyway. It stays
-# on the student's machine; see backend/README (or the deployment
-# report) for local startup instructions.
+# Also deploys the Python agent-service (LangGraph Coordinator). Without
+# it, blood requests are saved but no agent workflow runs in the cloud.
+# It needs no LLM: the agents decide with fixed rules in the API.
 #
 # To apply: Render dashboard -> New -> Blueprint -> connect this repo,
 # point it at this file (infra/render.yaml). See the deployment section
@@ -84,6 +82,15 @@ services:
       - key: Seed__AdminPassword
         sync: false
 
+      # Public URL of the blood-donation-agent service below. Render adds a
+      # random suffix to the name, so the URL is only known after the agent
+      # service exists: copy it from the dashboard and paste it here (e.g.
+      # https://blood-donation-agent-xxxx.onrender.com). Without it the API
+      # falls back to localhost:8000, blood requests are saved but no agent
+      # workflow ever starts.
+      - key: AgentService__BaseUrl
+        sync: false
+
       # Nominatim (the free OpenStreetMap geocoder this originally used)
       # actively blocks/rate-limits cloud-provider IP ranges — confirmed
       # live, every address failed to geocode once deployed here even
@@ -93,6 +100,38 @@ services:
       # from locationiq.com — paste it in via the dashboard, not here.
       - key: LocationIq__ApiKey
         sync: false
+
+  # ---------------------------------------------------------------
+  # Python agent service (FastAPI + LangGraph Coordinator)
+  # ---------------------------------------------------------------
+  - type: web
+    name: blood-donation-agent
+    env: docker
+    plan: free
+    region: oregon
+    rootDir: agent-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: BACKEND_BASE_URL
+        value: https://blood-donation-api-h3cp.onrender.com
+
+      # Must equal the API's own generated secret: every call between the
+      # two services carries it in X-Internal-Secret, in both directions.
+      - key: INTERNAL_AGENT_SECRET
+        fromService:
+          type: web
+          name: blood-donation-api
+          envVarKey: InternalAgentSecret
+
+      # Paused workflows (waiting for human approval) are checkpointed here.
+      # The free plan stops this service after ~15 idle minutes; without a
+      # database checkpoint every approval after that fails with "not found".
+      - key: CHECKPOINT_DATABASE_URL
+        fromDatabase:
+          name: blood-donation-db
+          property: connectionString
 
   # ---------------------------------------------------------------
   # React web app (static site)

@@ -75,7 +75,7 @@ export function AcceptInvitationPage() {
   };
 
   return (
-    <AuthCard title="Accept your staff invitation" subtitle="Create your Blood Donation Network account">
+    <AuthCard title="Accept your staff invitation" subtitle="Create your PulsePoint account">
       <form onSubmit={submit} noValidate style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
         <div className="text-body-sm" style={{ color: "var(--color-ink-muted)", background: "var(--color-surface-sunken)", borderRadius: "var(--radius-sm)", padding: "10px 12px" }}>
           Use the token shared by your administrator. Each invitation can only be redeemed once.

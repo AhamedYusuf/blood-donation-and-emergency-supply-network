@@ -80,9 +80,34 @@ class ResumeWorkflowRequest(BaseModel):
 # STOCK CHECK AGENT
 # =========================================================
 
+def require_internal_secret(
+    provided_secret: Optional[str] = Header(
+        default=None,
+        alias="X-Internal-Secret",
+    ),
+) -> None:
+    expected_secret = os.getenv("INTERNAL_AGENT_SECRET")
+
+    if not expected_secret:
+        raise HTTPException(
+            status_code=500,
+            detail="INTERNAL_AGENT_SECRET is not configured.",
+        )
+
+    if not provided_secret or not hmac.compare_digest(
+        provided_secret,
+        expected_secret,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Missing or invalid internal secret.",
+        )
+
+
 @app.post("/agents/stock-check")
 def agent_stock_check(
     request: StockCheckAgentRequest,
+    _: None = Depends(require_internal_secret),
 ):
     print("\n" + "=" * 70)
     print("[MAIN] STOCK CHECK REQUEST")
@@ -136,6 +161,7 @@ def agent_stock_check(
 @app.post("/agents/stock-risk")
 def agent_stock_risk(
     request: StockRiskAgentRequest,
+    _: None = Depends(require_internal_secret),
 ):
     print("\n" + "=" * 70)
     print("[MAIN] STOCK RISK REQUEST")
@@ -179,6 +205,7 @@ def agent_stock_risk(
 @app.post("/agents/emergency-recommendation")
 def agent_emergency_recommendation(
     request: EmergencyRecommendationAgentRequest,
+    _: None = Depends(require_internal_secret),
 ):
     print("\n" + "=" * 70)
     print("[MAIN] EMERGENCY RECOMMENDATION REQUEST")
@@ -248,28 +275,6 @@ def get_backend_config():
     return backend_base_url, headers
 
 
-def require_internal_secret(
-    provided_secret: Optional[str] = Header(
-        default=None,
-        alias="X-Internal-Secret",
-    ),
-) -> None:
-    expected_secret = os.getenv("INTERNAL_AGENT_SECRET")
-
-    if not expected_secret:
-        raise HTTPException(
-            status_code=500,
-            detail="INTERNAL_AGENT_SECRET is not configured.",
-        )
-
-    if not provided_secret or not hmac.compare_digest(
-        provided_secret,
-        expected_secret,
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Missing or invalid internal secret.",
-        )
 
 
 # =========================================================

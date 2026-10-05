@@ -750,11 +750,6 @@ export function OrganizationsPage() {
             </div>
           </div>
         </div>
-
-        <div className="organizations-hero__wave">
-          <div />
-          <div />
-        </div>
       </section>
 
       <section className="organizations-content">

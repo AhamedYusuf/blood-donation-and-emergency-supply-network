@@ -109,7 +109,7 @@ export function LoginPage() {
   return (
     <AuthCard
       title="Log in to your account"
-      subtitle="Blood Donation &amp; Emergency Supply Network"
+      subtitle="PulsePoint — Blood Donation &amp; Emergency Supply Network"
     >
       <form
         onSubmit={handleSubmit}
