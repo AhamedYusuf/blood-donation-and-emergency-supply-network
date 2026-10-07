@@ -153,6 +153,12 @@ services:
       # env var alone won't rebuild the already-baked-in JS.
       - key: VITE_API_BASE_URL
         value: https://blood-donation-api-h3cp.onrender.com/api
+
+      # The browser pings this service's /health while staff use the app.
+      # The agent sleeps when idle and a call from the API does not wake it,
+      # but a request from outside Render does (see wakeAgentService.ts).
+      - key: VITE_AGENT_BASE_URL
+        value: https://blood-donation-agent.onrender.com
     routes:
       # React Router client-side routes (e.g. /appointments) must all
       # serve index.html, or a page refresh on any non-root route 404s.

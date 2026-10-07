@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useEffect, type ComponentType, type ReactNode } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -14,6 +14,7 @@ import {
   type LucideProps,
 } from "lucide-react";
 import type { RootState } from "../app/store";
+import { wakeAgentService } from "../api/wakeAgentService";
 import { logout } from "../features/auth/authSlice";
 import { PulsePointMark } from "./PulsePointMark";
 import "./app-shell.css";
@@ -72,6 +73,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const navItems = role === "donor" ? DONOR_NAV_ITEMS : OPERATIONS_NAV_ITEMS;
+
+  // Staff and admins are the ones who start agent workflows, so keep the
+  // agent service awake while they move around the app.
+  useEffect(() => {
+    if (role === "staff" || role === "admin") {
+      wakeAgentService();
+    }
+  }, [role, location.pathname]);
 
   const resolveNavPath = (item: NavItem): string | null => {
     // Not built yet — no route exists to send them to.
