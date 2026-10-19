@@ -274,6 +274,5 @@ Main environment variables (names only):
 ## Known limitations
 
 - The free Render services sleep when idle. The first request after a quiet period is slow, and a request created while the agent service is asleep may not start its workflow; use **Start Workflow** on the request's details page to start it.
-- The agents use fixed rules only. A language model was planned for friendlier step summaries but was not built.
-- The Coordinator graph's routing is tested end to end by the golden cases but has no unit tests of its own.
+- The agents use fixed rules only.
 - Backend integration tests run on SQLite, so PostgreSQL-specific behaviour is only exercised by the evaluation scripts.
